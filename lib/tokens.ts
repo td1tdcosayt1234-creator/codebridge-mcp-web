@@ -1,4 +1,4 @@
-// Token economy: file joto boro, compile/fix e toto token.
+// Token economy: bigger files cost more tokens for compile/fix.
 // 1 token ~= 4 chars. Compile charge = prompt + files. Fix charge = output log + result size.
 export const TOKEN_PER_CHAR = 1 / 4;
 export const FREE_BALANCE = 10000;

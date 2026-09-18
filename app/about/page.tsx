@@ -2,24 +2,20 @@ import Link from "next/link";
 export default function About(){
   return (<div className="prose">
     <div className="page-hero"><h1>About <span className="grad">CodeBridge</span></h1>
-    <p>CodeBridge e user repo chhoy na. Tumi web e request diba → web GitHub Actions e chalano OpenCode ke task dibe → opencode code + compile korbe → output web e fire asbe → tumi result dekhba.</p></div>
+    <p>Send a compile request on the web → AI compiles it in the cloud and fixes errors itself → the output comes back here → you read the result. No setup, no infrastructure on your side.</p></div>
     <div className="grid g2">
-      <div className="card"><h3>🎯 Problem</h3><p>AI agent code likhe dey, kintu repo te tola, branch banano, Actions run kora, log dekha — sob hate korte hoy. Copy-paste + click + wait = slow loop.</p></div>
-      <div className="card"><h3>💡 Solution</h3><p>Agent nije MCP tool call kore: <code>push_code</code> te code GitHub e jabe, <code>trigger_build</code> e Actions compile korbe, <code>get_build_logs</code> e result fire asbe. Tumi sudhu agent ke bolba.</p></div>
+      <div className="card"><h3>🎯 The problem</h3><p>Code is written, but compiling it, reading errors, fixing and rebuilding — all manual. Copy-paste + waiting = a slow loop.</p></div>
+      <div className="card"><h3>💡 The solution</h3><p>Send a request (or let your agent call <code>run_task</code>): the cloud runner compiles — and in <code>fix-compile</code> mode the AI repairs failures itself and retries. Output lands back here.</p></div>
     </div>
-    <h3>🔄 Full auto pipeline</h3>
-    <div className="card"><pre style={{margin:0}}>web request (tumi) → task queue → workflow_dispatch → Actions: opencode run --auto → log/result POST web → dashboard + tumi</pre></div>
-    <h3>👥 Kara use korbe</h3>
+    <h3>🔄 Fully automatic pipeline</h3>
+    <div className="card"><pre style={{margin:0}}>web request (you) → task queue → cloud AI compile (+ auto fix) → log/result back to web → dashboard + you</pre></div>
+    <h3>👥 Who uses what</h3>
     <ul>
-      <li><b>User:</b> signup → <Link href="/dashboard/tasks">/dashboard/tasks</Link> e request dao → live status + output dekho. Repo/git/token — kisui lage na. MCP thakle agent ke diye <code>run_task</code> o korate paro.</li>
-      <li><b>Admin:</b> builder repo + workflow + runner token + global GitHub token set (<Link href="/admin/runner">/admin/runner</Link>), user/quota/task monitor — <Link href="/admin">admin dashboard</Link> theke.</li>
+      <li><b>User:</b> sign up → send requests in <Link href="/dashboard/tasks">/dashboard/tasks</Link> → watch live status + output. Earn extra coins by watching ads in <Link href="/dashboard/earn">/dashboard/earn</Link>.</li>
+      <li><b>Admin:</b> manages the cloud backend, users, coin balances, requests and support — from a protected admin area (invisible until admin login).</li>
     </ul>
-    <h3>🧱 Tech (short)</h3>
-    <ul>
-      <li>Next.js web + real MCP Streamable HTTP server (<code>/api/mcp</code>)</li>
-      <li>GitHub Classic Token vault (AES-256-GCM), Octokit API, workflow_dispatch</li>
-      <li>Auth: bcrypt + httpOnly JWT cookie, RBAC user/admin, audit tracking</li>
-    </ul>
-    <div className="cta"><h2>Try kore dekho</h2><p className="muted">Free plan e 100 MCP calls/month — card lage na.</p><div style={{display:"flex",gap:10,justifyContent:"center",marginTop:14}}><Link className="btn" href="/signup">Start free</Link><Link className="btn-ghost" href="/docs">Docs</Link></div></div>
+    <h3>🪙 Fair pricing by size</h3>
+    <p>1 coin ≈ 4 characters. Bigger files cost more — held on request, finally charged on output size. 10,000 coins free to start.</p>
+    <div className="cta"><h2>Try it out</h2><p className="muted">Free plan: 10,000 coins — no card required.</p><div style={{display:"flex",gap:10,justifyContent:"center",marginTop:14}}><Link className="btn" href="/signup">Start free</Link><Link className="btn-ghost" href="/docs">Docs</Link></div></div>
   </div>);
 }

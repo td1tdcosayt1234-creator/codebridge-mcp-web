@@ -3,21 +3,21 @@ import { readDb, writeDb, uid } from "@/lib/db";
 import { bearerToken, verifyRunner } from "@/lib/tasks";
 import { estimateResult } from "@/lib/tokens";
 
-// Actions runner: opencode er output web ke ferot dao.
+// Actions runner: send OpenCode output back to the web.
 export async function POST(req: Request) {
   const db = await readDb();
   if (!verifyRunner(db, bearerToken(req))) return NextResponse.json({ error: "bad runner token" }, { status: 403 });
   const { id, status, log, result, run_url } = await req.json().catch(() => ({}));
   const task = db.tasks.find((x) => x.id === String(id || ""));
-  if (!task) return NextResponse.json({ error: "task painai" }, { status: 404 });
+  if (!task) return NextResponse.json({ error: "Task not found." }, { status: 404 });
   const st = String(status || "");
-  if (!["running", "done", "failed"].includes(st)) return NextResponse.json({ error: "status running|done|failed hote hobe" }, { status: 400 });
+  if (!["running", "done", "failed"].includes(st)) return NextResponse.json({ error: "Status must be running|done|failed." }, { status: 400 });
   task.status = st as typeof task.status;
   if (log !== undefined) task.log = String(log).slice(0, 20000);
   if (result !== undefined) task.result = String(result).slice(0, 20000);
   if (run_url !== undefined) task.runUrl = String(run_url);
   task.updatedAt = new Date().toISOString();
-  // Final charge: output joto boro (fix soho) toto token — est er beshi hole extra kato
+  // Final charge: bigger output (incl. fixes) costs more — charge extra above the estimate
   if (st === "done" || st === "failed") {
     const actual = estimateResult(task.log, task.result);
     const extra = Math.max(0, actual - task.tokensCharged);

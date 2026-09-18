@@ -1,7 +1,11 @@
-"use client"; import { useEffect, useState } from "react";
+"use client";
 export default function McpPage(){
-  const [d,setD]=useState<any>(null);
-  useEffect(()=>{fetch("/api/overview").then(r=>r.json()).then(setD);},[]);
-  const key=d?.key||"";
-  return (<div><h2>MCP Key</h2><div className="card"><p className="muted small">Use as Bearer in opencode.json remote MCP.</p><pre>{key||"login required"}</pre><pre>{`{\n  "mcp": {\n    "codebridge": {\n      "type": "remote",\n      "url": "/api/mcp",\n      "headers": { "Authorization": "Bearer ${key||"PASTE_KEY"}" }\n    }\n  }\n}`}</pre></div></div>);
+  return (<div><h2>Connect your agent — no keys needed</h2><div className="card"><p className="muted small">Add the entry below to your agent config, stay logged in on this website, restart the agent app — done. No headers, no keys to paste.</p><pre>{`{
+  "mcp": {
+    "codebridge": {
+      "type": "remote",
+      "url": "/api/mcp"
+    }
+  }
+}`}</pre><p className="muted small">Replace the URL with your public domain after deploy.</p></div></div>);
 }

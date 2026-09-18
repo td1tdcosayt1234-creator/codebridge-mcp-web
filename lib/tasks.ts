@@ -1,8 +1,9 @@
 import { readDb, writeDb, uid, type DbShape } from "./db";
 import { decToken } from "./crypto";
+import { safeEqual } from "./security";
 import { estimateTask, MAX_FILES_BYTES, filesBytes } from "./tokens";
 
-// User repo chhobe na. Flow: web e request -> Actions e opencode run -> output web -> user.
+// Users never touch repos. Flow: web request -> Actions OpenCode run -> output to web -> user.
 export function runnerSettings(db: DbShape) {
   return {
     builderRepo: db.settings?.builderRepo || "",
@@ -19,7 +20,7 @@ export function verifyRunner(db: DbShape, token: string): boolean {
   const enc = db.settings?.runnerTokenEnc;
   if (!enc || !token) return false;
   try {
-    return decToken(enc) === token;
+    return safeEqual(decToken(enc), token);
   } catch {
     return false;
   }
@@ -31,31 +32,31 @@ export async function createTaskAndDispatch(
   prompt: string,
   opts?: { kind?: "compile" | "fix-compile"; files?: { path: string; content: string }[] }
 ): Promise<{ task: DbShape["tasks"][number] } | { error: string; status: number }> {
-  if (!title.trim() || !prompt.trim()) return { error: "title + prompt dui tai lagbe.", status: 400 };
+  if (!title.trim() || !prompt.trim()) return { error: "Title and prompt are both required.", status: 400 };
   const kind = opts?.kind === "fix-compile" ? "fix-compile" : "compile";
   const files = (opts?.files || []).filter((f) => f.path && f.content !== undefined).slice(0, 20).map((f) => ({ path: String(f.path).slice(0, 200), content: String(f.content).slice(0, 100000) }));
-  if (filesBytes(files) > MAX_FILES_BYTES) return { error: "Files onek boro (max 200KB). Choto kore vag kore pathao.", status: 400 };
+  if (filesBytes(files) > MAX_FILES_BYTES) return { error: "Files too large (max 200KB). Split into smaller requests.", status: 400 };
   const db = await readDb();
   const { builderRepo, builderWorkflow } = runnerSettings(db);
   if (!builderRepo.includes("/"))
-    return { error: "Admin ekhono builder repo set korenai. /admin/runner theke set korte bolo.", status: 400 };
+    return { error: "Admin has not set the builder repo yet. Ask them to set it in /admin/runner.", status: 400 };
   if (!db.globalGithub?.enc)
-    return { error: "Admin ekhono global GitHub token set korenai.", status: 400 };
-  // Token hold: file joto boro toto token lagbe
+    return { error: "Admin has not set the global GitHub token yet.", status: 400 };
+  // Token hold: bigger files cost more tokens
   const est = estimateTask(prompt, files);
   let us = db.usage.find((u) => u.userId === userId);
   if (!us) { us = { userId, mcpCalls: 0, githubCalls: 0, balance: 10000, usedTotal: 0 }; db.usage.push(us); }
   if (us.balance < est)
-    return { error: "Token kom ache (lagbe ~" + est + ", ache " + us.balance + "). Choto file/prompt dao ba balance barao.", status: 402 };
+    return { error: "Insufficient tokens (need ~" + est + ", have " + us.balance + "). Send smaller files or earn more.", status: 402 };
   us.balance -= est;
   us.usedTotal += est;
   const now = new Date().toISOString();
   const finalPrompt = kind === "fix-compile"
-    ? prompt.trim() + "\n\n[RULE] Build/compile fail hole error pore AI diye nije fix koro, max 3 bar retry koro. Sob attempt er output log e rakho."
+    ? prompt.trim() + "\n\n[RULE] If build/compile fails, read the error, fix it with AI yourself and retry up to 3 times. Keep every attempt in the log."
     : prompt.trim();
   const task: DbShape["tasks"][number] = {
     id: uid("task"), userId, title: title.trim(), prompt: finalPrompt, kind, files,
-    status: "queued", log: "Queued (" + kind + ", hold ~" + est + " tokens). GitHub Actions e opencode runner ke pathano hocche...", result: "", runUrl: "",
+    status: "queued", log: "Queued (" + kind + ", ~" + est + " tokens held). Dispatching the OpenCode runner on GitHub Actions...", result: "", runUrl: "",
     tokensEst: est, tokensCharged: est, createdAt: now, updatedAt: now,
   };
   db.tasks.push(task);
@@ -75,7 +76,7 @@ export async function createTaskAndDispatch(
     return { task };
   } catch (e) {
     task.status = "failed";
-    task.log = "Dispatch fail: " + (e as Error).message + ". Admin ke workflow file + repo secret check korte bolo.";
+    task.log = "Dispatch failed: " + (e as Error).message + ". Ask admin to check the workflow file + repo secrets.";
     task.updatedAt = new Date().toISOString();
     await writeDb(db);
     return { error: task.log, status: 502 };

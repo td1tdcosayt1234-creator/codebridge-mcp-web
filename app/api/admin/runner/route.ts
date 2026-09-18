@@ -12,7 +12,7 @@ async function admin() {
   return p;
 }
 
-// Builder repo + workflow + runner token manage koro. Runner token sudhu regenerate er somoy ekbar dekha jabe.
+// Manage builder repo + workflow + runner token. The runner token is shown only once at regenerate time.
 export async function GET() {
   const p = await admin();
   if (!p) return NextResponse.json({ error: "admin only" }, { status: 403 });
@@ -46,11 +46,11 @@ export async function POST(req: Request) {
     db.settings.updatedAt = new Date().toISOString();
     db.events.push({ id: uid("e"), userId: p.sub, action: "runner_token_regen", detail: "runner token regenerated", at: db.settings.updatedAt });
     await writeDb(db);
-    return NextResponse.json({ ok: true, token, note: "Ekbar e dekhabe — ekhoni builder repo secret RUNNER_TOKEN e bosao." });
+    return NextResponse.json({ ok: true, token, note: "Shown only once — put it into the builder repo secret RUNNER_TOKEN now." });
   }
   if (body.builderRepo !== undefined) {
     const r = String(body.builderRepo).trim();
-    if (r && !r.includes("/")) return NextResponse.json({ error: "builderRepo owner/repo format e hote hobe" }, { status: 400 });
+    if (r && !r.includes("/")) return NextResponse.json({ error: "builderRepo must be in owner/repo format." }, { status: 400 });
     db.settings.builderRepo = r;
   }
   if (body.builderWorkflow !== undefined) db.settings.builderWorkflow = String(body.builderWorkflow).trim() || "opencode-task.yml";

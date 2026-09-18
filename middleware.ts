@@ -28,7 +28,7 @@ export async function middleware(req: NextRequest) {
   if (path.startsWith("/admin")) {
     const role = await sessionRole(req);
     if (role !== "admin") {
-      // login na thakle / admin na hole 404
+      // 404 when not logged in or not admin
       const url = req.nextUrl.clone();
       url.pathname = "/not-found";
       return NextResponse.rewrite(url);

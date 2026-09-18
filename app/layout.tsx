@@ -1,8 +1,9 @@
 import "./globals.css";
 import Link from "next/link";
+import Footer from "../components/Footer";
 import type { ReactNode } from "react";
 
-export const metadata = { title: "CodeBridge — OpenCode to GitHub Build Pipeline", description: "MCP web bridge: OpenCode -> GitHub -> GitHub Actions -> Build" };
+export const metadata = { title: "CodeBridge — Request to Cloud Build", description: "Send a compile request on the web, OpenCode builds it in the cloud, output comes back to you." };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
@@ -24,14 +25,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           </div>
         </div>
         <div className="container" style={{minHeight:"60vh",paddingTop:24}}>{children}</div>
-        <div className="footer">
-          <div className="container" style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
-            <div>© {new Date().getFullYear()} CodeBridge • OpenCode → GitHub → Actions</div>
-            <div style={{display:"flex",gap:12}}>
-              <Link href="/terms">Terms</Link><Link href="/privacy">Privacy</Link><Link href="/docs">Docs</Link><Link href="/admin">Admin</Link><Link href="/dashboard">Dashboard</Link>
-            </div>
-          </div>
-        </div>
+        <Footer />
       </body>
     </html>
   );

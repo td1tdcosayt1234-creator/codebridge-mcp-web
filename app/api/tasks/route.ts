@@ -9,7 +9,7 @@ async function me() {
   return await verifyJwt(t);
 }
 
-// Web e request dao -> Actions e opencode -> output web -> tumi. Repo touch kora lage na.
+// Send a request on the web -> OpenCode in Actions -> output back to web -> you. No repo touching.
 export async function GET() {
   const p = await me();
   if (!p) return NextResponse.json({ error: "auth" }, { status: 401 });
@@ -21,7 +21,12 @@ export async function GET() {
 export async function POST(req: Request) {
   const p = await me();
   if (!p) return NextResponse.json({ error: "auth" }, { status: 401 });
-  const { title, prompt, kind, files } = await req.json().catch(() => ({}));
+  const { rateLimit } = await import("@/lib/security");
+  const rl = rateLimit("task:" + p.sub, 10, 60 * 1000);
+  if (!rl.ok) return NextResponse.json({ error: "Too many requests. Wait " + rl.retryAfterSec + "s." }, { status: 429 });
+  const { title, prompt, kind, files, website } = await req.json().catch(() => ({}));
+  const { honeypot } = await import("@/lib/antifraud");
+  if (honeypot({ website })) return NextResponse.json({ error: "Bot detected." }, { status: 400 });
   const out = await createTaskAndDispatch(p.sub, String(title || ""), String(prompt || ""), {
     kind: kind === "fix-compile" ? "fix-compile" : "compile",
     files: Array.isArray(files) ? files : [],

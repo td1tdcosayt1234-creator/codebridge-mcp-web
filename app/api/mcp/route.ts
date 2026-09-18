@@ -1,70 +1,23 @@
 import { NextResponse } from "next/server";
 import { readDb, writeDb, uid } from "@/lib/db";
-import { decToken } from "@/lib/crypto";
-import { effectiveGithubToken } from "@/lib/github-effective";
 
 export const dynamic = "force-dynamic";
 const PROTOCOL = "2025-06-18";
+const GUEST_ID = "mcp_guest";
+const GUEST_DAILY = 2000;
 
+// No headers needed: log in on the website and add this MCP —
+// identity resolves from optional key, else login cookie, else shared guest pool.
 const TOOLS = [
   {
-    name: "list_repos",
-    description: "List GitHub repos visible to the configured (admin global or user) token.",
-    inputSchema: { type: "object", properties: {}, additionalProperties: false },
-  },
-  {
-    name: "push_code",
-    description: "Push files to a GitHub repo branch (creates/updates files). Needs MCP key from /dashboard/mcp.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        repo: { type: "string", description: "owner/repo" },
-        branch: { type: "string", description: "branch, default main" },
-        message: { type: "string", description: "commit message" },
-        files: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: { path: { type: "string" }, content: { type: "string" } },
-            required: ["path", "content"],
-          },
-        },
-      },
-      required: ["repo", "files"],
-    },
-  },
-  {
-    name: "trigger_build",
-    description: "Dispatch GitHub Actions workflow_dispatch (default build.yml) for a repo branch.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        repo: { type: "string", description: "owner/repo" },
-        branch: { type: "string", description: "default main" },
-        workflow: { type: "string", description: "workflow file, default build.yml" },
-      },
-      required: ["repo"],
-    },
-  },
-  {
-    name: "get_build_status",
-    description: "Get status of a triggered build by run_id.",
-    inputSchema: { type: "object", properties: { run_id: { type: "string" } }, required: ["run_id"] },
-  },
-  {
-    name: "get_build_logs",
-    description: "Get logs of a triggered build by run_id.",
-    inputSchema: { type: "object", properties: { run_id: { type: "string" } }, required: ["run_id"] },
-  },
-  {
     name: "run_task",
-    description: "Send a compile/fix request to web: GitHub Actions e opencode run kore kaj korbe. File joto boro toto token katbe. Needs MCP key.",
+    description: "Compile anything: send title + prompt + optional files. OpenCode compiles in the cloud runner and fixes on failure (fix-compile). Bigger files cost more coins.",
     inputSchema: {
       type: "object",
       properties: {
         title: { type: "string", description: "short title" },
-        prompt: { type: "string", description: "exactly what opencode should do (code + compile)" },
-        kind: { type: "string", description: "compile or fix-compile (auto AI fix on fail). default compile" },
+        prompt: { type: "string", description: "exactly what should be compiled/fixed" },
+        kind: { type: "string", description: "compile or fix-compile. default compile" },
         files: {
           type: "array",
           description: "optional files to compile (max 200KB total)",
@@ -80,7 +33,7 @@ const TOOLS = [
   },
   {
     name: "get_task_result",
-    description: "Get output/result of a run_task by task_id.",
+    description: "Get output/result of a run_task by task_id (status + log + result + coins charged).",
     inputSchema: { type: "object", properties: { task_id: { type: "string" } }, required: ["task_id"] },
   },
 ];
@@ -88,10 +41,7 @@ const TOOLS = [
 type RpcMsg = { jsonrpc?: string; id?: string | number | null; method?: string; params?: Record<string, unknown> };
 
 function ok(id: string | number | null, result: unknown) {
-  return NextResponse.json(
-    { jsonrpc: "2.0", id, result },
-    { headers: { "MCP-Protocol-Version": PROTOCOL } }
-  );
+  return NextResponse.json({ jsonrpc: "2.0", id, result }, { headers: { "MCP-Protocol-Version": PROTOCOL } });
 }
 function err(id: string | number | null, code: number, message: string) {
   return NextResponse.json(
@@ -103,16 +53,45 @@ function text(t: string, isError = false) {
   return { content: [{ type: "text", text: t }], ...(isError ? { isError: true } : {}) };
 }
 
-async function userIdFrom(req: Request): Promise<string | null> {
-  const h = req.headers.get("authorization") || "";
-  const key = h.toLowerCase().startsWith("bearer ") ? h.slice(7).trim() : "";
-  if (!key) return null;
-  const db = await readDb();
-  return db.mcpKeys.find((k) => k.key === key)?.userId || null;
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
-async function track(userId: string | null, tool: string, detail: string) {
-  if (!userId) return;
+// Identity: optional personal key -> login session cookie -> shared guest pool.
+async function resolveUser(req: Request): Promise<{ userId: string; guest: boolean }> {
+  const db = await readDb();
+  const h = req.headers.get("authorization") || "";
+  const key = h.toLowerCase().startsWith("bearer ") ? h.slice(7).trim() : "";
+  if (key) {
+    const hit = db.mcpKeys.find((k) => k.key === key);
+    if (hit) return { userId: hit.userId, guest: false };
+  }
+  const cookies = req.headers.get("cookie") || "";
+  const m = cookies.split(";").map((s) => s.trim()).find((s) => s.startsWith("session="));
+  if (m) {
+    try {
+      const { verifyJwt } = await import("@/lib/auth");
+      const p = await verifyJwt(decodeURIComponent(m.slice(8)));
+      if (p?.sub && db.users.some((u) => u.id === p.sub)) return { userId: p.sub as string, guest: false };
+    } catch { /* fall through to guest */ }
+  }
+  // Shared guest pool (refilled daily) so headerless MCP just works after login.
+  db.settings = db.settings || { builderRepo: "", builderWorkflow: "opencode-task.yml", runnerTokenEnc: "", updatedBy: "", updatedAt: "" };
+  let g = db.usage.find((u) => u.userId === GUEST_ID);
+  if (!g) {
+    g = { userId: GUEST_ID, mcpCalls: 0, githubCalls: 0, balance: GUEST_DAILY, usedTotal: 0 };
+    db.usage.push(g);
+  }
+  const s = db.settings as typeof db.settings & { lastGuestRefill?: string };
+  if (s.lastGuestRefill !== todayKey()) {
+    s.lastGuestRefill = todayKey();
+    g.balance = GUEST_DAILY;
+  }
+  await writeDb(db);
+  return { userId: GUEST_ID, guest: true };
+}
+
+async function track(userId: string, tool: string, detail: string) {
   try {
     const db = await readDb();
     const us = db.usage.find((u) => u.userId === userId);
@@ -123,95 +102,29 @@ async function track(userId: string | null, tool: string, detail: string) {
 }
 
 async function callTool(req: Request, name: string, args: Record<string, unknown>) {
-  const userId = await userIdFrom(req);
-  const db = await readDb();
-  if (name === "run_task" || name === "get_task_result") {
-    if (!userId) return text("Auth lagbe: /dashboard/mcp theke MCP key niye Authorization: Bearer KEY header e pathao.", true);
-    if (name === "run_task") {
-      const { createTaskAndDispatch } = await import("@/lib/tasks");
-      const files = Array.isArray(args.files) ? (args.files as { path: string; content: string }[]) : [];
-      const out = await createTaskAndDispatch(userId, String(args.title || ""), String(args.prompt || ""), {
-        kind: args.kind === "fix-compile" ? "fix-compile" : "compile", files,
-      });
-      if ("error" in out) return text(out.error, true);
-      await track(userId, name, out.task.id);
-      return text("Request geche ✅ task_id=" + out.task.id + " (" + out.task.kind + ", charge ~" + out.task.tokensEst + " tokens). Actions e opencode kaj kore output dibe — get_task_result diye dekho.");
-    }
+  const { userId, guest } = await resolveUser(req);
+  if (name === "run_task") {
+    const { createTaskAndDispatch } = await import("@/lib/tasks");
+    const files = Array.isArray(args.files) ? (args.files as { path: string; content: string }[]) : [];
+    const out = await createTaskAndDispatch(userId, String(args.title || ""), String(args.prompt || ""), {
+      kind: args.kind === "fix-compile" ? "fix-compile" : "compile", files,
+    });
+    if ("error" in out) return text(out.error, true);
+    await track(userId, name, out.task.id);
+    return text(
+      "Request sent. task_id=" + out.task.id + " (" + out.task.kind + ", ~" + out.task.tokensEst + " coins held)" +
+      (guest ? " [shared guest pool]" : "") +
+      ". OpenCode compiles in the cloud runner and delivers output — check with get_task_result."
+    );
+  }
+  if (name === "get_task_result") {
+    const db = await readDb();
     const t = db.tasks.find((x) => x.id === String(args.task_id || ""));
-    if (!t || t.userId !== userId) return text("task painai: " + String(args.task_id || ""), true);
+    if (!t || (t.userId !== userId && t.userId !== GUEST_ID)) return text("Task not found: " + String(args.task_id || ""), true);
     await track(userId, name, t.id);
-    return text("[" + t.status + "] " + t.title + " (" + t.kind + ", charged " + t.tokensCharged + " tokens)\n--- log ---\n" + (t.log || "—") + "\n--- result ---\n" + (t.result || "— ekhono asenai"));
+    return text("[" + t.status + "] " + t.title + " (" + t.kind + ", charged " + t.tokensCharged + " coins)\n--- log ---\n" + (t.log || "-") + "\n--- result ---\n" + (t.result || "- not yet"));
   }
-  const writes = name === "push_code" || name === "trigger_build";
-  if (writes && !userId) {
-    return text("Auth lagbe: /dashboard/mcp theke MCP key niye Authorization: Bearer KEY header e pathao.", true);
-  }
-  const eff = userId ? effectiveGithubToken(db, userId) : { token: db.globalGithub?.enc ? decToken(db.globalGithub.enc) : "", source: db.globalGithub?.enc ? ("global" as const) : null };
-  if ((name === "list_repos" || writes) && !eff.token) {
-    return text("GitHub token set nai. Admin ke /admin/github theke global Classic Token set korte bolo.", true);
-  }
-  try {
-    const { Octokit } = await import("octokit");
-    if (name === "list_repos") {
-      const oct = new Octokit({ auth: eff.token });
-      const r = await oct.request("GET /user/repos", { per_page: 30, affiliation: "owner" });
-      const names = (r.data as { full_name: string }[]).map((x) => x.full_name);
-      await track(userId, name, names.length + " repos");
-      return text(names.length ? names.join("\n") : "Kono repo painai.");
-    }
-    if (name === "push_code") {
-      const repo = String(args.repo || "");
-      const branch = String(args.branch || "main");
-      const files = (args.files as { path: string; content: string }[]) || [];
-      const message = String(args.message || "CodeBridge MCP push");
-      if (!repo.includes("/") || files.length === 0) return text("repo (owner/repo) + files[{path,content}] lagbe.", true);
-      const [owner, repoName] = repo.split("/");
-      const oct = new Octokit({ auth: eff.token });
-      const done: string[] = [];
-      for (const f of files) {
-        let sha: string | undefined;
-        try {
-          const cur = await oct.request("GET /repos/{owner}/{repo}/contents/{path}", { owner, repo: repoName, path: f.path, ref: branch });
-          const d = cur.data as { sha?: string };
-          if (!Array.isArray(d) && d.sha) sha = d.sha;
-        } catch { /* new file */ }
-        const put = await oct.request("PUT /repos/{owner}/{repo}/contents/{path}", {
-          owner, repo: repoName, path: f.path, message, branch,
-          content: Buffer.from(f.content, "utf8").toString("base64"), ...(sha ? { sha } : {}),
-        });
-        const pd = put.data as { commit?: { sha?: string } };
-        done.push(f.path + "@" + (pd.commit?.sha || "?").slice(0, 7));
-      }
-      await track(userId, name, repo + "#" + branch + " " + done.length + " files");
-      return text("Pushed to " + repo + "#" + branch + " (" + eff.source + " token):\n" + done.join("\n"));
-    }
-    if (name === "trigger_build") {
-      const repo = String(args.repo || "");
-      const branch = String(args.branch || "main");
-      const workflow = String(args.workflow || "build.yml");
-      if (!repo.includes("/")) return text("repo (owner/repo) lagbe.", true);
-      const [owner, repoName] = repo.split("/");
-      const oct = new Octokit({ auth: eff.token });
-      await oct.request("POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches", {
-        owner, repo: repoName, workflow_id: workflow, ref: branch,
-      });
-      const b = { id: uid("run"), userId: userId || "mcp_anon", repo, branch, status: "queued", log: "Triggered via MCP (" + eff.source + " token). Workflow: " + workflow + "#" + branch + ".", at: new Date().toISOString() };
-      db.builds.push(b);
-      await writeDb(db);
-      await track(userId, name, repo + "#" + branch);
-      return text("Build dispatched: " + workflow + " on " + repo + "#" + branch + ". run_id=" + b.id + " (get_build_status diye dekho)");
-    }
-    if (name === "get_build_status" || name === "get_build_logs") {
-      const runId = String(args.run_id || "");
-      const b = db.builds.find((x) => x.id === runId);
-      if (!b) return text("run_id painai: " + runId, true);
-      await track(userId, name, runId);
-      return text(name === "get_build_status" ? b.repo + "#" + b.branch + " status=" + b.status + " at=" + b.at : b.log);
-    }
-    return text("Unknown tool: " + name, true);
-  } catch (e) {
-    return text("GitHub error: " + (e as Error).message, true);
-  }
+  return text("Unknown tool: " + name, true);
 }
 
 async function handleOne(req: Request, m: RpcMsg): Promise<{ resp: object | null }> {
@@ -219,7 +132,7 @@ async function handleOne(req: Request, m: RpcMsg): Promise<{ resp: object | null
     return { resp: { jsonrpc: "2.0", id: (m && m.id) ?? null, error: { code: -32600, message: "Invalid Request" } } };
   }
   const isNotif = m.id === undefined || m.id === null;
-  if (isNotif) return { resp: null }; // notifications/initialized -> 202 empty
+  if (isNotif) return { resp: null };
   const id = m.id as string | number;
   if (m.method === "initialize") {
     return {
@@ -228,7 +141,7 @@ async function handleOne(req: Request, m: RpcMsg): Promise<{ resp: object | null
         result: {
           protocolVersion: PROTOCOL,
           capabilities: { tools: {} },
-          serverInfo: { name: "codebridge", version: "1.0.0" },
+          serverInfo: { name: "codebridge", version: "2.0.0" },
         },
       },
     };
@@ -245,6 +158,9 @@ async function handleOne(req: Request, m: RpcMsg): Promise<{ resp: object | null
 }
 
 export async function POST(req: Request) {
+  const { rateLimit, clientIp } = await import("@/lib/security");
+  const rl = rateLimit("mcp:" + clientIp(req), 120, 60 * 1000);
+  if (!rl.ok) return err(null, -32000, "Rate limited. Retry in " + rl.retryAfterSec + "s.");
   let body: unknown;
   try {
     body = await req.json();
@@ -265,9 +181,9 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   const accept = req.headers.get("accept") || "";
   if (accept.includes("text/event-stream")) {
-    return new Response("SSE stream supported na — POST Streamable HTTP use koro.", { status: 405 });
+    return new Response("SSE streams not supported — use POST Streamable HTTP.", { status: 405 });
   }
   return NextResponse.json({
-    mcp: { name: "codebridge", protocol: PROTOCOL, url: "/api/mcp", tools: TOOLS.map((t) => t.name) },
+    mcp: { name: "codebridge", protocol: PROTOCOL, url: "/api/mcp", auth: "none — just log in on the website", tools: TOOLS.map((t) => t.name) },
   });
 }
