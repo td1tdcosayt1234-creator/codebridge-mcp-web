@@ -5,7 +5,7 @@ export default function About(){
     <p>Send a compile request on the web → AI compiles it in the cloud and fixes errors itself → the output comes back here → you read the result. No setup, no infrastructure on your side.</p></div>
     <div className="grid g2">
       <div className="card"><h3>🎯 The problem</h3><p>Code is written, but compiling it, reading errors, fixing and rebuilding — all manual. Copy-paste + waiting = a slow loop.</p></div>
-      <div className="card"><h3>💡 The solution</h3><p>Send a request (or let your agent call <code>run_task</code>): the cloud runner compiles — and in <code>fix-compile</code> mode the AI repairs failures itself and retries. Output lands back here.</p></div>
+      <div className="card"><h3>💡 The solution</h3><p>Send a request (or let your agent call <code>compile</code>): the cloud runner compiles — and <code>compile_fix</code> repairs failures with AI itself and retries. Output lands back here.</p></div>
     </div>
     <h3>🔄 Fully automatic pipeline</h3>
     <div className="card"><pre style={{margin:0}}>web request (you) → task queue → cloud AI compile (+ auto fix) → log/result back to web → dashboard + you</pre></div>

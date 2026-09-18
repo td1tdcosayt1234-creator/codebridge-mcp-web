@@ -23,7 +23,7 @@ export default function Home(){
       <h2>How it works <span className="grad">(100% automatic)</span></h2>
       <p className="sub">Connect once, then the same flow runs every time — no setup, no clicks.</p>
       <div className="grid g3">
-        <div className="card"><div className="step"><div className="stepnum">1</div><div><h3 style={{margin:"2px 0 6px"}}>Send a request (you)</h3><p className="muted small"><Link href="/dashboard/tasks">/dashboard/tasks</Link>: title + instructions + files — nothing else needed. With an agent, it can call <code>run_task</code> for you.</p></div></div></div>
+        <div className="card"><div className="step"><div className="stepnum">1</div><div><h3 style={{margin:"2px 0 6px"}}>Send a request (you)</h3><p className="muted small"><Link href="/dashboard/tasks">/dashboard/tasks</Link>: title + instructions + files — nothing else needed. With an agent, it can call <code>compile</code> for you.</p></div></div></div>
         <div className="card"><div className="step"><div className="stepnum">2</div><div><h3 style={{margin:"2px 0 6px"}}>AI compiles in the cloud</h3><p className="muted small">The cloud runner starts, compiles any file type, and in fix mode repairs failures itself and retries.</p></div></div></div>
         <div className="card"><div className="step"><div className="stepnum">3</div><div><h3 style={{margin:"2px 0 6px"}}>Output back to you</h3><p className="muted small">Logs + results return to the web. Watch live status on the dashboard, pay coins by size, done.</p></div></div></div>
       </div>
@@ -33,7 +33,7 @@ export default function Home(){
       <h2>Everything <span className="grad">in one place</span></h2>
       <p className="sub">From request to compiled result — CodeBridge handles the whole middle.</p>
       <div className="grid g3">
-        <div className="card"><div className="feat">🔌</div><h3>Agent connect</h3><p className="muted small">A real MCP server. Your coding agent connects in one step — no keys or headers needed, just log in on the website. 2 tools: send request, read result.</p></div>
+        <div className="card"><div className="feat">🔌</div><h3>Agent connect</h3><p className="muted small">A real MCP server. Your coding agent connects in one step — no keys or headers needed, just log in on the website. 2 tools: <code>compile</code> + <code>compile_fix</code>.</p></div>
         <div className="card"><div className="feat">📨</div><h3>Request, nothing else</h3><p className="muted small">You only send title + instructions + files. No setup, no tokens, no infrastructure on your side.</p></div>
         <div className="card"><div className="feat">⚙️</div><h3>Auto compile (all types)</h3><p className="muted small">The cloud runner compiles Python, Node, Go and more. In fix mode the AI repairs failures itself and retries up to 3 times.</p></div>
         <div className="card"><div className="feat">🪙</div><h3>Coin economy</h3><p className="muted small">Bigger files cost more coins (1 ≈ 4 chars). Held on request, finally charged on output size. Live balance on the dashboard — or earn free coins by watching ads.</p></div>
@@ -55,7 +55,7 @@ export default function Home(){
       <p className="sub">Copy-paste works — the AI + cloud do the rest automatically.</p>
       <div className="grid g2">
         <div className="card"><h3>Web request example</h3><pre>Title: compile landing page{"\n"}Instructions: compile the attached app, fix errors if any</pre></div>
-        <div className="card"><h3>Agent example</h3><pre>use codebridge run_task to send the request, then get_task_result to show the output</pre></div>
+        <div className="card"><h3>Agent example</h3><pre>use codebridge compile to compile my files (or compile_fix to auto-fix too)</pre></div>
       </div>
     </div>
 

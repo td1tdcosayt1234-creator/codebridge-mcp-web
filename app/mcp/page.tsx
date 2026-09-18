@@ -13,18 +13,17 @@ export default function Mcp(){
     }
   }
 }`}</pre><p className="muted small"><b>Restart the agent app afterwards</b> — otherwise no tools appear. Keep yourself logged in on the website.</p></div>
-      <div className="card"><h3>2️⃣ Tell the agent</h3><pre>{`send the request with codebridge run_task
-(title, instructions, kind=fix-compile)
-then show the output with get_task_result`}</pre><p className="muted small">Requests spend coins from the shared pool after your login — bigger files cost more.</p></div>
+      <div className="card"><h3>2️⃣ Tell the agent</h3><pre>{`compile my attached files with codebridge compile
+(or compile_fix to repair errors automatically)`}</pre><p className="muted small">Each call waits up to ~45s and returns the live result. Bigger files cost more coins.</p></div>
     </div>
     <h3>🧰 2 tools</h3>
     <div className="card"><table className="tools"><thead><tr><th>Tool</th><th>Input</th><th>Output</th></tr></thead><tbody>
-      <tr><td><code>run_task</code></td><td className="small">title, prompt, kind?, files?</td><td className="small">task_id — AI compiles in the cloud</td></tr>
-      <tr><td><code>get_task_result</code></td><td className="small">task_id</td><td className="small">status + log + result</td></tr>
+      <tr><td><code>compile</code></td><td className="small">title, prompt, files?</td><td className="small">live compile result (all types)</td></tr>
+      <tr><td><code>compile_fix</code></td><td className="small">title, prompt, files?</td><td className="small">result with AI self-fix + retries</td></tr>
     </tbody></table></div>
     <h3>✅ Verify it works</h3>
     <ul>
-      <li>After restart, tell the agent: <i>“send a test request with codebridge run_task”</i> — a task_id means connected.</li>
+      <li>After restart, tell the agent: <i>“compile hello with codebridge compile”</i> — a live result means connected.</li>
       <li>If not: is the web server running? URL correct? Logged in on the website? See <Link href="/docs">docs troubleshooting</Link>.</li>
     </ul>
   </div>);

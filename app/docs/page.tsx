@@ -41,8 +41,8 @@ Mode: fix-compile + file attached`}</pre>
 
     <h3>🔧 Agent tools reference</h3>
     <div className="card"><table className="tools"><thead><tr><th>Tool</th><th>What</th><th>Login?</th></tr></thead><tbody>
-      <tr><td><code>run_task</code></td><td>title, instructions, kind (compile/fix-compile), files[] → request + coin hold</td><td>Yes (website)</td></tr>
-      <tr><td><code>get_task_result</code></td><td>task_id → status + log + result + coins charged</td><td>Yes (website)</td></tr>
+      <tr><td><code>compile</code></td><td>title, instructions, files[] → compiles all types, waits ~45s for live result</td><td>Yes (website login)</td></tr>
+      <tr><td><code>compile_fix</code></td><td>like compile + AI self-fix with retries (fix size costs extra)</td><td>Yes (website login)</td></tr>
     </tbody></table></div>
 
     <h3>🔐 Security model</h3>

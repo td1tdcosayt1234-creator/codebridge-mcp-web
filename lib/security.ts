@@ -27,6 +27,27 @@ export function safeEqual(a: string, b: string): boolean {
   return crypto.timingSafeEqual(ha, hb);
 }
 
+// ---- CSRF: state-changing browser requests must come from our own origin.
+// Non-browser clients (MCP, runner, curl) send no Origin and are allowed;
+// a cross-site browser request carries a foreign Origin and is rejected.
+export function sameOrigin(req: Request): boolean {
+  const origin = req.headers.get("origin") || "";
+  const referer = req.headers.get("referer") || "";
+  const claimed = origin || referer;
+  if (!claimed) return true;
+  try {
+    const o = new URL(claimed);
+    const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").split(":")[0].toLowerCase();
+    return o.hostname.toLowerCase() === host;
+  } catch {
+    return false;
+  }
+}
+
+export function csrfBlock(): Response {
+  return Response.json({ error: "Cross-site request rejected." }, { status: 403 });
+}
+
 // ---- Password policy ----
 export function passwordError(pw: string): string | null {
   if (!pw || pw.length < 8) return "Password must be at least 8 characters.";

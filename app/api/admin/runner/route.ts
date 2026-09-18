@@ -36,6 +36,8 @@ export async function GET() {
 export async function POST(req: Request) {
   const p = await admin();
   if (!p) return NextResponse.json({ error: "admin only" }, { status: 403 });
+  const { sameOrigin, csrfBlock } = await import("@/lib/security");
+  if (!sameOrigin(req)) return csrfBlock();
   const body = await req.json().catch(() => ({}));
   const db = await readDb();
   db.settings = db.settings || { builderRepo: "", builderWorkflow: "opencode-task.yml", runnerTokenEnc: "", updatedBy: "", updatedAt: "" };

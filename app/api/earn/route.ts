@@ -36,6 +36,8 @@ export async function GET() {
 export async function POST(req: Request) {
   const p = await me();
   if (!p) return NextResponse.json({ error: "auth" }, { status: 401 });
+  const { sameOrigin, csrfBlock } = await import("@/lib/security");
+  if (!sameOrigin(req)) return csrfBlock();
   const rl = rateLimit("earn:" + p.sub, 30, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Too many tries. Wait a bit." }, { status: 429 });
   const { action, nonce } = await req.json().catch(() => ({}));

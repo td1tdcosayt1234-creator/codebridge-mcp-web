@@ -10,14 +10,13 @@ const GUEST_DAILY = 2000;
 // identity resolves from optional key, else login cookie, else shared guest pool.
 const TOOLS = [
   {
-    name: "run_task",
-    description: "Compile anything: send title + prompt + optional files. OpenCode compiles in the cloud runner and fixes on failure (fix-compile). Bigger files cost more coins.",
+    name: "compile",
+    description: "Compile anything (all types): send title + instructions + optional files. AI compiles in the cloud and this call waits up to ~45s for the live result. Bigger files cost more coins.",
     inputSchema: {
       type: "object",
       properties: {
         title: { type: "string", description: "short title" },
-        prompt: { type: "string", description: "exactly what should be compiled/fixed" },
-        kind: { type: "string", description: "compile or fix-compile. default compile" },
+        prompt: { type: "string", description: "exactly what should be compiled" },
         files: {
           type: "array",
           description: "optional files to compile (max 200KB total)",
@@ -32,9 +31,25 @@ const TOOLS = [
     },
   },
   {
-    name: "get_task_result",
-    description: "Get output/result of a run_task by task_id (status + log + result + coins charged).",
-    inputSchema: { type: "object", properties: { task_id: { type: "string" } }, required: ["task_id"] },
+    name: "compile_fix",
+    description: "Compile with AI fix: like compile, but on failure the AI repairs the code itself and retries (max 3). Fix size costs extra coins. Waits up to ~45s for the live result.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "short title" },
+        prompt: { type: "string", description: "exactly what should be compiled/fixed" },
+        files: {
+          type: "array",
+          description: "optional files to compile (max 200KB total)",
+          items: {
+            type: "object",
+            properties: { path: { type: "string" }, content: { type: "string" } },
+            required: ["path", "content"],
+          },
+        },
+      },
+      required: ["title", "prompt"],
+    },
   },
 ];
 
@@ -103,28 +118,24 @@ async function track(userId: string, tool: string, detail: string) {
 
 async function callTool(req: Request, name: string, args: Record<string, unknown>) {
   const { userId, guest } = await resolveUser(req);
-  if (name === "run_task") {
-    const { createTaskAndDispatch } = await import("@/lib/tasks");
-    const files = Array.isArray(args.files) ? (args.files as { path: string; content: string }[]) : [];
-    const out = await createTaskAndDispatch(userId, String(args.title || ""), String(args.prompt || ""), {
-      kind: args.kind === "fix-compile" ? "fix-compile" : "compile", files,
-    });
-    if ("error" in out) return text(out.error, true);
-    await track(userId, name, out.task.id);
-    return text(
-      "Request sent. task_id=" + out.task.id + " (" + out.task.kind + ", ~" + out.task.tokensEst + " coins held)" +
-      (guest ? " [shared guest pool]" : "") +
-      ". OpenCode compiles in the cloud runner and delivers output — check with get_task_result."
-    );
+  if (name !== "compile" && name !== "compile_fix") return text("Unknown tool: " + name, true);
+  const { createTaskAndDispatch, waitForResult } = await import("@/lib/tasks");
+  const files = Array.isArray(args.files) ? (args.files as { path: string; content: string }[]) : [];
+  const out = await createTaskAndDispatch(userId, String(args.title || ""), String(args.prompt || ""), {
+    kind: name === "compile_fix" ? "fix-compile" : "compile", files,
+  });
+  if ("error" in out) return text(out.error, true);
+  await track(userId, name, out.task.id);
+  const id = out.task.id;
+  const head = "task_id=" + id + " (" + out.task.kind + ", ~" + out.task.tokensEst + " coins held)" + (guest ? " [shared guest pool]" : "") + "\n";
+  const t = await waitForResult(id, 45000);
+  if (!t) return text(head + "Task vanished unexpectedly.", true);
+  const tail = (s: string) => (s || "-").slice(-6000);
+  if (t.status === "done" || t.status === "failed") {
+    await track(userId, name + "_result", id);
+    return text(head + "[" + t.status.toUpperCase() + "] " + t.title + " (charged " + t.tokensCharged + " coins)\n--- log ---\n" + tail(t.log) + "\n--- result ---\n" + tail(t.result));
   }
-  if (name === "get_task_result") {
-    const db = await readDb();
-    const t = db.tasks.find((x) => x.id === String(args.task_id || ""));
-    if (!t || (t.userId !== userId && t.userId !== GUEST_ID)) return text("Task not found: " + String(args.task_id || ""), true);
-    await track(userId, name, t.id);
-    return text("[" + t.status + "] " + t.title + " (" + t.kind + ", charged " + t.tokensCharged + " coins)\n--- log ---\n" + (t.log || "-") + "\n--- result ---\n" + (t.result || "- not yet"));
-  }
-  return text("Unknown tool: " + name, true);
+  return text(head + "Still " + t.status + " after 45s — the cloud runner is still working. Check the dashboard Tasks page (id " + id + ") for the live output.");
 }
 
 async function handleOne(req: Request, m: RpcMsg): Promise<{ resp: object | null }> {

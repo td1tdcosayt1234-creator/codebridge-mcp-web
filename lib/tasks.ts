@@ -16,6 +16,22 @@ export function bearerToken(req: Request): string {
   return h.toLowerCase().startsWith("bearer ") ? h.slice(7).trim() : "";
 }
 
+// Wait for a task to finish (for MCP: submit + return live result). Resolves
+// with the latest task state after done/failed or timeout.
+export async function waitForResult(taskId: string, timeoutMs = 45000): Promise<DbShape["tasks"][number] | null> {
+  const start = Date.now();
+  let last: DbShape["tasks"][number] | null = null;
+  while (Date.now() - start < timeoutMs) {
+    const db = await readDb();
+    const t = db.tasks.find((x) => x.id === taskId) || null;
+    if (!t) return null;
+    last = t;
+    if (t.status === "done" || t.status === "failed") return t;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  return last;
+}
+
 export function verifyRunner(db: DbShape, token: string): boolean {
   const enc = db.settings?.runnerTokenEnc;
   if (!enc || !token) return false;

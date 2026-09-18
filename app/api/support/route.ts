@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { readDb, writeDb, uid } from "@/lib/db";
 import { cookies } from "next/headers";
 import { verifyJwt } from "@/lib/auth";
-import { rateLimit, clientIp, clampText } from "@/lib/security";
+import { rateLimit, clientIp, clampText, sameOrigin, csrfBlock } from "@/lib/security";
 import { honeypot } from "@/lib/antifraud";
 
 export async function POST(req: Request) {
+  if (!sameOrigin(req)) return csrfBlock();
   const rl = rateLimit("support:" + clientIp(req), 5, 60 * 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Too many tickets. Please wait before sending another." }, { status: 429 });
   const raw = await req.json().catch(() => ({}));
