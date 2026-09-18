@@ -1,0 +1,10 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "codebridge": {
+      "type": "remote",
+      "url": "http://localhost:3000/api/mcp",
+      "enabled": true
+    }
+  }
+}

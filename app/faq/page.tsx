@@ -1,2 +1,20 @@
-const faqs=[["Is Free really free?","Yes. 100 MCP calls/month, 1 repo, 5 builds. No card."],["Which token?","GitHub Personal access token (classic) with repo + workflow scopes."],["Where does build run?","GitHub Actions cloud. Self-hosted PC runner guide in Pro."],["How does OpenCode connect?","Via Remote MCP. See /mcp page for opencode.json snippet."],["Is my token safe?","AES-256-GCM encrypted at rest, masked in UI, httpOnly auth, audit logs."]];
-export default function Faq(){ return (<div style={{padding:"30px 0"}}><h1>FAQ</h1>{faqs.map(([q,a])=>(<div key={q} className="card" style={{marginBottom:10}}><b>{q}</b><p className="muted small">{a}</p></div>))}</div>); }
+const faqs=[
+["Free ki sotti free? Card lagbe?","Ha, 100 MCP calls/month, dashboard + tracking soho. Card lage na. Beshi lagle Pro."],
+["Amar ki GitHub repo use korte hobe?","Na — hate na. Tumi sudhu agent ke bolba; web auto repo te push korbe, Actions auto build korbe, result fire asbe."],
+["Build kothay run hoy?","GitHub Actions cloud runner e (ubuntu). Target repo te build.yml thaklei compile auto."],
+["OpenCode connect kivabe?","opencode.json e remote MCP add + restart. Guide /mcp te, key /dashboard/mcp te."],
+["GitHub token ke dibe?","Admin. /admin/github te global Classic Token (repo + workflow scope) set kore — user der token add kora lage na."],
+["Amar token/key ki safe?","Token AES-256-GCM encrypted, UI te kokhono full dekha jay na. Password bcrypt hash, login httpOnly JWT cookie, sob action audit log e thake."],
+["push_code/trigger e 'Auth lagbe' bole keno?","Writes er jonno MCP key must. /dashboard/mcp theke key niye opencode.json er headers.Authorization Bearer e bosao."],
+["'GitHub token set nai' error mane?","Admin ekhono global token set korenai. Admin ke /admin/github set korte bolo."],
+["MCP add korar por tool asche na keno?","Config change er por OpenCode restart must (running session purono config use kore). Server URL + web server cholche kina check koro."],
+["Quota sesh hole ki hobe?","Tool call block + dashboard e usage 100% dekhabe. Pro te upgrade ba next month reset."],
+["Support pabo kothay?","/support e ticket kholo — admin dashboard theke reply hobe. Age /docs dekhe nile fast solve hoy."],
+["Ami ki repo use korbo? Request kothay dibo?","Na, repo chhoba na. /dashboard/tasks e title + prompt likhe request dao — web Actions e chalano opencode ke dibe, output ekhanei fire asbe."],
+["Actions er opencode ke admin kivabe bosabe?","/admin/runner: builder repo + workflow set, runner token secret e, opencode-task.yml file repo te. Template oi page ei ache."],
+["Runner web ke khuuje pay na keno?","GitHub cloud runner localhost e pouchate pare na — web er public URL (WEB_URL secret) lagbe, nahole PC te self-hosted runner chalao."],
+["Eta ki sudhu compile kore? Sob type?","Ha — sudhu compile, sob type (python, node, go...). Opencode target repo tei build command chalay."],
+["Token kivabe kate?","File joto boro toto token: 1 token ≈ 4 chars. Request e prompt+files onujayi hold, seshe log+result size onujayi final charge. Balance /dashboard/tokens e dekho."],
+["Fix-with-compile ki?","Fail hole opencode AI diye nije fix kore max 3 bar retry kore — fix er output joto boro toto extra token. Mode: /dashboard/tasks theke fix-compile nao."],
+];
+export default function Faq(){ return (<div className="prose"><div className="page-hero"><h1>FAQ — <span className="grad">sob answer</span></h1><p>Na bujhle /docs poro ba /support e ticket kholo.</p></div>{faqs.map(([q,a])=>(<div key={q} className="card" style={{marginBottom:10}}><b>{q}</b><p className="muted small" style={{marginBottom:0}}>{a}</p></div>))}</div>); }
