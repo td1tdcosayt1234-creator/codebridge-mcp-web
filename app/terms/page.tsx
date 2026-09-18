@@ -1,0 +1,1 @@
+export default function Terms(){ return (<div style={{padding:"30px 0"}}><h1>Terms</h1><p className="muted small">Free plan fair use: 100 MCP calls/month. You own your code. You are responsible for your GitHub token scopes. Abuse (spam builds, token scraping) leads to suspension. Builds run on your GitHub account, GitHub limits apply.</p></div>); }

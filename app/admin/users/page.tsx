@@ -1,0 +1,3 @@
+"use client"; import { useEffect, useState } from "react";
+function useAdmin(){ const [d,setD]=useState<any>(null); useEffect(()=>{fetch("/api/admin/overview").then(r=>r.json()).then(setD);},[]); return d; }
+export default function AdminUsersPage(){ const d=useAdmin(); if(!d) return <p>Loading</p>; if(d.error) return <p>Admin only</p>; return (<div className="card"><h3>Users</h3><table><thead><tr><th>Email</th><th>Role</th><th>Plan</th><th>Created</th></tr></thead><tbody>{d.users.map((u:any)=>(<tr key={u.id}><td>{u.email}</td><td>{u.role}</td><td>{u.plan}</td><td className="small">{u.createdAt}</td></tr>))}</tbody></table></div>); }

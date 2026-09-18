@@ -1,0 +1,1 @@
+export default function Content(){ return (<div className="card"><h3>Content</h3><p className="muted small">Edit /app/docs/page.tsx, /faq/page.tsx, /about/page.tsx directly for docs/faq/about. Support tickets in /admin/support.</p></div>); }

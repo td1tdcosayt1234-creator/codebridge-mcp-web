@@ -1,0 +1,1 @@
+export default function Privacy(){ return (<div style={{padding:"30px 0"}}><h1>Privacy</h1><p className="muted small">We store email + bcrypt hash, encrypted GitHub PAT (AES-256-GCM), build metadata + logs you trigger. No selling data. Tokens never logged full. Delete token anytime in /dashboard/github. Contact via /support for deletion.</p></div>); }
