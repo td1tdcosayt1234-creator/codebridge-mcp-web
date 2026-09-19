@@ -11,15 +11,36 @@ export type LoginAttempt = { email:string; fails:number; until:string };
 export type EarnNonce = { nonce:string; userId:string; at:number; used:boolean };
 export type DbShape = { users:User[]; events:EventItem[]; builds:Build[]; tickets:Ticket[]; githubTokens:{userId:string; enc:string}[]; mcpKeys:{userId:string; key:string}[]; usage:Usage[]; globalGithub?:{enc:string; updatedBy:string; updatedAt:string}; tasks:Task[]; settings?:RunnerSettings; attempts:LoginAttempt[]; earnNonces:EarnNonce[] };
 const file = process.env.DB_FILE || (process.env.VERCEL ? "/tmp/codebridge-db.json" : path.join(process.cwd(), "data", "db.json"));
-const seedAdminEmail = "admin@local.test";
+function seedAdminEmail(){ return (process.env.ADMIN_EMAIL || "admin@local.test").trim().toLowerCase().slice(0,120) || "admin@local.test"; }
+async function seedAdminPassword(): Promise<{ password: string; generated: boolean }> {
+  const pw = (process.env.ADMIN_PASSWORD || "").trim();
+  if (pw.length >= 12) return { password: pw, generated: false };
+  const { randomBytes } = await import("crypto");
+  return { password: "Adm-" + randomBytes(12).toString("hex"), generated: true };
+}
 async function ensure(){
   try{ await fs.access(file); }catch{
     await fs.mkdir(path.dirname(file),{recursive:true});
     const bcrypt = (await import("bcryptjs")).default;
-    const hash = await bcrypt.hash("admin123",10);
-    const seed:DbShape={users:[{id:"u_admin",email:seedAdminEmail,passHash:hash,role:"admin",plan:"pro",createdAt:new Date().toISOString()}],events:[],builds:[],tickets:[],githubTokens:[],mcpKeys:[{userId:"u_admin",key:"cb_admin_demo_key"}],usage:[{userId:"u_admin",mcpCalls:0,githubCalls:0,balance:10000,usedTotal:0}],tasks:[],attempts:[],earnNonces:[]};
+    const { password, generated } = await seedAdminPassword();
+    const hash = await bcrypt.hash(password,10);
+    const seed:DbShape={users:[{id:"u_admin",email:seedAdminEmail(),passHash:hash,role:"admin",plan:"pro",createdAt:new Date().toISOString()}],events:[],builds:[],tickets:[],githubTokens:[],mcpKeys:[{userId:"u_admin",key:"cb_admin_demo_key"}],usage:[{userId:"u_admin",mcpCalls:0,githubCalls:0,balance:10000,usedTotal:0}],tasks:[],attempts:[],earnNonces:[]};
     await fs.writeFile(file,JSON.stringify(seed,null,2));
+    if (generated) console.warn("[codebridge] generated admin password (shown once — save it and set ADMIN_PASSWORD): " + password);
   }
+}
+// Loud once-per-boot warning if the well-known default password is still active.
+let defaultPwWarned = false;
+export async function warnIfDefaultAdminPassword(){
+  if (defaultPwWarned) return; defaultPwWarned = true;
+  try {
+    const db = await readDb();
+    const admin = db.users.find((u) => u.role === "admin");
+    if (!admin) return;
+    const bcrypt = (await import("bcryptjs")).default;
+    if (await bcrypt.compare("admin123", admin.passHash))
+      console.warn("[codebridge] SECURITY: default admin password (admin123) is still active on " + admin.email + " — change it immediately.");
+  } catch { /* best effort */ }
 }
 export async function readDb():Promise<DbShape>{ await ensure(); const raw=await fs.readFile(file,"utf8"); const parsed=JSON.parse(raw); if(!parsed.tasks) parsed.tasks=[]; let dirty=false;
   for(const u of (parsed.usage||[])){ if(u.balance===undefined){ u.balance=10000; dirty=true; } if(u.usedTotal===undefined){ u.usedTotal=0; dirty=true; } }
@@ -31,6 +52,7 @@ export async function readDb():Promise<DbShape>{ await ensure(); const raw=await
   const kept=(parsed.earnNonces as EarnNonce[]).filter(n=>!n.used&&n.at>cutoff);
   if(kept.length!==(parsed.earnNonces as EarnNonce[]).length){ parsed.earnNonces=kept; dirty=true; }
   if(dirty){ try{ await fs.writeFile(file,JSON.stringify(parsed,null,2)); }catch{} }
+  void warnIfDefaultAdminPassword();
   return parsed; }
 export async function writeDb(db:DbShape){ await fs.mkdir(path.dirname(file),{recursive:true}); await fs.writeFile(file,JSON.stringify(db,null,2)); }
 export function uid(p:string){ return p+"_"+Math.random().toString(36).slice(2,9); }

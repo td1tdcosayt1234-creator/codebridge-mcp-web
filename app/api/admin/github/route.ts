@@ -17,8 +17,8 @@ export async function GET(){
 }
 export async function POST(req:Request){
   const p=await admin(); if(!p) return NextResponse.json({error:"admin only"},{status:403});
-  const { sameOrigin, csrfBlock }=await import("@/lib/security");
-  if(!sameOrigin(req)) return csrfBlock();
+  const { csrfCheck, csrfBlock }=await import("@/lib/security");
+  if(!csrfCheck(req)) return csrfBlock();
   const {token}=await req.json();
   const s=String(token||"");
   if(!s.startsWith("ghp_")&&!s.startsWith("github_pat_")) return NextResponse.json({error:"Use a GitHub Classic Token starting with ghp_ or github_pat_ (needs repo + workflow scopes)"},{status:400});
@@ -36,8 +36,8 @@ export async function POST(req:Request){
 }
 export async function DELETE(req:Request){
   const p=await admin(); if(!p) return NextResponse.json({error:"admin only"},{status:403});
-  const { sameOrigin, csrfBlock }=await import("@/lib/security");
-  if(!sameOrigin(req)) return csrfBlock();
+  const { csrfCheck, csrfBlock }=await import("@/lib/security");
+  if(!csrfCheck(req)) return csrfBlock();
   const db=await readDb();
   db.globalGithub=undefined;
   db.events.push({id:uid("e"),userId:p.sub,action:"admin_github_token_remove",detail:"global token removed",at:new Date().toISOString()});

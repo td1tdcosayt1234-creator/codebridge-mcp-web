@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { readDb, writeDb, uid } from "@/lib/db";
 import { signJwt } from "@/lib/auth";
-import { rateLimit, clientIp, cookieSecure, sameOrigin, csrfBlock } from "@/lib/security";
+import { rateLimit, clientIp, cookieSecure, csrfCheck, csrfBlock } from "@/lib/security";
 
 const MAX_FAILS = 5;
 const LOCK_MS = 15 * 60 * 1000;
 
 export async function POST(req: Request) {
-  if (!sameOrigin(req)) return csrfBlock();
+  if (!csrfCheck(req)) return csrfBlock();
   const ip = clientIp(req);
   const { email, password } = await req.json().catch(() => ({}));
   const mail = String(email || "").trim().toLowerCase().slice(0, 120);

@@ -21,8 +21,8 @@ export async function GET() {
 export async function POST(req: Request) {
   const p = await me();
   if (!p) return NextResponse.json({ error: "auth" }, { status: 401 });
-  const { rateLimit, sameOrigin, csrfBlock } = await import("@/lib/security");
-  if (!sameOrigin(req)) return csrfBlock();
+  const { rateLimit, csrfCheck, csrfBlock } = await import("@/lib/security");
+  if (!csrfCheck(req)) return csrfBlock();
   const rl = rateLimit("task:" + p.sub, 10, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Too many requests. Wait " + rl.retryAfterSec + "s." }, { status: 429 });
   const { title, prompt, kind, files, website } = await req.json().catch(() => ({}));

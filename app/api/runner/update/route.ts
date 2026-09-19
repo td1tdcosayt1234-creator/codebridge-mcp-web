@@ -5,8 +5,8 @@ import { estimateResult } from "@/lib/tokens";
 
 // Actions runner: send OpenCode output back to the web.
 export async function POST(req: Request) {
-  const { sameOrigin, csrfBlock } = await import("@/lib/security");
-  if (!sameOrigin(req)) return csrfBlock();
+  const { csrfCheck, csrfBlock } = await import("@/lib/security");
+  if (!csrfCheck(req)) return csrfBlock();
   const db = await readDb();
   if (!verifyRunner(db, bearerToken(req))) return NextResponse.json({ error: "bad runner token" }, { status: 403 });
   const { id, status, log, result, run_url } = await req.json().catch(() => ({}));

@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { readDb, writeDb, uid } from "@/lib/db";
 import { signJwt } from "@/lib/auth";
-import { rateLimit, clientIp, passwordError, cookieSecure, clampText, sameOrigin, csrfBlock } from "@/lib/security";
+import { rateLimit, clientIp, passwordError, cookieSecure, clampText, csrfCheck, csrfBlock } from "@/lib/security";
 import { honeypot, isVpn } from "@/lib/antifraud";
 
 export async function POST(req: Request) {
-  if (!sameOrigin(req)) return csrfBlock();
+  if (!csrfCheck(req)) return csrfBlock();
   const ip = clientIp(req);
   const rl = rateLimit("signup:" + ip, 5, 60 * 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Too many signups from this network. Try again later." }, { status: 429 });

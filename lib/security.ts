@@ -15,8 +15,13 @@ export function rateLimit(key: string, max: number, windowMs: number): { ok: boo
 }
 
 export function clientIp(req: Request): string {
-  const f = req.headers.get("x-forwarded-for") || "";
-  if (f) return f.split(",")[0].trim().slice(0, 64);
+  // Only trust proxy headers when explicitly enabled behind a real reverse
+  // proxy that strips client-supplied values. Otherwise the header is
+  // client-controlled and would allow IP spoofing past rate limits.
+  if (process.env.TRUST_PROXY === "true") {
+    const f = req.headers.get("x-forwarded-for") || "";
+    if (f) return f.split(",")[0].trim().slice(0, 64);
+  }
   return "local";
 }
 
@@ -28,13 +33,14 @@ export function safeEqual(a: string, b: string): boolean {
 }
 
 // ---- CSRF: state-changing browser requests must come from our own origin.
-// Non-browser clients (MCP, runner, curl) send no Origin and are allowed;
-// a cross-site browser request carries a foreign Origin and is rejected.
+// API clients (MCP, runner, curl with a bearer token) send no Origin and are
+// allowed via their Authorization header. A bare no-Origin request carrying
+// only cookies (classic CSRF shape) is rejected.
 export function sameOrigin(req: Request): boolean {
   const origin = req.headers.get("origin") || "";
   const referer = req.headers.get("referer") || "";
   const claimed = origin || referer;
-  if (!claimed) return true;
+  if (!claimed) return false;
   try {
     const o = new URL(claimed);
     const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").split(":")[0].toLowerCase();
@@ -42,6 +48,15 @@ export function sameOrigin(req: Request): boolean {
   } catch {
     return false;
   }
+}
+
+export function hasBearer(req: Request): boolean {
+  const h = req.headers.get("authorization") || "";
+  return h.toLowerCase().startsWith("bearer ") && h.slice(7).trim().length > 0;
+}
+
+export function csrfCheck(req: Request): boolean {
+  return hasBearer(req) || sameOrigin(req);
 }
 
 export function csrfBlock(): Response {

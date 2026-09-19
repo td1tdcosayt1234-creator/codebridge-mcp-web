@@ -58,3 +58,11 @@ Restart opencode after config change. Tools: `list_repos`, `push_code`, `trigger
 
 ## Security
 bcrypt passwords, JWT httpOnly cookie, AES-256-GCM vault (tokens never shown full), RBAC user/admin, login-must dashboard, 404 on admin for non-admin, audit tracking.
+
+## Production security checklist (must before public deploy)
+1. **Secrets**: set long random `AUTH_SECRET` + `TOKEN_ENC_KEY` (changing them logs everyone out and wipes saved encrypted tokens — set once, keep safe).
+2. **Admin**: set `ADMIN_EMAIL` + `ADMIN_PASSWORD` (min 12 chars) before first boot; never keep `admin123` — the server warns in logs while it is active. Sessions expire after 24h.
+3. **TLS**: serve only over HTTPS (reverse proxy). HSTS/CSP/secure-cookie flags only protect real HTTPS traffic; localhost HTTP is dev-only.
+4. **Proxy**: set `TRUST_PROXY=true` only behind a proxy that strips client `x-forwarded-for`, otherwise IPs can be spoofed past rate limits.
+5. **Files**: never serve the project folder statically — `.env`, `data/db.json` and `.git` must stay off the web (safe with `next start`, dangerous on static hosts).
+6. **Limits**: rate limits are in-memory (reset on restart) and login lockout persists in db — for multi-instance scale put a shared store in front.
