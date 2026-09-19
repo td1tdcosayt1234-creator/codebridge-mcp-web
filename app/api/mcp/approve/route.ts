@@ -30,6 +30,7 @@ export async function GET(req: Request) {
     "<h1>Allow this agent?</h1>" +
     "<p class=\"muted\">Your coding agent wants to run <b>" + p.tool + "</b> as <b>" + (me.email || me.sub) + "</b>. Approving spends YOUR coins when the task runs.</p>" +
     "<form method=\"POST\" action=\"/api/mcp/approve\"><input type=\"hidden\" name=\"req\" value=\"" + p.id + "\"/>" +
+    "<label style=\"display:flex;gap:8px;align-items:center;justify-content:center;font-size:14px;color:#8b9bb8;margin:12px 0\"><input type=\"checkbox\" name=\"always\" value=\"yes\" checked style=\"width:auto\"/> Always allow this agent (approve once, never ask again)</label>" +
     "<div class=\"row\"><button class=\"yes\" name=\"allow\" value=\"yes\" type=\"submit\">Approve</button>" +
     "<button class=\"no\" name=\"allow\" value=\"no\" type=\"submit\">Deny</button></div></form>"
   );
@@ -47,8 +48,15 @@ export async function POST(req: Request) {
   const form = await req.formData().catch(() => null);
   const id = String(form?.get("req") || "");
   const allow = String(form?.get("allow") || "");
+  const always = String(form?.get("always") || "") === "yes";
   const done = await settlePending(id, allow === "yes" ? String(me.sub) : null);
   if (!done) return shell("<h1>Link expired</h1><p class=\"muted\">Already decided or too old. Ask your agent for a fresh link.</p>");
-  if (allow === "yes") return shell("<h1>Approved ✓</h1><p class=\"muted\">Return to your agent — it will pick up the result automatically. You can close this tab.</p>");
+  if (allow === "yes") {
+    if (always) {
+      const { addTrusted } = await import("@/lib/mcpAuth");
+      await addTrusted(String(me.sub), done.fp, done.tool);
+    }
+    return shell("<h1>Approved ✓</h1><p class=\"muted\">" + (always ? "This agent is remembered — no approval needed next time. " : "") + "Return to your agent — it will pick up the result automatically. You can close this tab.</p>");
+  }
   return shell("<h1>Denied</h1><p class=\"muted\">Your agent was told. You can close this tab.</p>");
 }

@@ -2,7 +2,7 @@ import Link from "next/link";
 export default function Mcp(){
   return (<div className="prose">
     <div className="page-hero"><h1>Agent Connect — <span className="grad">signup required</span></h1>
-    <p>This web is an MCP server (<code>/api/mcp</code>). <b>Easiest:</b> add only the URL below — when the agent first calls a tool it gives you a browser link; open it, signup/login + Approve, and the agent continues automatically. <b>Alternative</b> (headless agents): copy your personal key from <Link href="/dashboard/mcp">/dashboard/mcp</Link> into headers. Anonymous calls are rejected.</p></div>
+    <p>This web is an MCP server (<code>/api/mcp</code>). <b>Easiest:</b> add only the URL below — when the agent first calls a tool it gives you a browser link; open it, signup/login + tick <b>Always allow</b> + Approve, and it never asks again. <b>Alternative</b> (headless agents): copy your personal key from <Link href="/dashboard/mcp">/dashboard/mcp</Link> into headers. Anonymous calls are rejected.</p></div>
     <div className="grid g2">
       <div className="card"><h3>1️⃣ Get your key</h3><p className="muted small"><Link href="/signup">Signup</Link> / <Link href="/login">login</Link>, then open <Link href="/dashboard/mcp">/dashboard/mcp</Link> — your personal key is shown there (never share it). Put this in your project <code>opencode.json</code>:</p><pre>{`{
   "$schema": "https://opencode.ai/config.json",

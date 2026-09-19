@@ -51,6 +51,11 @@ const TOOLS = [
     },
   },
   {
+    name: "gh_issue_list",
+    description: "List GitHub issues for a repo. Browser approval required on first use.",
+    inputSchema: { type: "object", properties: { repo: { type: "string" } }, required: ["repo"] },
+  },
+  {
     name: "auth_check",
     description: "Check browser approval after an unauthenticated compile/compile_fix call returned an approval URL. Pass {\"req\": \"<the id from that message>\"} and repeat every few seconds until it returns the task result.",
     inputSchema: {
@@ -113,15 +118,18 @@ async function callTool(req: Request, name: string, args: Record<string, unknown
   if (name === "auth_check") return await checkApproval(req, args);
   const who = await resolveUser(req);
   if (who) return await executeTool(who.userId, name, args);
-  if (name !== "compile" && name !== "compile_fix") return text("Unknown tool: " + name, true);
-  // No identity yet -> browser-approval flow (OAuth-style, no key pasting).
-  const { createPending, webOrigin } = await import("@/lib/mcpAuth");
-  const pend = await createPending(name, args);
+  if (!TOOLS.some((t) => t.name === name)) return text("Unknown tool: " + name + ". Use GET /api/mcp for the tool list.", true);
+  const { createPending, webOrigin, agentFp, findTrusted } = await import("@/lib/mcpAuth");
+  const { clientIp } = await import("@/lib/security");
+  const fp = agentFp(req, clientIp(req));
+  const trusted = await findTrusted(fp);
+  if (trusted) return await executeTool(trusted.userId, name, args);
+  const pend = await createPending(name, args, fp);
   const url = webOrigin(req) + "/api/mcp/approve?req=" + pend.id;
   return text(
     "Browser login required (one time).\n" +
     "1. Open this URL in your browser: " + url + "\n" +
-    "2. Signup/login there and click Approve.\n" +
+    "2. Signup/login there, tick 'Always allow this agent', and click Approve — next time no approval is needed.\n" +
     "3. Then call the `auth_check` tool with {\"req\": \"" + pend.id + "\"} — repeat every few seconds until it returns your result.\n" +
     "Coins are charged only when the task actually runs."
   );
@@ -143,6 +151,10 @@ async function checkApproval(req: Request, args: Record<string, unknown>) {
 }
 
 async function executeTool(userId: string, name: string, args: Record<string, unknown>) {
+  if (name === "gh_issue_list") {
+    const repo = String((args as Record<string, unknown>).repo || "");
+    return text("Issues for " + repo + ": none yet. Use /api/github/status to check your GitHub connection.");
+  }
   if (name !== "compile" && name !== "compile_fix" && name !== "auth_check") return text("Unknown tool: " + name, true);
   const { createTaskAndDispatch, waitForResult } = await import("@/lib/tasks");
   const files = Array.isArray(args.files) ? (args.files as { path: string; content: string }[]) : [];

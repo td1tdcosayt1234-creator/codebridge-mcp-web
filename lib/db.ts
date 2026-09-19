@@ -11,8 +11,9 @@ export type RunnerSettings = { builderRepo:string; builderWorkflow:string; runne
 export type LoginAttempt = { email:string; fails:number; until:string };
 export type EarnNonce = { nonce:string; userId:string; at:number; used:boolean };
 export type ApprovalState = "waiting" | "approved" | "denied";
-export type PendingCall = { id:string; tool:string; args:Record<string,unknown>; userId?:string; state:ApprovalState; createdAt:number };
-export type DbShape = { users:User[]; events:EventItem[]; builds:Build[]; tickets:Ticket[]; githubTokens:{userId:string; enc:string}[]; mcpKeys:{userId:string; key:string}[]; usage:Usage[]; globalGithub?:{enc:string; updatedBy:string; updatedAt:string}; tasks:Task[]; settings?:RunnerSettings; attempts:LoginAttempt[]; earnNonces:EarnNonce[]; approvals:PendingCall[] };
+export type PendingCall = { id:string; tool:string; args:Record<string,unknown>; userId?:string; state:ApprovalState; createdAt:number; fp:{ip:string; ua:string} };
+export type TrustedAgent = { id:string; userId:string; ip:string; ua:string; tool:string; createdAt:string; lastUsed:string; expiresAt:string };
+export type DbShape = { users:User[]; events:EventItem[]; builds:Build[]; tickets:Ticket[]; githubTokens:{userId:string; enc:string}[]; mcpKeys:{userId:string; key:string}[]; usage:Usage[]; globalGithub?:{enc:string; updatedBy:string; updatedAt:string}; tasks:Task[]; settings?:RunnerSettings; attempts:LoginAttempt[]; earnNonces:EarnNonce[]; approvals:PendingCall[]; trusted:TrustedAgent[] };
 const file = process.env.DB_FILE || (process.env.VERCEL ? "/tmp/codebridge-db.json" : path.join(process.cwd(), "data", "db.json"));
 
 // ---- At-rest encryption (AES-256-GCM via lib/crypto) ----
@@ -57,7 +58,7 @@ async function ensure(){
     const bcrypt = (await import("bcryptjs")).default;
     const { password, generated } = await seedAdminPassword();
     const hash = await bcrypt.hash(password,10);
-    const seed:DbShape={users:[{id:"u_admin",email:seedAdminEmail(),passHash:hash,role:"admin",plan:"pro",createdAt:new Date().toISOString()}],events:[],builds:[],tickets:[],githubTokens:[],mcpKeys:[{userId:"u_admin",key:"cb_admin_demo_key"}],usage:[{userId:"u_admin",mcpCalls:0,githubCalls:0,balance:10000,usedTotal:0}],tasks:[],attempts:[],earnNonces:[],approvals:[]};
+    const seed:DbShape={users:[{id:"u_admin",email:seedAdminEmail(),passHash:hash,role:"admin",plan:"pro",createdAt:new Date().toISOString()}],events:[],builds:[],tickets:[],githubTokens:[],mcpKeys:[{userId:"u_admin",key:"cb_admin_demo_key"}],usage:[{userId:"u_admin",mcpCalls:0,githubCalls:0,balance:10000,usedTotal:0}],tasks:[],attempts:[],earnNonces:[],approvals:[],trusted:[]};
     await writeDb(seed);
     if (generated) console.warn("[codebridge] generated admin password (shown once — save it and set ADMIN_PASSWORD): " + password);
   }
@@ -81,6 +82,7 @@ export async function readDb():Promise<DbShape>{ await ensure(); const raw=await
   if(!parsed.attempts) parsed.attempts=[];
   if(!parsed.earnNonces) parsed.earnNonces=[];
   if(!parsed.approvals) parsed.approvals=[];
+  if(!parsed.trusted) parsed.trusted=[];
   // prune used/old earn nonces (>1h)
   const cutoff=Date.now()-3600000;
   const kept=(parsed.earnNonces as EarnNonce[]).filter(n=>!n.used&&n.at>cutoff);
