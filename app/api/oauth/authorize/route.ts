@@ -59,6 +59,7 @@ function params(url: string) {
   return {
     clientId: u.searchParams.get("client_id") || "",
     redirectUri: u.searchParams.get("redirect_uri") || "",
+    responseType: u.searchParams.get("response_type") || "",
     state: u.searchParams.get("state") || "",
     challenge: u.searchParams.get("code_challenge") || "",
     method: u.searchParams.get("code_challenge_method") || "S256",
@@ -111,6 +112,12 @@ export async function GET(req: Request) {
     );
   // Lenient DCR: register unknown clients on the fly (localhost-friendly).
   if (!(await getClient(p.clientId))) await saveClient(p.clientId, [p.redirectUri]);
+  if (p.responseType && p.responseType !== "code") {
+    const sep = p.redirectUri.includes("?") ? "&" : "?";
+    return NextResponse.redirect(
+      p.redirectUri + sep + "error=unsupported_response_type" + (p.state ? "&state=" + encodeURIComponent(p.state) : "")
+    );
+  }
   const t = cookies().get("session")?.value || "";
   const me = await verifyJwt(t);
   if (!me) {

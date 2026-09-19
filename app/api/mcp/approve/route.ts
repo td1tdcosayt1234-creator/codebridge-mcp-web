@@ -40,15 +40,16 @@ export async function POST(req: Request) {
   const { csrfCheck, csrfBlock } = await import("@/lib/security");
   if (!csrfCheck(req)) return csrfBlock();
   const t = cookies().get("session")?.value || "";
-  const me = await verifyJwt(t);
-  if (!me) {
-    const back = "/api/mcp/approve";
-    return NextResponse.redirect(webOrigin(req) + "/login?next=" + encodeURIComponent(back));
-  }
   const form = await req.formData().catch(() => null);
   const id = String(form?.get("req") || "");
   const allow = String(form?.get("allow") || "");
   const always = String(form?.get("always") || "") === "yes";
+  const me = await verifyJwt(t);
+  if (!me) {
+    // Keep the request id across login so the user lands back on THIS approval.
+    const back = "/api/mcp/approve" + (id ? "?req=" + encodeURIComponent(id) : "");
+    return NextResponse.redirect(webOrigin(req) + "/login?next=" + encodeURIComponent(back));
+  }
   const done = await settlePending(id, allow === "yes" ? String(me.sub) : null);
   if (!done) return shell("<h1>Link expired</h1><p class=\"muted\">Already decided or too old. Ask your agent for a fresh link.</p>");
   if (allow === "yes") {

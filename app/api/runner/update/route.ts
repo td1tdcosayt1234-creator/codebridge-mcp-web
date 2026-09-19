@@ -26,7 +26,8 @@ export async function POST(req: Request) {
     if (extra > 0) {
       let us = db.usage.find((u) => u.userId === task.userId);
       if (!us) { us = { userId: task.userId, mcpCalls: 0, githubCalls: 0, balance: 10000, usedTotal: 0 }; db.usage.push(us); }
-      us.balance -= extra;
+      // Floor at zero: the task already ran, so usage is still recorded in full.
+      us.balance = Math.max(0, us.balance - extra);
       us.usedTotal += extra;
       task.tokensCharged += extra;
     }

@@ -7,6 +7,9 @@ export const dynamic = "force-dynamic";
 // Body: { redirect_uris: [...], client_name?: ... }
 // Returns: { client_id, ... } — the client then opens the browser authorize URL.
 export async function POST(req: Request) {
+  const { rateLimit, clientIp } = await import("@/lib/security");
+  const rl = rateLimit("dcr:" + clientIp(req), 30, 60 * 1000);
+  if (!rl.ok) return NextResponse.json({ error: "invalid_request" }, { status: 429 });
   let body: { redirect_uris?: string[]; client_name?: string } = {};
   try {
     body = await req.json();

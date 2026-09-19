@@ -91,7 +91,7 @@ export async function readDb():Promise<DbShape>{ await ensure(); const raw=await
   const cutoff=Date.now()-3600000;
   const kept=(parsed.earnNonces as EarnNonce[]).filter(n=>!n.used&&n.at>cutoff);
   if(kept.length!==(parsed.earnNonces as EarnNonce[]).length){ parsed.earnNonces=kept; dirty=true; }
-  if(dirty){ try{ await fs.writeFile(file,JSON.stringify(parsed,null,2)); }catch{} }
+  if(dirty){ try{ await writeDb(parsed); }catch{} }
   void warnIfDefaultAdminPassword();
   return parsed; }
 export async function writeDb(db:DbShape){

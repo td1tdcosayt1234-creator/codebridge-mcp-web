@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { readDb, writeDb, uid } from "@/lib/db";
 import { signJwt } from "@/lib/auth";
 import { rateLimit, clientIp, passwordError, cookieSecure, clampText, csrfCheck, csrfBlock } from "@/lib/security";
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
   const passHash = await bcrypt.hash(String(password), 10);
   const u = { id: uid("u"), email: mail, passHash, role: "user" as const, plan: "free" as const, createdAt: new Date().toISOString() };
   db.users.push(u);
-  db.mcpKeys.push({ userId: u.id, key: "cb_" + Math.random().toString(36).slice(2, 14) });
+  db.mcpKeys.push({ userId: u.id, key: "cb_" + crypto.randomBytes(12).toString("hex") });
   db.usage.push({ userId: u.id, mcpCalls: 0, githubCalls: 0, balance: 10000, usedTotal: 0 });
   db.events.push({ id: uid("e"), userId: u.id, action: "signup", detail: u.email, at: new Date().toISOString() });
   await writeDb(db);
