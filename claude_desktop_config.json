@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "codebridge": {
+      "url": "http://localhost:3001/api/mcp",
+      "transport": "streamableHttp"
+    }
+  }
+}

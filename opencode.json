@@ -1,9 +1,14 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
+    "blockbench": {
+      "type": "remote",
+      "url": "http://127.0.0.1:3000/bb-mcp",
+      "enabled": true
+    },
     "codebridge": {
       "type": "remote",
-      "url": "http://localhost:3000/api/mcp",
+      "url": "http://localhost:3001/api/mcp",
       "enabled": true
     }
   }

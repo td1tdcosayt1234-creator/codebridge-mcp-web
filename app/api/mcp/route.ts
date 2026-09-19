@@ -183,17 +183,20 @@ async function handleOne(req: Request, m: RpcMsg): Promise<{ resp: object | null
   if (isNotif) return { resp: null };
   const id = m.id as string | number;
   if (m.method === "initialize") {
-    return {
-      resp: {
-        jsonrpc: "2.0", id,
-        result: {
-          protocolVersion: PROTOCOL,
-          capabilities: { tools: {} },
-          serverInfo: { name: "codebridge", version: "2.0.0" },
+      return {
+        resp: {
+          jsonrpc: "2.0", id,
+          result: {
+            protocolVersion: PROTOCOL,
+            capabilities: {
+              tools: { listChanged: true },
+            },
+            serverInfo: { name: "codebridge", version: "2.0.0" },
+            instructions: "Signup/login required. When calling a tool without auth you will get an approval URL — open it in a browser, login, tick 'Always allow', and Approve. Call auth_check with the req id to get the result.",
+          },
         },
-      },
-    };
-  }
+      };
+    }
   if (m.method === "ping") return { resp: { jsonrpc: "2.0", id, result: {} } };
   if (m.method === "tools/list") return { resp: { jsonrpc: "2.0", id, result: { tools: TOOLS } } };
   if (m.method === "tools/call") {

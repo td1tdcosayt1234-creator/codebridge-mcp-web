@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json.schemastore.org/cursor-settings",
+  "mcpServers": {
+    "codebridge": {
+      "type": "streamableHttp",
+      "url": "http://localhost:3001/api/mcp"
+    }
+  }
+}
