@@ -20,8 +20,9 @@ jobs:
           echo "$HOME/.opencode/bin" >> $GITHUB_PATH
       - name: Pull task from web
         run: |
-          curl -sf -H "Authorization: Bearer \${{ secrets.RUNNER_TOKEN }}" \\
-            "$WEB_URL/api/runner/next?task_id=\${{ inputs.task_id }}" -o task.json
+          WEB="\${WEB_URL%/}"
+          curl -sf -H "Authorization: Bearer \${{ secrets.RUNNER_TOKEN }}" \
+            "$WEB/api/runner/next?task_id=\${{ inputs.task_id }}" -o task.json
           cat task.json
         env:
           WEB_URL: \${{ secrets.WEB_URL }}
@@ -36,7 +37,24 @@ jobs:
       - name: Run opencode
         run: |
           node -e "const t=require('./task.json');require('fs').writeFileSync('prompt.txt',t.prompt)"
-          opencode run --auto -m anthropic/claude-sonnet-4-6 "$(cat prompt.txt)" 2>&1 | tee agent.log
+          KIND=$(node -e "console.log(require('./task.json').kind||'compile')")
+          # fix-compile mode retries up to 3 times, compile mode runs once
+          MAX_TRY=1
+          if [ "$KIND" = "fix-compile" ]; then MAX_TRY=3; fi
+          echo "kind=$KIND max_try=$MAX_TRY"
+          : > agent.log
+          EXIT_CODE=1
+          for i in $(seq 1 $MAX_TRY); do
+            echo "=== attempt $i/$MAX_TRY ($KIND) ===" | tee -a agent.log
+            opencode run --auto -m anthropic/claude-sonnet-4-5 "$(cat prompt.txt)" 2>&1 | tee -a agent.log
+            EXIT_CODE=\${PIPESTATUS[0]}
+            echo "attempt $i exit=$EXIT_CODE" | tee -a agent.log
+            if [ "$EXIT_CODE" = "0" ]; then break; fi
+            if [ "$KIND" != "fix-compile" ]; then break; fi
+            echo "Retrying with fix context..." | tee -a agent.log
+          done
+          echo "final_exit=$EXIT_CODE" | tee -a agent.log
+          echo "$EXIT_CODE" > exit.code
         env:
           ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
       - name: Send result to web
@@ -46,7 +64,9 @@ jobs:
           const fs=require('fs');
           const ok=fs.existsSync('agent.log');
           const log=ok?fs.readFileSync('agent.log','utf8').slice(-15000):'no log';
-          fetch(process.env.WEB_URL+'/api/runner/update',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+process.env.RUNNER_TOKEN},body:JSON.stringify({id:'\${{ inputs.task_id }}',status:ok?'done':'failed',log,result:log})}).then(r=>console.log('sent',r.status));
+          let code=1; try{ code=parseInt(fs.readFileSync('exit.code','utf8').trim(),10); }catch{}
+          const base=(process.env.WEB_URL||'').replace(/\/+$/,'');
+          fetch(base+'/api/runner/update',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+process.env.RUNNER_TOKEN},body:JSON.stringify({id:'\${{ inputs.task_id }}',status:(ok&&code===0)?'done':'failed',log,result:log})}).then(async r=>{console.log('sent',r.status); if(!r.ok) console.log(await r.text());});
           "
         env:
           WEB_URL: \${{ secrets.WEB_URL }}

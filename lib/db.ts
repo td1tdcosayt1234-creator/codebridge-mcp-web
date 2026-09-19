@@ -10,7 +10,7 @@ export type RunnerSettings = { builderRepo:string; builderWorkflow:string; runne
 export type LoginAttempt = { email:string; fails:number; until:string };
 export type EarnNonce = { nonce:string; userId:string; at:number; used:boolean };
 export type DbShape = { users:User[]; events:EventItem[]; builds:Build[]; tickets:Ticket[]; githubTokens:{userId:string; enc:string}[]; mcpKeys:{userId:string; key:string}[]; usage:Usage[]; globalGithub?:{enc:string; updatedBy:string; updatedAt:string}; tasks:Task[]; settings?:RunnerSettings; attempts:LoginAttempt[]; earnNonces:EarnNonce[] };
-const file = path.join(process.cwd(),"data","db.json");
+const file = process.env.DB_FILE || (process.env.VERCEL ? "/tmp/codebridge-db.json" : path.join(process.cwd(), "data", "db.json"));
 const seedAdminEmail = "admin@local.test";
 async function ensure(){
   try{ await fs.access(file); }catch{
