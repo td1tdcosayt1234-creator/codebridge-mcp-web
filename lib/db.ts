@@ -1,5 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
+import { encWith, decWith } from "./crypto";
 export type User = { id:string; email:string; passHash:string; role:"user"|"admin"; plan:"free"|"pro"; createdAt:string };
 export type EventItem = { id:string; userId:string; action:string; detail:string; ip?:string; at:string };
 export type Build = { id:string; userId:string; repo:string; branch:string; status:string; log:string; at:string };
@@ -11,6 +12,36 @@ export type LoginAttempt = { email:string; fails:number; until:string };
 export type EarnNonce = { nonce:string; userId:string; at:number; used:boolean };
 export type DbShape = { users:User[]; events:EventItem[]; builds:Build[]; tickets:Ticket[]; githubTokens:{userId:string; enc:string}[]; mcpKeys:{userId:string; key:string}[]; usage:Usage[]; globalGithub?:{enc:string; updatedBy:string; updatedAt:string}; tasks:Task[]; settings?:RunnerSettings; attempts:LoginAttempt[]; earnNonces:EarnNonce[] };
 const file = process.env.DB_FILE || (process.env.VERCEL ? "/tmp/codebridge-db.json" : path.join(process.cwd(), "data", "db.json"));
+
+// ---- At-rest encryption (AES-256-GCM via lib/crypto) ----
+// If DB_MASTER_KEY is set, the whole database file is stored encrypted:
+// {"v":1,"data":"base64(iv|tag|ciphertext)"}. Without the key the file is
+// opaque — password hashes, tokens and logs cannot be read from disk.
+// Files without the wrapper are treated as legacy plaintext and get
+// encrypted on the next write (automatic migration).
+function dbKeySet(): boolean { return (process.env.DB_MASTER_KEY || "").trim().length >= 16; }
+function dbSecret(): string { return (process.env.DB_MASTER_KEY || "").trim(); }
+let noKeyWarned = false;
+function warnNoDbKey() {
+  if (noKeyWarned) return; noKeyWarned = true;
+  console.warn("[codebridge] SECURITY: DB_MASTER_KEY not set — database is stored in PLAINTEXT. Set it to enable at-rest encryption.");
+}
+function encryptDb(plain: string): string {
+  if (!dbKeySet()) { warnNoDbKey(); return plain; }
+  return JSON.stringify({ v: 1, data: encWith(dbSecret(), plain) });
+}
+function decryptDb(raw: string): string {
+  const t = raw.trim();
+  if (t.startsWith('{"v":1') || t.startsWith('{"v": 1')) {
+    let data = "";
+    try { data = (JSON.parse(t) as { data?: string }).data || ""; } catch { throw new Error("Database envelope is corrupt."); }
+    const plain = decWith(dbSecret(), data);
+    if (!plain) throw new Error("Database decrypt failed — wrong DB_MASTER_KEY or corrupt file. NOT overwriting. Restore from data/db.json.bak.1 or fix the key.");
+    return plain;
+  }
+  warnNoDbKey();
+  return raw; // legacy plaintext
+}
 function seedAdminEmail(){ return (process.env.ADMIN_EMAIL || "admin@local.test").trim().toLowerCase().slice(0,120) || "admin@local.test"; }
 async function seedAdminPassword(): Promise<{ password: string; generated: boolean }> {
   const pw = (process.env.ADMIN_PASSWORD || "").trim();
@@ -25,7 +56,7 @@ async function ensure(){
     const { password, generated } = await seedAdminPassword();
     const hash = await bcrypt.hash(password,10);
     const seed:DbShape={users:[{id:"u_admin",email:seedAdminEmail(),passHash:hash,role:"admin",plan:"pro",createdAt:new Date().toISOString()}],events:[],builds:[],tickets:[],githubTokens:[],mcpKeys:[{userId:"u_admin",key:"cb_admin_demo_key"}],usage:[{userId:"u_admin",mcpCalls:0,githubCalls:0,balance:10000,usedTotal:0}],tasks:[],attempts:[],earnNonces:[]};
-    await fs.writeFile(file,JSON.stringify(seed,null,2));
+    await writeDb(seed);
     if (generated) console.warn("[codebridge] generated admin password (shown once — save it and set ADMIN_PASSWORD): " + password);
   }
 }
@@ -42,7 +73,7 @@ export async function warnIfDefaultAdminPassword(){
       console.warn("[codebridge] SECURITY: default admin password (admin123) is still active on " + admin.email + " — change it immediately.");
   } catch { /* best effort */ }
 }
-export async function readDb():Promise<DbShape>{ await ensure(); const raw=await fs.readFile(file,"utf8"); const parsed=JSON.parse(raw); if(!parsed.tasks) parsed.tasks=[]; let dirty=false;
+export async function readDb():Promise<DbShape>{ await ensure(); const raw=await fs.readFile(file,"utf8"); const parsed=JSON.parse(decryptDb(raw)); if(!parsed.tasks) parsed.tasks=[]; let dirty=false;
   for(const u of (parsed.usage||[])){ if(u.balance===undefined){ u.balance=10000; dirty=true; } if(u.usedTotal===undefined){ u.usedTotal=0; dirty=true; } }
   for(const t of (parsed.tasks||[])){ if(!t.kind) t.kind="compile"; if(!t.files) t.files=[]; if(t.tokensEst===undefined) t.tokensEst=0; if(t.tokensCharged===undefined) t.tokensCharged=0; }
   if(!parsed.attempts) parsed.attempts=[];
@@ -54,5 +85,18 @@ export async function readDb():Promise<DbShape>{ await ensure(); const raw=await
   if(dirty){ try{ await fs.writeFile(file,JSON.stringify(parsed,null,2)); }catch{} }
   void warnIfDefaultAdminPassword();
   return parsed; }
-export async function writeDb(db:DbShape){ await fs.mkdir(path.dirname(file),{recursive:true}); await fs.writeFile(file,JSON.stringify(db,null,2)); }
+export async function writeDb(db:DbShape){
+  const dir = path.dirname(file);
+  await fs.mkdir(dir,{recursive:true});
+  // Rotating backups (latest 3) so a bad write/key never means total loss.
+  try {
+    await fs.access(file);
+    for (let i = 3; i >= 2; i--) { try { await fs.rename(file + ".bak." + (i - 1), file + ".bak." + i); } catch {} }
+    try { await fs.copyFile(file, file + ".bak.1"); } catch {}
+  } catch { /* first write — nothing to back up */ }
+  // Atomic write: temp file + rename, never a half-written db.
+  const tmp = file + ".tmp." + process.pid;
+  await fs.writeFile(tmp, encryptDb(JSON.stringify(db)));
+  await fs.rename(tmp, file);
+}
 export function uid(p:string){ return p+"_"+Math.random().toString(36).slice(2,9); }

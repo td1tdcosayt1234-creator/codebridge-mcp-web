@@ -66,3 +66,4 @@ bcrypt passwords, JWT httpOnly cookie, AES-256-GCM vault (tokens never shown ful
 4. **Proxy**: set `TRUST_PROXY=true` only behind a proxy that strips client `x-forwarded-for`, otherwise IPs can be spoofed past rate limits.
 5. **Files**: never serve the project folder statically — `.env`, `data/db.json` and `.git` must stay off the web (safe with `next start`, dangerous on static hosts).
 6. **Limits**: rate limits are in-memory (reset on restart) and login lockout persists in db — for multi-instance scale put a shared store in front.
+7. **Database**: set `DB_MASTER_KEY` so `data/db.json` is AES-256-GCM encrypted at rest (auto-migrates on next write; rotating `.bak.1-3` backups kept). Back up the key with the backups — without it data is unrecoverable. Restrict file ACLs to the app user only.

@@ -2,6 +2,8 @@ node_modules/
 .next/
 out/
 data/db.json
+data/db.json.bak.*
+data/*.tmp.*
 .env
 .env.local
 *.log
