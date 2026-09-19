@@ -48,7 +48,7 @@ export default function Home(){
       <Reveal><h2>Everything <span className="grad">in one place</span></h2>
       <p className="sub">From request to compiled result — CodeBridge handles the whole middle.</p></Reveal>
       <div className="grid g3">
-        <Reveal delay={0}><div className="card"><div className="feat">🔌</div><h3>Agent connect</h3><p className="muted small">A real MCP server. Your coding agent connects in one step — no keys or headers needed, just log in on the website. 2 tools: <code>compile</code> + <code>compile_fix</code>.</p></div></Reveal>
+        <Reveal delay={0}><div className="card"><div className="feat">🔌</div><h3>Agent connect</h3><p className="muted small">A real MCP server. Signup/login on the website, paste your personal key from <code>/dashboard/mcp</code> into the agent config — 2 tools: <code>compile</code> + <code>compile_fix</code>.</p></div></Reveal>
         <Reveal delay={80}><div className="card"><div className="feat">📨</div><h3>Request, nothing else</h3><p className="muted small">You only send title + instructions + files. No setup, no tokens, no infrastructure on your side.</p></div></Reveal>
         <Reveal delay={160}><div className="card"><div className="feat">⚙️</div><h3>Auto compile (all types)</h3><p className="muted small">The cloud runner compiles Python, Node, Go and more. In fix mode the AI repairs failures itself and retries up to 3 times.</p></div></Reveal>
         <Reveal delay={0}><div className="card"><div className="feat">🪙</div><h3>Coin economy</h3><p className="muted small">Bigger files cost more coins (1 ≈ 4 chars). Held on request, finally charged on output size. Live balance on the dashboard — or earn free coins by watching ads.</p></div></Reveal>

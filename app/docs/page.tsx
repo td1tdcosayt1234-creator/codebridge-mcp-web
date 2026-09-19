@@ -16,13 +16,14 @@ export default function Docs(){
     </ul>
 
     <h3>Step 2 — Connect your agent (optional)</h3>
-    <p>Add to your project <code>opencode.json</code>, then restart the agent app. No headers or keys needed — just be logged in on the website:</p>
+    <p>Signup/login is required to use the agent tools. Copy your personal key from <Link href="/dashboard/mcp">/dashboard/mcp</Link>, add it to your project <code>opencode.json</code>, then restart the agent app:</p>
     <pre>{`{
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
     "codebridge": {
       "type": "remote",
-      "url": "https://your-domain.com/api/mcp"
+      "url": "https://your-domain.com/api/mcp",
+      "headers": { "Authorization": "Bearer PASTE_KEY_FROM_DASHBOARD" }
     }
   }
 }`}</pre>

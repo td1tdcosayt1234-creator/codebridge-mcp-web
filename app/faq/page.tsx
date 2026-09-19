@@ -5,7 +5,7 @@ const faqs=[
 ["How are coins charged?","Bigger files cost more: 1 coin ≈ 4 chars. Held on request, finally charged on output size. See /dashboard/tokens for balance and per-request history."],
 ["What is fix-with-compile?","On failure, the AI fixes the code itself and retries up to 3 times — bigger fixes cost more. Pick fix-compile mode in /dashboard/tasks."],
 ["How do I earn free coins?","Watch ads in /dashboard/earn: +50 coins per full ad, max 10 per day. Ad blocker and VPN must be off; watch time is verified server-side, skipping pays nothing."],
-["How do I connect my coding agent?","Add the remote entry from /mcp to your agent config — no headers or keys. Just stay logged in on the website, then restart the agent app."],
+  ["How do I connect my coding agent?","Signup/login on the web first, then copy your personal key from /dashboard/mcp into the agent config headers (see /mcp), and restart the agent app. Anonymous use is disabled."],
 ["Is my data safe?","Passwords are bcrypt-hashed, sessions are httpOnly cookies, secrets encrypted and never shown, logins rate-limited + locked after 5 fails, bots/VPN blocked, everything audit-logged."],
 ["What does 402 / 'low balance' mean?","Not enough coins for the file size. Split into smaller requests or earn coins via ads."],
 ["I added the agent entry but no tools appear?","Config loads once at startup — quit and restart the agent app. Also check the server URL and website login."],

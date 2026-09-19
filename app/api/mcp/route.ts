@@ -3,11 +3,10 @@ import { readDb, writeDb, uid } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 const PROTOCOL = "2025-06-18";
-const GUEST_ID = "mcp_guest";
-const GUEST_DAILY = 2000;
 
-// No headers needed: log in on the website and add this MCP —
-// identity resolves from optional key, else login cookie, else shared guest pool.
+// Web signup/login required: every call must belong to a registered user.
+// Identity resolves from personal key (Authorization: Bearer <key> from
+// /dashboard/mcp) or login session cookie. No anonymous access.
 const TOOLS = [
   {
     name: "compile",
@@ -51,6 +50,17 @@ const TOOLS = [
       required: ["title", "prompt"],
     },
   },
+  {
+    name: "auth_check",
+    description: "Check browser approval after an unauthenticated compile/compile_fix call returned an approval URL. Pass {\"req\": \"<the id from that message>\"} and repeat every few seconds until it returns the task result.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        req: { type: "string", description: "approval request id" },
+      },
+      required: ["req"],
+    },
+  },
 ];
 
 type RpcMsg = { jsonrpc?: string; id?: string | number | null; method?: string; params?: Record<string, unknown> };
@@ -68,18 +78,14 @@ function text(t: string, isError = false) {
   return { content: [{ type: "text", text: t }], ...(isError ? { isError: true } : {}) };
 }
 
-function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-// Identity: optional personal key -> login session cookie -> shared guest pool.
-async function resolveUser(req: Request): Promise<{ userId: string; guest: boolean }> {
+// Identity: personal key -> login session cookie. Null = must signup/login.
+async function resolveUser(req: Request): Promise<{ userId: string } | null> {
   const db = await readDb();
   const h = req.headers.get("authorization") || "";
   const key = h.toLowerCase().startsWith("bearer ") ? h.slice(7).trim() : "";
   if (key) {
     const hit = db.mcpKeys.find((k) => k.key === key);
-    if (hit) return { userId: hit.userId, guest: false };
+    if (hit && db.users.some((u) => u.id === hit.userId)) return { userId: hit.userId };
   }
   const cookies = req.headers.get("cookie") || "";
   const m = cookies.split(";").map((s) => s.trim()).find((s) => s.startsWith("session="));
@@ -87,23 +93,10 @@ async function resolveUser(req: Request): Promise<{ userId: string; guest: boole
     try {
       const { verifyJwt } = await import("@/lib/auth");
       const p = await verifyJwt(decodeURIComponent(m.slice(8)));
-      if (p?.sub && db.users.some((u) => u.id === p.sub)) return { userId: p.sub as string, guest: false };
-    } catch { /* fall through to guest */ }
+      if (p?.sub && db.users.some((u) => u.id === p.sub)) return { userId: p.sub as string };
+    } catch { /* fall through to auth-required */ }
   }
-  // Shared guest pool (refilled daily) so headerless MCP just works after login.
-  db.settings = db.settings || { builderRepo: "", builderWorkflow: "opencode-task.yml", runnerTokenEnc: "", updatedBy: "", updatedAt: "" };
-  let g = db.usage.find((u) => u.userId === GUEST_ID);
-  if (!g) {
-    g = { userId: GUEST_ID, mcpCalls: 0, githubCalls: 0, balance: GUEST_DAILY, usedTotal: 0 };
-    db.usage.push(g);
-  }
-  const s = db.settings as typeof db.settings & { lastGuestRefill?: string };
-  if (s.lastGuestRefill !== todayKey()) {
-    s.lastGuestRefill = todayKey();
-    g.balance = GUEST_DAILY;
-  }
-  await writeDb(db);
-  return { userId: GUEST_ID, guest: true };
+  return null;
 }
 
 async function track(userId: string, tool: string, detail: string) {
@@ -117,8 +110,40 @@ async function track(userId: string, tool: string, detail: string) {
 }
 
 async function callTool(req: Request, name: string, args: Record<string, unknown>) {
-  const { userId, guest } = await resolveUser(req);
+  if (name === "auth_check") return await checkApproval(req, args);
+  const who = await resolveUser(req);
+  if (who) return await executeTool(who.userId, name, args);
   if (name !== "compile" && name !== "compile_fix") return text("Unknown tool: " + name, true);
+  // No identity yet -> browser-approval flow (OAuth-style, no key pasting).
+  const { createPending, webOrigin } = await import("@/lib/mcpAuth");
+  const pend = await createPending(name, args);
+  const url = webOrigin(req) + "/api/mcp/approve?req=" + pend.id;
+  return text(
+    "Browser login required (one time).\n" +
+    "1. Open this URL in your browser: " + url + "\n" +
+    "2. Signup/login there and click Approve.\n" +
+    "3. Then call the `auth_check` tool with {\"req\": \"" + pend.id + "\"} — repeat every few seconds until it returns your result.\n" +
+    "Coins are charged only when the task actually runs."
+  );
+}
+
+async function checkApproval(req: Request, args: Record<string, unknown>) {
+  const id = String((args as Record<string, unknown>).req || "");
+  if (!id) return text("Missing \"req\". Call compile/compile_fix first to get an approval URL.", true);
+  const { getPending, dropPending, webOrigin } = await import("@/lib/mcpAuth");
+  const p = await getPending(id);
+  if (!p) return text("Unknown or expired approval request. Call compile/compile_fix again for a fresh URL.", true);
+  if (p.state === "denied") { await dropPending(id); return text("Approval was denied in the browser.", true); }
+  if (p.state !== "approved" || !p.userId) {
+    const url = webOrigin(req) + "/api/mcp/approve?req=" + p.id;
+    return text("Still waiting for browser approval. Open " + url + ", login and Approve — then call auth_check again.", false);
+  }
+  dropPending(id).catch(() => {});
+  return await executeTool(p.userId, p.tool, p.args);
+}
+
+async function executeTool(userId: string, name: string, args: Record<string, unknown>) {
+  if (name !== "compile" && name !== "compile_fix" && name !== "auth_check") return text("Unknown tool: " + name, true);
   const { createTaskAndDispatch, waitForResult } = await import("@/lib/tasks");
   const files = Array.isArray(args.files) ? (args.files as { path: string; content: string }[]) : [];
   const out = await createTaskAndDispatch(userId, String(args.title || ""), String(args.prompt || ""), {
@@ -127,7 +152,7 @@ async function callTool(req: Request, name: string, args: Record<string, unknown
   if ("error" in out) return text(out.error, true);
   await track(userId, name, out.task.id);
   const id = out.task.id;
-  const head = "task_id=" + id + " (" + out.task.kind + ", ~" + out.task.tokensEst + " coins held)" + (guest ? " [shared guest pool]" : "") + "\n";
+  const head = "task_id=" + id + " (" + out.task.kind + ", ~" + out.task.tokensEst + " coins held)\n";
   const t = await waitForResult(id, 45000);
   if (!t) return text(head + "Task vanished unexpectedly.", true);
   const tail = (s: string) => (s || "-").slice(-6000);
@@ -195,6 +220,6 @@ export async function GET(req: Request) {
     return new Response("SSE streams not supported — use POST Streamable HTTP.", { status: 405 });
   }
   return NextResponse.json({
-    mcp: { name: "codebridge", protocol: PROTOCOL, url: "/api/mcp", auth: "none — just log in on the website", tools: TOOLS.map((t) => t.name) },
+    mcp: { name: "codebridge", protocol: PROTOCOL, url: "/api/mcp", auth: "signup/login required — personal key from /dashboard/mcp", tools: TOOLS.map((t) => t.name) },
   });
 }

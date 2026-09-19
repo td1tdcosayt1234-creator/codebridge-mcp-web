@@ -62,6 +62,7 @@ TOKEN_ENC_KEY=32chars-min-key
   }
 }
 ```
+Signup/login on the web first, copy the personal key from `/dashboard/mcp` — anonymous calls are rejected.
 Restart opencode after config change. Tools: `list_repos`, `push_code`, `trigger_build`, `get_build_status`, `get_build_logs`, `run_task` (kind+files), `get_task_result`.
 
 ## Security
