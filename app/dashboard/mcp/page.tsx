@@ -16,7 +16,8 @@ export default function McpPage(){
     else setMsg("Error: "+(j.error||"failed"));
   }
   const snippet = `{\n  "mcp": {\n    "codebridge": {\n      "type": "remote",\n      "url": "${origin || "https://your-domain.com"}/api/mcp",\n      "headers": { "Authorization": "Bearer ${key || "PASTE_YOUR_KEY_HERE"}" }\n    }\n  }\n}`;
-  return (<div><h2>Connect your agent — login required</h2>
+  return (<div><h2>Connect your agent — one click</h2>
+    <div className="card" style={{borderColor:"#22c55e55"}}><b>✨ Easiest (Notion-style): just the URL, no key.</b><p className="muted small" style={{marginBottom:0}}>Add <code>{(origin || "https://your-domain.com") + "/api/mcp"}</code> as a remote MCP server — the client opens a browser login, you click <b>Connect</b>, done. Wrong/old key? Clients now get a clear <code>invalid_token</code> error instead of a confusing message.</p></div>
     <div className="card" style={{borderColor:"#22c55e55"}}><b>✨ Easiest: automatic browser login (approve once).</b><p className="muted small" style={{marginBottom:0}}>Add the MCP with only the URL (no headers). On first use the agent gives you a browser link — open it, login + tick <b>Always allow</b> + Approve. After that one approval this agent runs without asking again. Revoke anytime below.</p></div>
     <div className="card" style={{marginTop:12}}><h3>Remembered agents</h3>
       {trusted.length===0&&<p className="muted small">None yet — approve an agent once with “Always allow” and it appears here.</p>}

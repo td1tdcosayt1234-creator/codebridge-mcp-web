@@ -10,7 +10,9 @@ const PROTOCOL = "2025-06-18";
 const TOOLS = [
   {
     name: "compile",
+    title: "Compile Code",
     description: "Compile anything (all types): send title + instructions + optional files. AI compiles in the cloud and this call waits up to ~45s for the live result. Bigger files cost more coins.",
+    annotations: { title: "Compile Code", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     inputSchema: {
       type: "object",
       properties: {
@@ -31,7 +33,9 @@ const TOOLS = [
   },
   {
     name: "compile_fix",
+    title: "Fix and Compile",
     description: "Compile with AI fix: like compile, but on failure the AI repairs the code itself and retries (max 3). Fix size costs extra coins. Waits up to ~45s for the live result.",
+    annotations: { title: "Fix and Compile", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     inputSchema: {
       type: "object",
       properties: {
@@ -51,13 +55,41 @@ const TOOLS = [
     },
   },
   {
+    name: "list_tasks",
+    title: "Search Tasks",
+    description: "Search your compile tasks (newest first). Use it to find a past task id before fetching its result.",
+    annotations: { title: "Search Tasks", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "optional text to match in title/prompt" },
+        limit: { type: "number", description: "max tasks to return (default 10, max 50)" },
+      },
+    },
+  },
+  {
+    name: "get_task_result",
+    title: "Fetch Task Result",
+    description: "Fetch one task with its live log and result. Pass the task_id returned by compile/compile_fix.",
+    annotations: { title: "Fetch Task Result", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    inputSchema: {
+      type: "object",
+      properties: { task_id: { type: "string", description: "task id, e.g. task_abc1234" } },
+      required: ["task_id"],
+    },
+  },
+  {
     name: "gh_issue_list",
+    title: "List GitHub Issues",
     description: "List GitHub issues for a repo. Browser approval required on first use.",
+    annotations: { title: "List GitHub Issues", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     inputSchema: { type: "object", properties: { repo: { type: "string" } }, required: ["repo"] },
   },
   {
     name: "auth_check",
+    title: "Check Approval",
     description: "Check browser approval after an unauthenticated compile/compile_fix call returned an approval URL. Pass {\"req\": \"<the id from that message>\"} and repeat every few seconds until it returns the task result.",
+    annotations: { title: "Check Approval", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     inputSchema: {
       type: "object",
       properties: {
@@ -84,13 +116,16 @@ function text(t: string, isError = false) {
 }
 
 // Identity: personal key -> login session cookie. Null = must signup/login.
-async function resolveUser(req: Request): Promise<{ userId: string } | null> {
+// "sentBadKey" is true when the client sent a Bearer key that does not match
+// any user — that is a hard 401 (invalid_token), never an approval prompt.
+async function resolveUser(req: Request): Promise<{ userId: string } | { sentBadKey: true } | null> {
   const db = await readDb();
   const h = req.headers.get("authorization") || "";
   const key = h.toLowerCase().startsWith("bearer ") ? h.slice(7).trim() : "";
   if (key) {
     const hit = db.mcpKeys.find((k) => k.key === key);
     if (hit && db.users.some((u) => u.id === hit.userId)) return { userId: hit.userId };
+    return { sentBadKey: true };
   }
   const cookies = req.headers.get("cookie") || "";
   const m = cookies.split(";").map((s) => s.trim()).find((s) => s.startsWith("session="));
@@ -117,6 +152,10 @@ async function track(userId: string, tool: string, detail: string) {
 async function callTool(req: Request, name: string, args: Record<string, unknown>) {
   if (name === "auth_check") return await checkApproval(req, args);
   const who = await resolveUser(req);
+  if (who && "sentBadKey" in who) {
+    const { invalidToken } = await import("@/lib/mcpOAuth");
+    throw invalidToken("This personal key is wrong or was regenerated. Copy the fresh key from /dashboard/mcp.");
+  }
   if (who) return await executeTool(who.userId, name, args);
   if (!TOOLS.some((t) => t.name === name)) return text("Unknown tool: " + name + ". Use GET /api/mcp for the tool list.", true);
   const { createPending, webOrigin, agentFp, findTrusted } = await import("@/lib/mcpAuth");
@@ -151,6 +190,27 @@ async function checkApproval(req: Request, args: Record<string, unknown>) {
 }
 
 async function executeTool(userId: string, name: string, args: Record<string, unknown>) {
+  if (name === "list_tasks") {
+    const { readDb } = await import("@/lib/db");
+    const db = await readDb();
+    const q = String((args as Record<string, unknown>).query || "").toLowerCase();
+    const limit = Math.min(50, Math.max(1, Number((args as Record<string, unknown>).limit) || 10));
+    const mine = db.tasks
+      .filter((t) => t.userId === userId && (!q || (t.title + " " + t.prompt).toLowerCase().includes(q)))
+      .slice(-limit)
+      .reverse()
+      .map((t) => ({ task_id: t.id, title: t.title, kind: t.kind, status: t.status, updatedAt: t.updatedAt }));
+    return text(mine.length ? JSON.stringify(mine, null, 2) : "No tasks yet. Use compile to create one.");
+  }
+  if (name === "get_task_result") {
+    const { readDb } = await import("@/lib/db");
+    const db = await readDb();
+    const id = String((args as Record<string, unknown>).task_id || "");
+    const t = db.tasks.find((x) => x.id === id && x.userId === userId);
+    if (!t) return text("Unknown task id. Use list_tasks to find yours.", true);
+    const tail = (s: string) => (s || "-").slice(-6000);
+    return text("[" + t.status.toUpperCase() + "] " + t.title + " (charged " + t.tokensCharged + " coins)\n--- log ---\n" + tail(t.log) + "\n--- result ---\n" + tail(t.result));
+  }
   if (name === "gh_issue_list") {
     const repo = String((args as Record<string, unknown>).repo || "");
     return text("Issues for " + repo + ": none yet. Use /api/github/status to check your GitHub connection.");
@@ -199,11 +259,18 @@ async function handleOne(req: Request, m: RpcMsg): Promise<{ resp: object | null
     }
   if (m.method === "ping") return { resp: { jsonrpc: "2.0", id, result: {} } };
   if (m.method === "tools/list") return { resp: { jsonrpc: "2.0", id, result: { tools: TOOLS } } };
+  if (m.method === "resources/list") return { resp: { jsonrpc: "2.0", id, result: { resources: [] } } };
+  if (m.method === "prompts/list") return { resp: { jsonrpc: "2.0", id, result: { prompts: [] } } };
   if (m.method === "tools/call") {
     const p = (m.params || {}) as { name?: string; arguments?: Record<string, unknown> };
     if (!p.name) return { resp: { jsonrpc: "2.0", id, error: { code: -32602, message: "Missing tool name" } } };
-    const result = await callTool(req, p.name, p.arguments || {});
-    return { resp: { jsonrpc: "2.0", id, result } };
+    try {
+      const result = await callTool(req, p.name, p.arguments || {});
+      return { resp: { jsonrpc: "2.0", id, result } };
+    } catch (e) {
+      if (e instanceof Response) throw e; // hard auth failure -> HTTP 401
+      throw e;
+    }
   }
   return { resp: { jsonrpc: "2.0", id, error: { code: -32601, message: "Method not found: " + m.method } } };
 }
@@ -221,8 +288,13 @@ export async function POST(req: Request) {
   const batch = Array.isArray(body) ? (body as RpcMsg[]) : [body as RpcMsg];
   const out: object[] = [];
   for (const m of batch) {
-    const r = await handleOne(req, m);
-    if (r.resp) out.push(r.resp);
+    try {
+      const r = await handleOne(req, m);
+      if (r.resp) out.push(r.resp);
+    } catch (e) {
+      if (e instanceof Response) return e; // e.g. invalid Bearer -> 401 JSON
+      throw e;
+    }
   }
   if (out.length === 0) return new Response(null, { status: 202 });
   const payload = Array.isArray(body) ? out : out[0];
@@ -232,9 +304,27 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   const accept = req.headers.get("accept") || "";
   if (accept.includes("text/event-stream")) {
-    return new Response("SSE streams not supported — use POST Streamable HTTP.", { status: 405 });
+    // Streamable-HTTP clients open a GET SSE stream first. We have no live
+    // stream, so answer with JSON (Notion-style servers do the same) instead
+    // of plain text the client cannot parse.
+    return NextResponse.json(
+      { error: "sse_not_supported", error_description: "Use POST Streamable HTTP on this URL." },
+      { status: 405, headers: { Allow: "GET, POST", "MCP-Protocol-Version": PROTOCOL } }
+    );
   }
   return NextResponse.json({
-    mcp: { name: "codebridge", protocol: PROTOCOL, url: "/api/mcp", auth: "signup/login required — personal key from /dashboard/mcp", tools: TOOLS.map((t) => t.name) },
+    mcp: {
+      name: "codebridge",
+      version: "2.0.0",
+      protocol: PROTOCOL,
+      transport: "streamableHttp",
+      url: "/api/mcp",
+      status: "healthy",
+      auth: {
+        type: "oauth2+bearer",
+        connect: "Add only this URL in your client — a browser login connects it (no key pasting). Manual key: /dashboard/mcp.",
+      },
+      tools: TOOLS.map((t) => t.name),
+    },
   });
 }
