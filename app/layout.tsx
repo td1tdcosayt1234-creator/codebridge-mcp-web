@@ -9,6 +9,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
+        <div className="bg-stage" aria-hidden="true"><div className="orb orb-a" /><div className="orb orb-b" /><div className="orb orb-c" /><div className="stars" /></div>
+        <div className="vignette" aria-hidden="true" />
+        <div className="grain" aria-hidden="true" />
         <div className="nav">
           <div className="container nav-inner">
             <Link href="/" className="logo">Code<span>Bridge</span></Link>
