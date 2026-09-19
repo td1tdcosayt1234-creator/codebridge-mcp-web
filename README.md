@@ -25,6 +25,14 @@ npm run dev
 
 Demo admin: `admin@local.test` / `admin123` (prod e bodlao).
 
+## Access over Tailscale (tailnet)
+Bind all interfaces and open the firewall once:
+```bash
+npm run dev -- -p 3001 -H 0.0.0.0
+netsh advfirewall firewall add rule name=CodeBridgeDev dir=in action=allow protocol=TCP localport=3001
+```
+Then open `http://<tailnet-ip>:3001` from any device on your tailnet (traffic stays inside WireGuard encryption). Login/CSRF work with the tailnet hostname — no code change needed.
+
 ## Env
 Copy `.env.example` to `.env`:
 ```
