@@ -1,8 +1,19 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 export default function Login(){
-  const [email,setEmail]=useState(""); const [password,setPassword]=useState(""); const [err,setErr]=useState(""); const r=useRouter();
-  async function go(e:any){ e.preventDefault(); setErr(""); const res=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password})}); const j=await res.json(); if(!res.ok){setErr(j.error||"Login failed");return;} r.push(j.role==="admin"?"/admin":"/dashboard"); }
-  return (<div style={{maxWidth:420,margin:"30px auto"}}><h1>Login</h1><p className="muted small">Demo admin: admin@local.test / admin123 (change in production). Accounts lock for 15 min after 5 wrong tries.</p><form onSubmit={go}><label>Email</label><input value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email"/><label>Password</label><input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password"/>{err&&<p style={{color:"#fca5a5"}}>{err}</p>}<div style={{marginTop:14}}><button className="btn" type="submit">Login</button></div></form></div>);
+  const [email,setEmail]=useState(""); const [password,setPassword]=useState(""); const [err,setErr]=useState(""); const [busy,setBusy]=useState(false); const r=useRouter();
+  async function go(e:any){ e.preventDefault(); setErr(""); setBusy(true); try{ const res=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password})}); const j=await res.json(); if(!res.ok){setErr(j.error||"Login failed");return;} r.push(j.role==="admin"?"/admin":"/dashboard"); }finally{ setBusy(false); } }
+  return (<div style={{maxWidth:460,margin:"36px auto"}} className="fade-up">
+    <div className="card" style={{padding:30,boxShadow:"0 30px 80px -30px #6c8cff88,0 0 60px -20px #22d3ee55",borderColor:"#22d3ee33"}}>
+      <div className="kicker"><span className="pulse-dot" />Welcome back</div>
+      <h1 style={{margin:"0 0 6px",letterSpacing:"-.5px"}}>Login to <span className="grad-anim">CodeBridge</span></h1>
+      <p className="muted small" style={{marginTop:0}}>Demo admin: <code>admin@local.test</code> / <code>admin123</code> (change in production). Accounts lock for 15 min after 5 wrong tries.</p>
+      <form onSubmit={go}><label>Email</label><input value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com"/><label>Password</label><input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" placeholder="••••••••"/>
+      {err&&<p className="small" style={{marginTop:10}}><span className="badge bad">{err}</span></p>}
+      <div style={{marginTop:16}}><button className="btn btn-lg" style={{width:"100%"}} type="submit" disabled={busy}>{busy?"Logging in…":"Login"}</button></div></form>
+      <p className="muted small" style={{margin:"16px 0 0",textAlign:"center"}}>No account yet? <Link href="/signup" style={{color:"var(--brand2)"}}>Sign up free →</Link></p>
+    </div>
+  </div>);
 }
