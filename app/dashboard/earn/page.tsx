@@ -1,6 +1,7 @@
-"use client"; import { useEffect, useState } from "react";
+"use client"; import { useEffect, useRef, useState } from "react";
 export default function Earn(){
   const [info,setInfo]=useState<any>(null); const [nonce,setNonce]=useState(""); const [left,setLeft]=useState(0); const [msg,setMsg]=useState(""); const [adblock,setAdblock]=useState(false);
+  const finishing=useRef(false);
   async function load(){ const r=await fetch("/api/earn"); const j=await r.json(); if(r.ok) setInfo(j); }
   useEffect(()=>{ load(); },[]);
   useEffect(()=>{
@@ -22,6 +23,7 @@ export default function Earn(){
   },[nonce]);
   async function start(){
     setMsg("");
+    finishing.current=false;
     if(adblock){ setMsg("Ad blocker detected. Disable it to earn coins."); return; }
     const r=await fetch("/api/earn",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"start"})});
     const j=await r.json();
@@ -29,6 +31,7 @@ export default function Earn(){
     setNonce(j.nonce); setLeft(j.seconds);
   }
   async function finish(){
+    if(finishing.current) return; finishing.current=true;
     const r=await fetch("/api/earn",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"complete",nonce})});
     const j=await r.json();
     setNonce("");
