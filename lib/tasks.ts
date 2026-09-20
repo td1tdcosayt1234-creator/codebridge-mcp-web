@@ -50,7 +50,14 @@ export async function createTaskAndDispatch(
 ): Promise<{ task: DbShape["tasks"][number] } | { error: string; status: number }> {
   if (!title.trim() || !prompt.trim()) return { error: "Title and prompt are both required.", status: 400 };
   const kind = opts?.kind === "fix-compile" ? "fix-compile" : "compile";
-  const files = (opts?.files || []).filter((f) => f.path && f.content !== undefined).slice(0, 20).map((f) => ({ path: String(f.path).slice(0, 200), content: String(f.content).slice(0, 100000) }));
+  // Junk filter: .git/.gradle/build/node_modules etc. khabe na — age .git/hooks quota kheye
+  // asol source batil hoye hallucination hoto (task_pl1jeie: 20tar 17tai .git/hooks chilo).
+  const JUNK = /(^|\/)\.git(\/|$)|(^|\/)\.gradle(\/|$)|(^|\/)build(\/|$)|(^|\/)node_modules(\/|$)|(^|\/)\.next(\/|$)|(^|\/)__pycache__(\/|$)|(^|\/)\.idea(\/|$)|(^|\/)\.vscode(\/|$)|(^|\/)\.cxx(\/|$)|(^|\/)captures(\/|$)|(^|\/)\.externalNativeBuild(\/|$)|local\.properties$|\.iml$|\.hprof$|\.bin$|\.apk$|\.aab$/i;
+  const files = (opts?.files || [])
+    .filter((f) => f.path && f.content !== undefined)
+    .map((f) => ({ path: String(f.path).replace(/^\/+/, "").slice(0, 200), content: String(f.content).slice(0, 100000) }))
+    .filter((f) => !JUNK.test(f.path))
+    .slice(0, 50).map((f) => ({ path: f.path, content: f.content }));
   if (filesBytes(files) > MAX_FILES_BYTES) return { error: "Files too large (max 200KB). Split into smaller requests.", status: 400 };
   const db = await readDb();
   const { builderRepo, builderWorkflow } = runnerSettings(db);

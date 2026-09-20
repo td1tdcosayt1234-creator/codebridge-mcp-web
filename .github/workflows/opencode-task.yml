@@ -64,6 +64,30 @@ jobs:
           done
           echo "final_exit=$EXIT_CODE" | tee -a agent.log
           echo "$EXIT_CODE" > exit.code
+      - name: Set up Java 17 (Android needs VERSION_17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Set up Android SDK (compileSdk 34)
+        uses: android-actions/setup-android@v3
+      - name: Real Gradle build (assembleDebug, no hallucination)
+        if: always()
+        run: |
+          echo "=== REAL GRADLE BUILD (assembleDebug) ===" | tee -a agent.log
+          java -version 2>&1 | tee -a agent.log
+          sdkmanager --install "platforms;android-34" "build-tools;34.0.0" 2>&1 | tail -n 3 | tee -a agent.log
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          if [ -f ./gradlew ]; then chmod +x ./gradlew; GRADLE_CMD="./gradlew"; else curl -fsSL https://services.gradle.org/distributions/gradle-8.7-bin.zip -o /tmp/gradle.zip && unzip -q /tmp/gradle.zip -d /tmp && export PATH=/tmp/gradle-8.7/bin:$PATH; GRADLE_CMD="gradle"; fi
+          echo "gradle-cmd=$GRADLE_CMD java=17 kotlin=1.9.24 agp=8.5.2 compileSdk=34" | tee -a agent.log
+          $GRADLE_CMD assembleDebug --stacktrace 2>&1 | tee gradle-build.log | tail -n 60 | tee -a agent.log
+          echo "${PIPESTATUS[0]}" > gradle-exit.code
+          echo "gradle-exit=$(cat gradle-exit.code)" | tee -a agent.log
+          APK=$(find . -name "*.apk" -path "*debug*" 2>/dev/null | head -n 5)
+          echo "apk-files:" | tee -a agent.log; echo "$APK" | tee -a agent.log
+          cat gradle-build.log >> agent.log
+          # AI exit code er sathe real gradle verdict merge: gradle fail hole task failed
+          if [ "$(cat gradle-exit.code)" != "0" ] && [ -f exit.code ] && [ "$(cat exit.code)" = "0" ]; then echo "1" > exit.code; echo "override: AI exit 0 kintu real gradle fail -> task failed" | tee -a agent.log; fi
       - name: Send result to web
         if: always()
         run: |

@@ -34,22 +34,26 @@ jobs:
           for(const f of (t.files||[])){fs.mkdirSync(require('path').dirname(f.path),{recursive:true});fs.writeFileSync(f.path,f.content);}
           console.log('files:',(t.files||[]).length,'kind:',t.kind);
           "
-      - name: Run opencode (free, no API key)
+      - name: Run opencode (free local Ollama, no API key)
         run: |
           node -e "const t=require('./task.json');require('fs').writeFileSync('prompt.txt',t.prompt)"
           KIND=$(node -e "console.log(require('./task.json').kind||'compile')")
-          # Free Pollinations provider (OpenAI-compatible, no key) — api key lagbe na
-          node -e "require('fs').writeFileSync('opencode.json', JSON.stringify({\$schema:'https://opencode.ai/config.json', provider:{ pollinations:{ npm:'@ai-sdk/openai-compatible', name:'Pollinations (free)', options:{ baseURL:'https://text.pollinations.ai/openai' }, models:{ openai:{ name:'Pollinations OpenAI (free)' } } } } }, null, 2))"
+          # Ollama local (100% free, unlimited, no key) — api key lagbe na
+          curl -fsSL https://ollama.com/install.sh | sh
+          (ollama serve > ollama.log 2>&1 &)
+          sleep 5
+          ollama pull qwen2.5-coder:1.5b
+          node -e "require('fs').writeFileSync('opencode.json', JSON.stringify({\$schema:'https://opencode.ai/config.json', provider:{ ollama:{ npm:'@ai-sdk/openai-compatible', name:'Ollama (local free)', options:{ baseURL:'http://localhost:11434/v1' }, models:{ 'qwen2.5-coder:1.5b':{ name:'Qwen2.5-Coder 1.5B (local free)' } } } } }, null, 2))"
           cat opencode.json
           # fix-compile mode retries up to 3 times, compile mode runs once
           MAX_TRY=1
           if [ "$KIND" = "fix-compile" ]; then MAX_TRY=3; fi
-          echo "kind=$KIND max_try=$MAX_TRY model=pollinations/openai"
+          echo "kind=$KIND max_try=$MAX_TRY model=ollama/qwen2.5-coder:1.5b"
           : > agent.log
           EXIT_CODE=1
           for i in $(seq 1 $MAX_TRY); do
             echo "=== attempt $i/$MAX_TRY ($KIND) ===" | tee -a agent.log
-            opencode run --auto -m pollinations/openai "$(cat prompt.txt)" 2>&1 | tee -a agent.log
+            opencode run --auto -m ollama/qwen2.5-coder:1.5b "$(cat prompt.txt)" 2>&1 | tee -a agent.log
             EXIT_CODE=\${PIPESTATUS[0]}
             echo "attempt $i exit=$EXIT_CODE" | tee -a agent.log
             if [ "$EXIT_CODE" = "0" ]; then break; fi
@@ -58,6 +62,30 @@ jobs:
           done
           echo "final_exit=$EXIT_CODE" | tee -a agent.log
           echo "$EXIT_CODE" > exit.code
+      - name: Set up Java 17 (Android needs VERSION_17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Set up Android SDK (compileSdk 34)
+        uses: android-actions/setup-android@v3
+      - name: Real Gradle build (assembleDebug, no hallucination)
+        if: always()
+        run: |
+          echo "=== REAL GRADLE BUILD (assembleDebug) ===" | tee -a agent.log
+          java -version 2>&1 | tee -a agent.log
+          sdkmanager --install "platforms;android-34" "build-tools;34.0.0" 2>&1 | tail -n 3 | tee -a agent.log
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          if [ -f ./gradlew ]; then chmod +x ./gradlew; GRADLE_CMD="./gradlew"; else curl -fsSL https://services.gradle.org/distributions/gradle-8.7-bin.zip -o /tmp/gradle.zip && unzip -q /tmp/gradle.zip -d /tmp && export PATH=/tmp/gradle-8.7/bin:$PATH; GRADLE_CMD="gradle"; fi
+          echo "gradle-cmd=$GRADLE_CMD java=17 kotlin=1.9.24 agp=8.5.2 compileSdk=34" | tee -a agent.log
+          $GRADLE_CMD assembleDebug --stacktrace 2>&1 | tee gradle-build.log | tail -n 60 | tee -a agent.log
+          echo "\${PIPESTATUS[0]}" > gradle-exit.code
+          echo "gradle-exit=$(cat gradle-exit.code)" | tee -a agent.log
+          APK=$(find . -name "*.apk" -path "*debug*" 2>/dev/null | head -n 5)
+          echo "apk-files:" | tee -a agent.log; echo "$APK" | tee -a agent.log
+          cat gradle-build.log >> agent.log
+          # AI exit code er sathe real gradle verdict merge: gradle fail hole task failed
+          if [ "$(cat gradle-exit.code)" != "0" ] && [ -f exit.code ] && [ "$(cat exit.code)" = "0" ]; then echo "1" > exit.code; echo "override: AI exit 0 kintu real gradle fail -> task failed" | tee -a agent.log; fi
       - name: Send result to web
         if: always()
         run: |
