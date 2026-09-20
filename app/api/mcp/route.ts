@@ -11,7 +11,7 @@ const TOOLS = [
   {
     name: "compile",
     title: "Compile Code",
-    description: "Compile anything (all types): send title + instructions + optional files. AI compiles in the cloud and this call waits up to ~45s for the live result. Bigger files cost more coins.",
+    description: "Compile anything (all types): send title + instructions + optional files. AI compiles in the cloud and this call waits up to ~8 min for the FULL live result directly in this agent (no dashboard needed). Bigger files cost more coins. If it returns 'Still running', call get_task_result with the task_id — output ekhanei asbe.",
     annotations: { title: "Compile Code", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     inputSchema: {
       type: "object",
@@ -34,7 +34,7 @@ const TOOLS = [
   {
     name: "compile_fix",
     title: "Fix and Compile",
-    description: "Compile with AI fix: like compile, but on failure the AI repairs the code itself and retries (max 3). Fix size costs extra coins. Waits up to ~45s for the live result.",
+    description: "Compile with AI fix: like compile, but on failure the AI repairs the code itself and retries (max 3). Fix size costs extra coins. Waits up to ~8 min for the FULL live result directly in this agent. If 'Still running', call get_task_result with the task_id.",
     annotations: { title: "Fix and Compile", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     inputSchema: {
       type: "object",
@@ -70,7 +70,7 @@ const TOOLS = [
   {
     name: "get_task_result",
     title: "Fetch Task Result",
-    description: "Fetch one task with its live log and result. Pass the task_id returned by compile/compile_fix.",
+    description: "Fetch one task with its live log and result DIRECTLY in this agent (dashboard e jete hoy na). Pass the task_id returned by compile/compile_fix.",
     annotations: { title: "Fetch Task Result", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     inputSchema: {
       type: "object",
@@ -225,14 +225,14 @@ async function executeTool(userId: string, name: string, args: Record<string, un
   await track(userId, name, out.task.id);
   const id = out.task.id;
   const head = "task_id=" + id + " (" + out.task.kind + ", ~" + out.task.tokensEst + " coins held)\n";
-  const t = await waitForResult(id, 45000);
+  const t = await waitForResult(id, 480000);
   if (!t) return text(head + "Task vanished unexpectedly.", true);
   const tail = (s: string) => (s || "-").slice(-6000);
   if (t.status === "done" || t.status === "failed") {
     await track(userId, name + "_result", id);
     return text(head + "[" + t.status.toUpperCase() + "] " + t.title + " (charged " + t.tokensCharged + " coins)\n--- log ---\n" + tail(t.log) + "\n--- result ---\n" + tail(t.result));
   }
-  return text(head + "Still " + t.status + " after 45s — the cloud runner is still working. Check the dashboard Tasks page (id " + id + ") for the live output.");
+  return text(head + "Still " + t.status + " after 8 min — runner ekhono kaj korche. Dashboard e jete hobe NA: ei agent thekei `get_task_result` tool e {\"task_id\": \"" + id + "\"} pathao, full log+result ekhanei pabe. 1-2 min por abar call koro.");
 }
 
 async function handleOne(req: Request, m: RpcMsg): Promise<{ resp: object | null }> {

@@ -16,9 +16,12 @@ export function bearerToken(req: Request): string {
   return h.toLowerCase().startsWith("bearer ") ? h.slice(7).trim() : "";
 }
 
-// Wait for a task to finish (for MCP: submit + return live result). Resolves
-// with the latest task state after done/failed or timeout.
-export async function waitForResult(taskId: string, timeoutMs = 45000): Promise<DbShape["tasks"][number] | null> {
+// Wait for a task to finish (for MCP: submit + return live result IN THE AGENT).
+// Resolves with the latest task state after done/failed or timeout.
+// Android Gradle builds take minutes (Ollama pull + assembleDebug ~3-6 min),
+// so the agent call blocks up to ~8 min to deliver the FULL output directly —
+// dashboard e jete hoy na.
+export async function waitForResult(taskId: string, timeoutMs = 480000): Promise<DbShape["tasks"][number] | null> {
   const start = Date.now();
   let last: DbShape["tasks"][number] | null = null;
   while (Date.now() - start < timeoutMs) {
@@ -27,7 +30,7 @@ export async function waitForResult(taskId: string, timeoutMs = 45000): Promise<
     if (!t) return null;
     last = t;
     if (t.status === "done" || t.status === "failed") return t;
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 5000));
   }
   return last;
 }
