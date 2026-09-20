@@ -1,20 +1,51 @@
 # CodeBridge — Web Request → Actions OpenCode → Compile + Fix
 
 User repo chhoy na. Web e request dao → GitHub Actions e chalano OpenCode compile/fix kore → output web e fire ase → user result dekhe.
+MCP diye coding agent thekei full output paoa jay — dashboard e jete hoy na.
 
 ## Flow
 ```
-web request (/dashboard/tasks, title+prompt+files)
+web request (/dashboard/tasks, title+prompt+files) ba MCP (compile/compile_fix)
   → task queue → workflow_dispatch (builder repo)
-  → Actions: opencode run --auto (code + compile, fail hole AI fix, max 3 retry)
-  → POST /api/runner/update → dashboard live output
+  → Actions: task files task-work/ dir e likhe AI review (Ollama, free, no key)
+    + project type onujayi REAL build (Android/Node/Python/Go/Rust)
+  → APK thakle POST /api/runner/apk → POST /api/runner/update
+  → MCP tool call ei full log+result+APK link (8 min porjonto wait, tarpor get_task_result)
 ```
+
+## Real build matrix (all types)
+Task files isolated `task-work/` dir e lekha hoy — builder repo nijer `package.json` trigger hoy na.
+Runner project marker dekhe matching builder চালায়, AI verdict shudhu tokhon override kore jokhon real build fail kore:
+
+| Type | Marker | Real command |
+|---|---|---|
+| Android | `settings.gradle` / `app/build.gradle` / `AndroidManifest.xml` | `assembleDebug` (Java 17, AGP 8.5.2, Kotlin 1.9.24, compileSdk 34) + APK upload |
+| Node | `task-work/package.json` | `npm ci` + `npm run build` (script thakle) |
+| Python | `*.py` / `requirements.txt` / `pyproject.toml` | `pip install` + `py_compile` + `pytest` (test thakle) |
+| Go | `task-work/go.mod` | `go build ./...` |
+| Rust | `task-work/Cargo.toml` | `cargo build` |
+| Other | kono marker nei | skip — AI verdict stands |
+
+`.git/.gradle/build/node_modules` junk file server-side filter hoy (quota noshto hoy na, max 50 files / 200KB).
+APK flow: GitHub → web (`POST /api/runner/apk`) → agent (`--- apk ---` download link, same Bearer key).
 
 ## Token economy
 - 1 token ≈ 4 chars. File joto boro toto token.
 - Request e prompt+files onujayi hold, seshe log+result size onujayi final charge.
+- Final charge cap: total kokhonoi `estimate×3 + 500` er beshi na (infra log bloat e choto test marbe na).
+- Dispatch fail hole auto refund (hold ferot, `tokensCharged = 0`).
 - Free balance: 10,000. Kom thakle `402` — request jabe na.
-- Modes: `compile` (only) / `fix-compile` (fail → AI auto fix).
+- Modes: `compile` (only) / `fix-compile` (fail → AI auto fix, max 3 retry).
+
+## Quick start (localhost)
+```bash
+npm install
+npm run dev -- -p 3001 -H 0.0.0.0
+# open http://localhost:3001 (3000 Blockbench use kore, tai 3001)
+# ba start-codebridge.bat chalao
+```
+
+Demo admin `.env` theke ase (`ADMIN_EMAIL` / `ADMIN_PASSWORD`, min 12 chars).
 
 ## Quick start (localhost)
 ```bash
@@ -23,7 +54,7 @@ npm run dev
 # open http://localhost:3000
 ```
 
-Demo admin: `admin@local.test` / `admin123` (prod e bodlao).
+Demo admin `.env` theke ase (`ADMIN_EMAIL` / `ADMIN_PASSWORD`, min 12 chars).
 
 ## Access over Tailscale (tailnet)
 Bind all interfaces and open the firewall once:
@@ -32,6 +63,7 @@ npm run dev -- -p 3001 -H 0.0.0.0
 netsh advfirewall firewall add rule name=CodeBridgeDev dir=in action=allow protocol=TCP localport=3001
 ```
 Then open `http://<tailnet-ip>:3001` from any device on your tailnet (traffic stays inside WireGuard encryption). Login/CSRF work with the tailnet hostname — no code change needed.
+**Note:** GitHub cloud runner localhost/tailnet IP te pouchate pare na — `WEB_URL` er jonno public URL (Cloudflare Tunnel) lage, nahole self-hosted runner.
 
 ## Env
 Copy `.env.example` to `.env`:
@@ -47,8 +79,8 @@ TOKEN_ENC_KEY=32chars-min-key
 
 ## Admin setup (must)
 1. `/admin/github` — Global GitHub Classic Token (scope `repo` + `workflow`).
-2. `/admin/runner` — builder repo (owner/repo) + workflow file + runner token regenerate → builder repo secrets: `WEB_URL` (public URL; localhost e cloud runner pouchay na → self-hosted runner), `RUNNER_TOKEN`, `ANTHROPIC_API_KEY`.
-3. Builder repo te `.github/workflows/opencode-task.yml` bosao (ready template `/admin/runner` page e).
+2. `/admin/runner` — builder repo (owner/repo) + workflow file + runner token regenerate → builder repo secrets: `WEB_URL` (public URL; localhost e cloud runner pouchay na → Cloudflare Tunnel ba self-hosted runner), `RUNNER_TOKEN`. Kono AI API key lage na — runner free local Ollama (`qwen2.5-coder:1.5b`) use kore.
+3. Builder repo te `.github/workflows/opencode-task.yml` bosao (ready template `/admin/runner` page e — sob somoy repo file tai source of truth).
 
 ## MCP connect (opencode.json)
 ```json
@@ -63,7 +95,7 @@ TOKEN_ENC_KEY=32chars-min-key
 }
 ```
 Signup/login on the web first, copy the personal key from `/dashboard/mcp` — anonymous calls are rejected.
-Restart opencode after config change. Tools: `list_repos`, `push_code`, `trigger_build`, `get_build_status`, `get_build_logs`, `run_task` (kind+files), `get_task_result`.
+Restart opencode after config change. Tools: `compile`, `compile_fix`, `list_tasks`, `get_task_result`, `gh_issue_list`, `auth_check` — full log+result+APK link agent ei ase (compile call ~8 min wait, sesh na hole `get_task_result` e `task_id` pathao).
 
 ## Security
 bcrypt passwords, JWT httpOnly cookie, AES-256-GCM vault (tokens never shown full), RBAC user/admin, login-must dashboard, 404 on admin for non-admin, audit tracking.
