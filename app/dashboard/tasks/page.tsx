@@ -40,7 +40,7 @@ export default function Tasks(){
     <h3 style={{marginTop:18}}>My requests (auto refresh)</h3>
     {tasks.length===0&&<p className="muted small">No requests yet.</p>}
     {tasks.map((t:any)=>(<div key={t.id} className="card" style={{marginTop:8}}>
-      <div><span className="badge">{t.status}</span> <span className="badge">{t.kind||"compile"}</span> <b>{t.title}</b> <span className="muted small">{t.id} • charged {t.tokensCharged||0}</span></div>
+      <div><span className="badge">{t.status}</span> <span className="badge">{t.kind||"compile"}</span> <b>{t.title}</b> <span className="muted small">{t.id} • charged {t.tokensCharged||0}</span>{t.apkSize>0&&<span> • <a href={"/api/tasks/"+t.id+"/apk"}>Download APK ({Math.round(t.apkSize/1048576*10)/10} MB)</a></span>}</div>
       <div style={{marginTop:8}}><button className="btn-ghost" onClick={()=>setOpen(open===t.id?null:t.id)}>{open===t.id?"Hide output":"Show output"}</button></div>
       {open===t.id&&(<div style={{marginTop:8}}><div className="muted small">Prompt:</div><pre>{t.prompt}</pre><div className="muted small">Log:</div><pre>{t.log||"—"}</pre><div className="muted small">Result:</div><pre>{t.result||"— not yet, OpenCode is working"}</pre></div>)}
     </div>))}

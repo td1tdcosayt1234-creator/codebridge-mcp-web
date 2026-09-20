@@ -96,6 +96,21 @@ jobs:
           # nahole 15000-char slice + coin charge bloat hoy (19-coin test e 7500 katsilo).
           # AI exit code er sathe real gradle verdict merge: gradle fail hole task failed
           if [ "$(cat gradle-exit.code)" != "0" ] && [ -f exit.code ] && [ "$(cat exit.code)" = "0" ]; then echo "1" > exit.code; echo "override: AI exit 0 kintu real gradle fail -> task failed" | tee -a agent.log; fi
+      - name: Send APK to web (thakle — web theke agent download korbe)
+        if: always()
+        run: |
+          APK=$(find . -name "*.apk" -path "*debug*" 2>/dev/null | head -n 1)
+          if [ -n "$APK" ]; then
+            echo "uploading $APK ($(du -h "$APK" | cut -f1))"
+            WEB="${WEB_URL%/}"
+            curl -sf -X POST -H "Authorization: Bearer ${{ secrets.RUNNER_TOKEN }}" --data-binary "@$APK" "$WEB/api/runner/apk?task_id=${{ inputs.task_id }}"
+            echo "apk-sent=$?"
+          else
+            echo "no apk (non-Android ba build fail)"
+          fi
+        env:
+          WEB_URL: ${{ secrets.WEB_URL }}
+          RUNNER_TOKEN: ${{ secrets.RUNNER_TOKEN }}
       - name: Send result to web
         if: always()
         run: |

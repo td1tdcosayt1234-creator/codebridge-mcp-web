@@ -156,13 +156,13 @@ async function callTool(req: Request, name: string, args: Record<string, unknown
     const { invalidToken } = await import("@/lib/mcpOAuth");
     throw invalidToken("This personal key is wrong or was regenerated. Copy the fresh key from /dashboard/mcp.");
   }
-  if (who) return await executeTool(who.userId, name, args);
-  if (!TOOLS.some((t) => t.name === name)) return text("Unknown tool: " + name + ". Use GET /api/mcp for the tool list.", true);
   const { createPending, webOrigin, agentFp, findTrusted } = await import("@/lib/mcpAuth");
+  if (who) return await executeTool(who.userId, name, args, webOrigin(req));
+  if (!TOOLS.some((t) => t.name === name)) return text("Unknown tool: " + name + ". Use GET /api/mcp for the tool list.", true);
   const { clientIp } = await import("@/lib/security");
   const fp = agentFp(req, clientIp(req));
   const trusted = await findTrusted(fp);
-  if (trusted) return await executeTool(trusted.userId, name, args);
+  if (trusted) return await executeTool(trusted.userId, name, args, webOrigin(req));
   const pend = await createPending(name, args, fp);
   const url = webOrigin(req) + "/api/mcp/approve?req=" + pend.id;
   return text(
@@ -186,10 +186,14 @@ async function checkApproval(req: Request, args: Record<string, unknown>) {
     return text("Still waiting for browser approval. Open " + url + ", login and Approve — then call auth_check again.", false);
   }
   dropPending(id).catch(() => {});
-  return await executeTool(p.userId, p.tool, p.args);
+  return await executeTool(p.userId, p.tool, p.args, webOrigin(req));
 }
 
-async function executeTool(userId: string, name: string, args: Record<string, unknown>) {
+async function executeTool(userId: string, name: string, args: Record<string, unknown>, origin: string) {
+  const apkLine = (t: { id: string; apkSize?: number }) =>
+    t.apkSize
+      ? "\n--- apk ---\napp-debug.apk (" + (t.apkSize / 1048576).toFixed(1) + " MB): " + origin + "/api/tasks/" + t.id + "/apk — same Bearer key header diye ei agent ei download koro."
+      : "";
   if (name === "list_tasks") {
     const { readDb } = await import("@/lib/db");
     const db = await readDb();
@@ -209,7 +213,7 @@ async function executeTool(userId: string, name: string, args: Record<string, un
     const t = db.tasks.find((x) => x.id === id && x.userId === userId);
     if (!t) return text("Unknown task id. Use list_tasks to find yours.", true);
     const tail = (s: string) => (s || "-").slice(-6000);
-    return text("[" + t.status.toUpperCase() + "] " + t.title + " (charged " + t.tokensCharged + " coins)\n--- log ---\n" + tail(t.log) + "\n--- result ---\n" + tail(t.result));
+    return text("[" + t.status.toUpperCase() + "] " + t.title + " (charged " + t.tokensCharged + " coins)\n--- log ---\n" + tail(t.log) + "\n--- result ---\n" + tail(t.result) + apkLine(t));
   }
   if (name === "gh_issue_list") {
     const repo = String((args as Record<string, unknown>).repo || "");
@@ -230,7 +234,7 @@ async function executeTool(userId: string, name: string, args: Record<string, un
   const tail = (s: string) => (s || "-").slice(-6000);
   if (t.status === "done" || t.status === "failed") {
     await track(userId, name + "_result", id);
-    return text(head + "[" + t.status.toUpperCase() + "] " + t.title + " (charged " + t.tokensCharged + " coins)\n--- log ---\n" + tail(t.log) + "\n--- result ---\n" + tail(t.result));
+    return text(head + "[" + t.status.toUpperCase() + "] " + t.title + " (charged " + t.tokensCharged + " coins)\n--- log ---\n" + tail(t.log) + "\n--- result ---\n" + tail(t.result) + apkLine(t));
   }
   return text(head + "Still " + t.status + " after 8 min — runner ekhono kaj korche. Dashboard e jete hobe NA: ei agent thekei `get_task_result` tool e {\"task_id\": \"" + id + "\"} pathao, full log+result ekhanei pabe. 1-2 min por abar call koro.");
 }

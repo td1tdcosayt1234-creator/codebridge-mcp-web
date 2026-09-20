@@ -4,6 +4,7 @@ out/
 data/db.json
 data/db.json.bak.*
 data/*.tmp.*
+data/apks/
 .env
 .env.local
 *.log
