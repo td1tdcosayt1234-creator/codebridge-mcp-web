@@ -62,16 +62,22 @@ jobs:
           done
           echo "final_exit=$EXIT_CODE" | tee -a agent.log
           echo "$EXIT_CODE" > exit.code
-      - name: Set up Java 17 (Android needs VERSION_17)
+      - name: Set up Java 17 (Android project thakle only)
+        if: \${{ hashFiles('settings.gradle', 'build.gradle', 'app/build.gradle', '**/AndroidManifest.xml') != '' }}
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
       - name: Set up Android SDK (compileSdk 34)
+        if: \${{ hashFiles('settings.gradle', 'build.gradle', 'app/build.gradle', '**/AndroidManifest.xml') != '' }}
         uses: android-actions/setup-android@v3
-      - name: Real Gradle build (assembleDebug, no hallucination)
+      - name: Real Gradle build (Android project thakle only, no hallucination)
         if: always()
         run: |
+          if [ ! -f settings.gradle ] && [ ! -f build.gradle ] && [ ! -f app/build.gradle ] && ! find . -name AndroidManifest.xml -print -quit 2>/dev/null | grep -q .; then
+            echo "skip: Android project na (no gradle/manifest files) — AI verdict stands, gradle chalabo na" | tee -a agent.log
+            exit 0
+          fi
           echo "=== REAL GRADLE BUILD (assembleDebug) ===" | tee -a agent.log
           java -version 2>&1 | tee -a agent.log
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
@@ -84,7 +90,8 @@ jobs:
           echo "gradle-exit=$(cat gradle-exit.code)" | tee -a agent.log
           APK=$(find . -name "*.apk" -path "*debug*" 2>/dev/null | head -n 5)
           echo "apk-files:" | tee -a agent.log; echo "$APK" | tee -a agent.log
-          cat gradle-build.log >> agent.log
+          # Full gradle log artifact e jabe (gradle-build.log), agent.log e sudhu tail-60 —
+          # nahole 15000-char slice + coin charge bloat hoy (19-coin test e 7500 katsilo).
           # AI exit code er sathe real gradle verdict merge: gradle fail hole task failed
           if [ "$(cat gradle-exit.code)" != "0" ] && [ -f exit.code ] && [ "$(cat exit.code)" = "0" ]; then echo "1" > exit.code; echo "override: AI exit 0 kintu real gradle fail -> task failed" | tee -a agent.log; fi
       - name: Send result to web
@@ -105,7 +112,10 @@ jobs:
         if: always()
         with:
           name: task-\${{ inputs.task_id }}-log
-          path: agent.log
+          path: |
+            agent.log
+            gradle-build.log
+          if-no-files-found: warn
       - name: Upload APK (agar build success hoy)
         if: always()
         run: |

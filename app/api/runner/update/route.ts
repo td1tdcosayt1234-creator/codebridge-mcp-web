@@ -19,10 +19,13 @@ export async function POST(req: Request) {
   if (result !== undefined) task.result = String(result).slice(0, 20000);
   if (run_url !== undefined) task.runUrl = String(run_url);
   task.updatedAt = new Date().toISOString();
-  // Final charge: bigger output (incl. fixes) costs more — charge extra above the estimate
+  // Final charge: bigger output (incl. fixes) costs more — charge extra above the estimate.
+  // Cap: infra log bloat (gradle stacktrace) jeno choto test ke na mare —
+  // total kokhonoi estimate-er 3x + 500 er beshi na (19-coin hello test e 7500 katsilo).
   if (st === "done" || st === "failed") {
     const actual = estimateResult(task.log, task.result);
-    const extra = Math.max(0, actual - task.tokensCharged);
+    const maxTotal = task.tokensEst * 3 + 500;
+    const extra = Math.max(0, Math.min(actual, maxTotal) - task.tokensCharged);
     if (extra > 0) {
       let us = db.usage.find((u) => u.userId === task.userId);
       if (!us) { us = { userId: task.userId, mcpCalls: 0, githubCalls: 0, balance: 10000, usedTotal: 0 }; db.usage.push(us); }
