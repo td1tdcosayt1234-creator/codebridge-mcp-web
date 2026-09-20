@@ -94,6 +94,10 @@ export async function createTaskAndDispatch(
     task.status = "failed";
     task.log = "Dispatch failed: " + (e as Error).message + ". Ask admin to check the workflow file + repo secrets.";
     task.updatedAt = new Date().toISOString();
+    // Dispatch hoy ni — hold kora coin refund, nahole infra fail eo charge katbe
+    const usu = db.usage.find((u) => u.userId === userId);
+    if (usu) { usu.balance += est; usu.usedTotal = Math.max(0, usu.usedTotal - est); }
+    task.tokensCharged = 0;
     await writeDb(db);
     return { error: task.log, status: 502 };
   }

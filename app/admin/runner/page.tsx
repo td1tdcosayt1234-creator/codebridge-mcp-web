@@ -34,19 +34,22 @@ jobs:
           for(const f of (t.files||[])){fs.mkdirSync(require('path').dirname(f.path),{recursive:true});fs.writeFileSync(f.path,f.content);}
           console.log('files:',(t.files||[]).length,'kind:',t.kind);
           "
-      - name: Run opencode
+      - name: Run opencode (free, no API key)
         run: |
           node -e "const t=require('./task.json');require('fs').writeFileSync('prompt.txt',t.prompt)"
           KIND=$(node -e "console.log(require('./task.json').kind||'compile')")
+          # Free Pollinations provider (OpenAI-compatible, no key) — api key lagbe na
+          node -e "require('fs').writeFileSync('opencode.json', JSON.stringify({\$schema:'https://opencode.ai/config.json', provider:{ pollinations:{ npm:'@ai-sdk/openai-compatible', name:'Pollinations (free)', options:{ baseURL:'https://text.pollinations.ai/openai' }, models:{ openai:{ name:'Pollinations OpenAI (free)' } } } } }, null, 2))"
+          cat opencode.json
           # fix-compile mode retries up to 3 times, compile mode runs once
           MAX_TRY=1
           if [ "$KIND" = "fix-compile" ]; then MAX_TRY=3; fi
-          echo "kind=$KIND max_try=$MAX_TRY"
+          echo "kind=$KIND max_try=$MAX_TRY model=pollinations/openai"
           : > agent.log
           EXIT_CODE=1
           for i in $(seq 1 $MAX_TRY); do
             echo "=== attempt $i/$MAX_TRY ($KIND) ===" | tee -a agent.log
-            opencode run --auto -m anthropic/claude-sonnet-4-5 "$(cat prompt.txt)" 2>&1 | tee -a agent.log
+            opencode run --auto -m pollinations/openai "$(cat prompt.txt)" 2>&1 | tee -a agent.log
             EXIT_CODE=\${PIPESTATUS[0]}
             echo "attempt $i exit=$EXIT_CODE" | tee -a agent.log
             if [ "$EXIT_CODE" = "0" ]; then break; fi
@@ -55,8 +58,6 @@ jobs:
           done
           echo "final_exit=$EXIT_CODE" | tee -a agent.log
           echo "$EXIT_CODE" > exit.code
-        env:
-          ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
       - name: Send result to web
         if: always()
         run: |
