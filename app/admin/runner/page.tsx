@@ -104,8 +104,18 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: task-\${{ inputs.task_id }}
+          name: task-\${{ inputs.task_id }}-log
           path: agent.log
+      - name: Upload APK (agar build success hoy)
+        if: always()
+        run: |
+          ls -lh app/build/outputs/apk/debug/ 2>/dev/null || echo "no apk dir (gradle fail hole APK thakbe na)"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task-\${{ inputs.task_id }}-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
 `;
 export default function AdminRunner(){
   const [st,setSt]=useState<any>(null); const [repo,setRepo]=useState(""); const [wf,setWf]=useState("opencode-task.yml"); const [msg,setMsg]=useState(""); const [newToken,setNewToken]=useState("");
