@@ -8,4 +8,5 @@ data/apks/
 .env
 .env.local
 *.log
+tsconfig.tsbuildinfo
 .DS_Store
