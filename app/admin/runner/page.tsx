@@ -9,6 +9,9 @@ on:
 jobs:
   agent:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      models: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,7 +43,7 @@ jobs:
           KIND=$(node -e "console.log(require('./task.json').kind||'compile')")
           # Ollama local (100% free, unlimited, no key) — api key lagbe na
           curl -fsSL https://ollama.com/install.sh | sh
-          (ollama serve > ollama.log 2>&1 &)
+          (ollama serve > ollama.log 2>&1 &) 
           sleep 5
           ollama pull qwen2.5-coder:1.5b
           node -e "require('fs').writeFileSync('opencode.json', JSON.stringify({\$schema:'https://opencode.ai/config.json', provider:{ ollama:{ npm:'@ai-sdk/openai-compatible', name:'Ollama (local free)', options:{ baseURL:'http://localhost:11434/v1' }, models:{ 'qwen2.5-coder:1.5b':{ name:'Qwen2.5-Coder 1.5B (local free)' } } } } }, null, 2))"
@@ -71,14 +74,25 @@ jobs:
       - name: Set up Android SDK (compileSdk 34)
         if: \${{ hashFiles('settings.gradle', 'build.gradle', 'app/build.gradle', '**/AndroidManifest.xml') != '' }}
         uses: android-actions/setup-android@v3
-      - name: Real Gradle build (Android project thakle only, no hallucination)
+      - name: Set up Python (Python project thakle only)
+        if: \${{ hashFiles('requirements.txt', 'pyproject.toml', 'setup.py', 'setup.cfg', '**/*.py') != '' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Set up Go (Go project thakle only)
+        if: \${{ hashFiles('go.mod') != '' }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+      - name: Real build (project type onujayi — Android/Node/Python/Go/Rust)
         if: always()
         run: |
-          if [ ! -f settings.gradle ] && [ ! -f build.gradle ] && [ ! -f app/build.gradle ] && ! find . -name AndroidManifest.xml -print -quit 2>/dev/null | grep -q .; then
-            echo "skip: Android project na (no gradle/manifest files) — AI verdict stands, gradle chalabo na" | tee -a agent.log
-            exit 0
-          fi
-          echo "=== REAL GRADLE BUILD (assembleDebug) ===" | tee -a agent.log
+          BUILD_RAN=0
+          mark_fail() { if [ -f exit.code ] && [ "$(cat exit.code)" = "0" ]; then echo "1" > exit.code; fi; echo "override: AI exit 0 kintu real $1 fail -> task failed" | tee -a agent.log; }
+          # ---- Android Gradle ----
+          if [ -f settings.gradle ] || [ -f build.gradle ] || [ -f app/build.gradle ] || find . -name AndroidManifest.xml -print -quit 2>/dev/null | grep -q .; then
+            BUILD_RAN=1
+            echo "=== REAL GRADLE BUILD (assembleDebug) ===" | tee -a agent.log
           java -version 2>&1 | tee -a agent.log
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
           (sdkmanager --install "platforms;android-34" "build-tools;34.0.0" 2>&1 | tail -n 3 || echo "sdkmanager skip (preinstalled SDK)") | tee -a agent.log
@@ -93,7 +107,51 @@ jobs:
           # Full gradle log artifact e jabe (gradle-build.log), agent.log e sudhu tail-60 —
           # nahole 15000-char slice + coin charge bloat hoy (19-coin test e 7500 katsilo).
           # AI exit code er sathe real gradle verdict merge: gradle fail hole task failed
-          if [ "$(cat gradle-exit.code)" != "0" ] && [ -f exit.code ] && [ "$(cat exit.code)" = "0" ]; then echo "1" > exit.code; echo "override: AI exit 0 kintu real gradle fail -> task failed" | tee -a agent.log; fi
+          if [ "$(cat gradle-exit.code)" != "0" ]; then mark_fail "gradle"; fi
+          fi
+          # ---- Node (package.json) ----
+          if [ -f package.json ]; then
+            BUILD_RAN=1
+            echo "=== REAL NODE BUILD ===" | tee -a agent.log
+            (npm ci 2>&1 || npm install 2>&1) | tail -n 10 | tee -a agent.log
+            if node -e "process.exit(require('./package.json').scripts && require('./package.json').scripts.build ? 0 : 1)"; then
+              npm run build 2>&1 | tee node-build.log | tail -n 40 | tee -a agent.log
+              if [ "\${PIPESTATUS[0]}" != "0" ]; then mark_fail "node-build"; else echo "node-build-exit=0" | tee -a agent.log; fi
+            else
+              echo "no build script — deps install only, AI verdict stands" | tee -a agent.log
+            fi
+          fi
+          # ---- Python (.py / requirements.txt / pyproject.toml) ----
+          if ls *.py >/dev/null 2>&1 || [ -f requirements.txt ] || [ -f pyproject.toml ] || [ -f setup.py ] || find . -name "*.py" -not -path "./node_modules/*" -print -quit 2>/dev/null | grep -q .; then
+            BUILD_RAN=1
+            echo "=== REAL PYTHON BUILD (py_compile) ===" | tee -a agent.log
+            if [ -f requirements.txt ]; then pip install -r requirements.txt 2>&1 | tail -n 5 | tee -a agent.log; fi
+            PYFILES=$(find . -name "*.py" -not -path "./node_modules/*" -not -path "./.git/*" 2>/dev/null)
+            if [ -n "$PYFILES" ]; then
+              python3 -m py_compile $PYFILES 2>&1 | tee py-build.log | tail -n 30 | tee -a agent.log
+              if [ "\${PIPESTATUS[0]}" != "0" ]; then mark_fail "python-compile"; else echo "python-compile-exit=0" | tee -a agent.log; fi
+            fi
+            if [ -f pytest.ini ] || [ -d tests ] || [ -f test_*.py ] || find . -name "test_*.py" -print -quit 2>/dev/null | grep -q .; then
+              python3 -m pytest -q 2>&1 | tail -n 20 | tee -a agent.log || mark_fail "pytest"
+            fi
+          fi
+          # ---- Go (go.mod) ----
+          if [ -f go.mod ]; then
+            BUILD_RAN=1
+            echo "=== REAL GO BUILD ===" | tee -a agent.log
+            go build ./... 2>&1 | tee go-build.log | tail -n 30 | tee -a agent.log
+            if [ "\${PIPESTATUS[0]}" != "0" ]; then mark_fail "go-build"; else echo "go-build-exit=0" | tee -a agent.log; fi
+          fi
+          # ---- Rust (Cargo.toml) ----
+          if [ -f Cargo.toml ]; then
+            BUILD_RAN=1
+            echo "=== REAL RUST BUILD ===" | tee -a agent.log
+            cargo build 2>&1 | tee rust-build.log | tail -n 30 | tee -a agent.log
+            if [ "\${PIPESTATUS[0]}" != "0" ]; then mark_fail "cargo-build"; else echo "cargo-build-exit=0" | tee -a agent.log; fi
+          fi
+          if [ "$BUILD_RAN" = "0" ]; then
+            echo "skip: kono known project type na (Android/Node/Python/Go/Rust marker nei) — AI verdict stands" | tee -a agent.log
+          fi
       - name: Send APK to web (thakle — web theke agent download korbe)
         if: always()
         run: |
