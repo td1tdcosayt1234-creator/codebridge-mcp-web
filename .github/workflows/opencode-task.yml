@@ -76,7 +76,8 @@ jobs:
         run: |
           echo "=== REAL GRADLE BUILD (assembleDebug) ===" | tee -a agent.log
           java -version 2>&1 | tee -a agent.log
-          sdkmanager --install "platforms;android-34" "build-tools;34.0.0" 2>&1 | tail -n 3 | tee -a agent.log
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+          (sdkmanager --install "platforms;android-34" "build-tools;34.0.0" 2>&1 | tail -n 3 || echo "sdkmanager skip (preinstalled SDK)") | tee -a agent.log
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
           if [ -f ./gradlew ]; then chmod +x ./gradlew; GRADLE_CMD="./gradlew"; else curl -fsSL https://services.gradle.org/distributions/gradle-8.7-bin.zip -o /tmp/gradle.zip && unzip -q /tmp/gradle.zip -d /tmp && export PATH=/tmp/gradle-8.7/bin:$PATH; GRADLE_CMD="gradle"; fi
           echo "gradle-cmd=$GRADLE_CMD java=17 kotlin=1.9.24 agp=8.5.2 compileSdk=34" | tee -a agent.log
