@@ -29,14 +29,15 @@ jobs:
           cat task.json
         env:
           WEB_URL: \${{ secrets.WEB_URL }}
-      - name: Write task files
+      - name: Write task files (isolated task-work/ dir e)
         run: |
           node -e "
           const fs=require('fs');
           const t=JSON.parse(fs.readFileSync('task.json','utf8'));
-          for(const f of (t.files||[])){fs.mkdirSync(require('path').dirname(f.path),{recursive:true});fs.writeFileSync(f.path,f.content);}
+          for(const f of (t.files||[])){const p='task-work/'+f.path;fs.mkdirSync(require('path').dirname(p),{recursive:true});fs.writeFileSync(p,f.content);}
           console.log('files:',(t.files||[]).length,'kind:',t.kind);
           "
+          ls task-work 2>/dev/null || echo "(no files — prompt-only task)"
       - name: Run opencode (free local Ollama, no API key)
         run: |
           node -e "const t=require('./task.json');require('fs').writeFileSync('prompt.txt',t.prompt)"
@@ -66,21 +67,21 @@ jobs:
           echo "final_exit=$EXIT_CODE" | tee -a agent.log
           echo "$EXIT_CODE" > exit.code
       - name: Set up Java 17 (Android project thakle only)
-        if: \${{ hashFiles('settings.gradle', 'build.gradle', 'app/build.gradle', '**/AndroidManifest.xml') != '' }}
+        if: \${{ hashFiles('task-work/settings.gradle', 'task-work/build.gradle', 'task-work/app/build.gradle', 'task-work/**/AndroidManifest.xml') != '' }}
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
       - name: Set up Android SDK (compileSdk 34)
-        if: \${{ hashFiles('settings.gradle', 'build.gradle', 'app/build.gradle', '**/AndroidManifest.xml') != '' }}
+        if: \${{ hashFiles('task-work/settings.gradle', 'task-work/build.gradle', 'task-work/app/build.gradle', 'task-work/**/AndroidManifest.xml') != '' }}
         uses: android-actions/setup-android@v3
       - name: Set up Python (Python project thakle only)
-        if: \${{ hashFiles('requirements.txt', 'pyproject.toml', 'setup.py', 'setup.cfg', '**/*.py') != '' }}
+        if: \${{ hashFiles('task-work/requirements.txt', 'task-work/pyproject.toml', 'task-work/setup.py', 'task-work/setup.cfg', 'task-work/**/*.py') != '' }}
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Set up Go (Go project thakle only)
-        if: \${{ hashFiles('go.mod') != '' }}
+        if: \${{ hashFiles('task-work/go.mod') != '' }}
         uses: actions/setup-go@v5
         with:
           go-version: 'stable'
@@ -89,16 +90,17 @@ jobs:
         run: |
           BUILD_RAN=0
           mark_fail() { if [ -f exit.code ] && [ "$(cat exit.code)" = "0" ]; then echo "1" > exit.code; fi; echo "override: AI exit 0 kintu real $1 fail -> task failed" | tee -a agent.log; }
+          W=task-work
           # ---- Android Gradle ----
-          if [ -f settings.gradle ] || [ -f build.gradle ] || [ -f app/build.gradle ] || find . -name AndroidManifest.xml -print -quit 2>/dev/null | grep -q .; then
+          if [ -f $W/settings.gradle ] || [ -f $W/build.gradle ] || [ -f $W/app/build.gradle ] || find $W -name AndroidManifest.xml -print -quit 2>/dev/null | grep -q .; then
             BUILD_RAN=1
             echo "=== REAL GRADLE BUILD (assembleDebug) ===" | tee -a agent.log
           java -version 2>&1 | tee -a agent.log
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
           (sdkmanager --install "platforms;android-34" "build-tools;34.0.0" 2>&1 | tail -n 3 || echo "sdkmanager skip (preinstalled SDK)") | tee -a agent.log
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          if [ -f ./gradlew ]; then chmod +x ./gradlew; GRADLE_CMD="./gradlew"; else curl -fsSL https://services.gradle.org/distributions/gradle-8.7-bin.zip -o /tmp/gradle.zip && unzip -q /tmp/gradle.zip -d /tmp && export PATH=/tmp/gradle-8.7/bin:$PATH; GRADLE_CMD="gradle"; fi
-          echo "gradle-cmd=$GRADLE_CMD java=17 kotlin=1.9.24 agp=8.5.2 compileSdk=34" | tee -a agent.log
+          if [ -f ./gradlew ]; then chmod +x ./gradlew; GRADLE_CMD="./gradlew -p $W"; else curl -fsSL https://services.gradle.org/distributions/gradle-8.7-bin.zip -o /tmp/gradle.zip && unzip -q /tmp/gradle.zip -d /tmp && export PATH=/tmp/gradle-8.7/bin:$PATH; GRADLE_CMD="gradle -p $W"; fi
+          echo "gradle-cmd=$GRADLE_CMD java=17 kotlin=1.9.24 agp=8.5.2 compileSdk=34 dir=$W" | tee -a agent.log
           $GRADLE_CMD assembleDebug --stacktrace 2>&1 | tee gradle-build.log | tail -n 60 | tee -a agent.log
           echo "\${PIPESTATUS[0]}" > gradle-exit.code
           echo "gradle-exit=$(cat gradle-exit.code)" | tee -a agent.log
@@ -110,43 +112,43 @@ jobs:
           if [ "$(cat gradle-exit.code)" != "0" ]; then mark_fail "gradle"; fi
           fi
           # ---- Node (package.json) ----
-          if [ -f package.json ]; then
+          if [ -f $W/package.json ]; then
             BUILD_RAN=1
-            echo "=== REAL NODE BUILD ===" | tee -a agent.log
-            (npm ci 2>&1 || npm install 2>&1) | tail -n 10 | tee -a agent.log
-            if node -e "process.exit(require('./package.json').scripts && require('./package.json').scripts.build ? 0 : 1)"; then
-              npm run build 2>&1 | tee node-build.log | tail -n 40 | tee -a agent.log
+            echo "=== REAL NODE BUILD (dir=$W) ===" | tee -a agent.log
+            (npm --prefix $W ci 2>&1 || npm --prefix $W install 2>&1) | tail -n 10 | tee -a agent.log
+            if node -e "process.exit(require('./$W/package.json').scripts && require('./$W/package.json').scripts.build ? 0 : 1)"; then
+              npm --prefix $W run build 2>&1 | tee node-build.log | tail -n 40 | tee -a agent.log
               if [ "\${PIPESTATUS[0]}" != "0" ]; then mark_fail "node-build"; else echo "node-build-exit=0" | tee -a agent.log; fi
             else
               echo "no build script — deps install only, AI verdict stands" | tee -a agent.log
             fi
           fi
           # ---- Python (.py / requirements.txt / pyproject.toml) ----
-          if ls *.py >/dev/null 2>&1 || [ -f requirements.txt ] || [ -f pyproject.toml ] || [ -f setup.py ] || find . -name "*.py" -not -path "./node_modules/*" -print -quit 2>/dev/null | grep -q .; then
+          if ls $W/*.py >/dev/null 2>&1 || [ -f $W/requirements.txt ] || [ -f $W/pyproject.toml ] || [ -f $W/setup.py ] || find $W -name "*.py" -not -path "$W/node_modules/*" -print -quit 2>/dev/null | grep -q .; then
             BUILD_RAN=1
-            echo "=== REAL PYTHON BUILD (py_compile) ===" | tee -a agent.log
-            if [ -f requirements.txt ]; then pip install -r requirements.txt 2>&1 | tail -n 5 | tee -a agent.log; fi
-            PYFILES=$(find . -name "*.py" -not -path "./node_modules/*" -not -path "./.git/*" 2>/dev/null)
+            echo "=== REAL PYTHON BUILD (py_compile, dir=$W) ===" | tee -a agent.log
+            if [ -f $W/requirements.txt ]; then pip install -r $W/requirements.txt 2>&1 | tail -n 5 | tee -a agent.log; fi
+            PYFILES=$(find $W -name "*.py" -not -path "$W/node_modules/*" -not -path "$W/.git/*" 2>/dev/null)
             if [ -n "$PYFILES" ]; then
               python3 -m py_compile $PYFILES 2>&1 | tee py-build.log | tail -n 30 | tee -a agent.log
               if [ "\${PIPESTATUS[0]}" != "0" ]; then mark_fail "python-compile"; else echo "python-compile-exit=0" | tee -a agent.log; fi
             fi
-            if [ -f pytest.ini ] || [ -d tests ] || [ -f test_*.py ] || find . -name "test_*.py" -print -quit 2>/dev/null | grep -q .; then
-              python3 -m pytest -q 2>&1 | tail -n 20 | tee -a agent.log || mark_fail "pytest"
+            if [ -f $W/pytest.ini ] || [ -d $W/tests ] || find $W -name "test_*.py" -print -quit 2>/dev/null | grep -q .; then
+              (cd $W && python3 -m pytest -q) 2>&1 | tail -n 20 | tee -a agent.log || mark_fail "pytest"
             fi
           fi
           # ---- Go (go.mod) ----
-          if [ -f go.mod ]; then
+          if [ -f $W/go.mod ]; then
             BUILD_RAN=1
-            echo "=== REAL GO BUILD ===" | tee -a agent.log
-            go build ./... 2>&1 | tee go-build.log | tail -n 30 | tee -a agent.log
+            echo "=== REAL GO BUILD (dir=$W) ===" | tee -a agent.log
+            (cd $W && go build ./...) 2>&1 | tee ../go-build.log | tail -n 30 | tee -a agent.log
             if [ "\${PIPESTATUS[0]}" != "0" ]; then mark_fail "go-build"; else echo "go-build-exit=0" | tee -a agent.log; fi
           fi
           # ---- Rust (Cargo.toml) ----
-          if [ -f Cargo.toml ]; then
+          if [ -f $W/Cargo.toml ]; then
             BUILD_RAN=1
-            echo "=== REAL RUST BUILD ===" | tee -a agent.log
-            cargo build 2>&1 | tee rust-build.log | tail -n 30 | tee -a agent.log
+            echo "=== REAL RUST BUILD (dir=$W) ===" | tee -a agent.log
+            (cd $W && cargo build) 2>&1 | tee ../rust-build.log | tail -n 30 | tee -a agent.log
             if [ "\${PIPESTATUS[0]}" != "0" ]; then mark_fail "cargo-build"; else echo "cargo-build-exit=0" | tee -a agent.log; fi
           fi
           if [ "$BUILD_RAN" = "0" ]; then
@@ -192,7 +194,7 @@ jobs:
       - name: Upload APK (agar build success hoy)
         if: always()
         run: |
-          ls -lh app/build/outputs/apk/debug/ 2>/dev/null || echo "no apk dir (gradle fail hole APK thakbe na)"
+          ls -lh task-work/app/build/outputs/apk/debug/ 2>/dev/null || echo "no apk dir (gradle fail hole APK thakbe na)"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
