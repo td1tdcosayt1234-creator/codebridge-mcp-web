@@ -3,7 +3,7 @@ import Link from "next/link";
 import Footer from "../components/Footer";
 import type { ReactNode } from "react";
 
-export const metadata = { title: "CodeBridge — Request to Cloud Build", description: "Send a compile request on the web, OpenCode builds it in the cloud, output comes back to you." };
+export const metadata = { title: "CodeBridge â Request to Cloud Build", description: "Send a compile request on the web, OpenCode builds it in the cloud, output comes back to you." };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
@@ -17,7 +17,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <div className="container nav-inner">
             <Link href="/" className="logo"><span className="logo-orb" aria-hidden="true" />Code<span className="grad-anim">Bridge</span></Link>
             <nav className="links">
-              <Link className="link-pill" href="/pricing">Pricing</Link>
+              <Link className="link-pill" href="/dev" style={{background:"#6c8cff18",border:"1px solid #6c8cff33"}}>Studio</Link><Link className="link-pill" href="/pricing">Pricing</Link>
               <Link className="link-pill" href="/mcp">MCP</Link>
               <Link className="link-pill" href="/docs">Docs</Link>
               <Link className="link-pill" href="/faq">FAQ</Link>
