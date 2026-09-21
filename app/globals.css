@@ -109,7 +109,7 @@ code{font-family:ui-monospace,Consolas,monospace}
 .cta h2{margin:0 0 10px;position:relative}.cta p{color:#c9d6f2;position:relative}.cta div{position:relative}
 .page-hero{padding:40px 0 10px}.page-hero h1{font-size:40px;margin:0 0 10px;letter-spacing:-.5px}.page-hero p{color:var(--muted);max-width:760px;font-size:16px}
 .prose h3{margin:22px 0 8px}.prose p,.prose li{color:#c4cfe6;font-size:14.5px;line-height:1.65}.prose ul{padding-left:20px}
-.check li{list-style:none;margin:8px 0}.check{padding:0}.check li::before{content:"✓ ";color:var(--ok);font-weight:800}
+.check li{list-style:none;margin:8px 0}.check{padding:0}.check li::before{content:"â ";color:var(--ok);font-weight:800}
 .btn-lg{padding:14px 26px;font-size:16px;border-radius:14px}
 table.tools td:first-child{white-space:nowrap}table.tools code{color:var(--brand2)}
 @media(max-width:800px){.farrow{transform:rotate(90deg);padding:6px 0;width:100%;text-align:center}.page-hero h1{font-size:30px}.section h2{font-size:25px}}
@@ -122,3 +122,11 @@ table.tools td:first-child{white-space:nowrap}table.tools code{color:var(--brand
   *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
   .fade-up,.rv{opacity:1;transform:none}
 }
+
+/* --- Dev Studio cinematic --- */
+.dev-cinematic-bg{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.dev-orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.4;animation:devDrift 24s ease-in-out infinite alternate}
+.dev-orb-a{width:600px;height:600px;left:-120px;top:-100px;background:radial-gradient(circle at 30% 30%,#6c8cff45,transparent 70%)}
+.dev-orb-b{width:500px;height:500px;right:-100px;top:20%;background:radial-gradient(circle at 60% 40%,#22d3ee35,transparent 70%);animation-delay:-8s}
+.dev-orb-c{width:700px;height:700px;left:30%;bottom:-200px;background:radial-gradient(circle at 50% 50%,#a855f725,transparent 70%);animation-delay:-16s}
+@keyframes devDrift{from{transform:translate(0,0) scale(1)} to{transform:translate(60px,40px) scale(1.08)}}
