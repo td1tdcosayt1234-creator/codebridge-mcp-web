@@ -4,6 +4,31 @@ import { safeEqual } from "./security";
 import { estimateTask, MAX_FILES_BYTES, filesBytes } from "./tokens";
 
 // Users never touch repos. Flow: web request -> Actions OpenCode run -> output to web -> user.
+// All-type detector: files[] theke project type guess kore — runner YAML + UI hint er jonno.
+export function detectProjectType(files: { path: string }[]): string {
+  const p = files.map((f) => String(f.path).toLowerCase());
+  const has = (...names: string[]) => p.some((x) => names.some((n) => x === n || x.endsWith("/" + n)));
+  const anyExt = (...exts: string[]) => p.some((x) => exts.some((e) => x.endsWith(e)));
+  const anyDir = (...dirs: string[]) => p.some((x) => dirs.some((d) => x.includes(d)));
+  if (p.some((x) => x.endsWith("androidmanifest.xml")) || has("settings.gradle", "app/build.gradle")) return "android";
+  if (has("plugin.yml", "paper-plugin.yml", "bukkit.yml", "spigot.yml", "fabric.mod.json", "quilt.mod.json") || p.some((x) => x.endsWith("mods.toml")) || has("pack.mcmeta")) return "minecraft";
+  if (has("pubspec.yaml") || anyExt(".dart")) return "flutter";
+  if (has("deno.json", "deno.jsonc", "deno.lock")) return "deno";
+  if (has("bun.lockb", "bunfig.toml")) return "bun";
+  if (has("package.json")) return "node";
+  if (has("requirements.txt", "pyproject.toml", "setup.py", "setup.cfg") || anyExt(".py")) return "python";
+  if (has("go.mod")) return "go";
+  if (has("cargo.toml")) return "rust";
+  if (has("pom.xml", "build.gradle", "build.gradle.kts") || anyExt(".java", ".kt", ".kts")) return "java";
+  if (has("global.json") || anyExt(".cs") || p.some(x=>x.endsWith(".csproj")||x.endsWith(".sln"))) return "dotnet";
+  if (has("composer.json") || anyExt(".php")) return "php";
+  if (has("gemfile", "gemfile.lock") || anyExt(".rb")) return "ruby";
+  if (has("cmakelists.txt", "makefile") || anyExt(".c", ".cc", ".cpp", ".h", ".hpp")) return "cpp";
+  if (anyExt(".html", ".css", ".js", ".ts", ".tsx", ".jsx", ".vue", ".svelte")) return "web";
+  if (anyDir("datapacks/", "data/")) return "minecraft-datapack";
+  if (files.length === 0) return "prompt-only";
+  return "generic";
+}
 export function runnerSettings(db: DbShape) {
   return {
     builderRepo: db.settings?.builderRepo || "",
@@ -19,7 +44,7 @@ export function bearerToken(req: Request): string {
 // Wait for a task to finish (for MCP: submit + return live result IN THE AGENT).
 // Resolves with the latest task state after done/failed or timeout.
 // Android Gradle builds take minutes (Ollama pull + assembleDebug ~3-6 min),
-// so the agent call blocks up to ~8 min to deliver the FULL output directly —
+// so the agent call blocks up to ~8 min to deliver the FULL output directly â
 // dashboard e jete hoy na.
 export async function waitForResult(taskId: string, timeoutMs = 480000): Promise<DbShape["tasks"][number] | null> {
   const start = Date.now();
@@ -53,9 +78,9 @@ export async function createTaskAndDispatch(
 ): Promise<{ task: DbShape["tasks"][number] } | { error: string; status: number }> {
   if (!title.trim() || !prompt.trim()) return { error: "Title and prompt are both required.", status: 400 };
   const kind = opts?.kind === "fix-compile" ? "fix-compile" : "compile";
-  // Junk filter: .git/.gradle/build/node_modules etc. khabe na — age .git/hooks quota kheye
+  // Junk filter: .git/.gradle/build/node_modules etc. khabe na â age .git/hooks quota kheye
   // asol source batil hoye hallucination hoto (task_pl1jeie: 20tar 17tai .git/hooks chilo).
-  const JUNK = /(^|\/)\.git(\/|$)|(^|\/)\.gradle(\/|$)|(^|\/)build(\/|$)|(^|\/)node_modules(\/|$)|(^|\/)\.next(\/|$)|(^|\/)__pycache__(\/|$)|(^|\/)\.idea(\/|$)|(^|\/)\.vscode(\/|$)|(^|\/)\.cxx(\/|$)|(^|\/)captures(\/|$)|(^|\/)\.externalNativeBuild(\/|$)|local\.properties$|\.iml$|\.hprof$|\.bin$|\.apk$|\.aab$/i;
+  const JUNK = /(^|\/)\.git(\/|$)|(^|\/)\.gradle(\/|$)|(^|\/)build(\/|$)|(^|\/)node_modules(\/|$)|(^|\/)\.next(\/|$)|(^|\/)__pycache__(\/|$)|(^|\/)\.idea(\/|$)|(^|\/)\.vscode(\/|$)|(^|\/)\.cxx(\/|$)|(^|\/)captures(\/|$)|(^|\/)\.externalNativeBuild(\/|$)|(^|\/)dist(\/|$)|(^|\/)out(\/|$)|(^|\/)target(\/|$)|(^|\/)\.dart_tool(\/|$)|local\.properties$|\.iml$|\.hprof$|\.bin$|\.apk$|\.aab$|\.jar$|\.war$|\.ear$|\.zip$|\.tar\.gz$|\.tgz$|\.exe$|\.dll$|\.so$|\.class$|\.o$|\.obj$|\.pyc$|\.mcpack$|\.mcaddon$/i;
   const files = (opts?.files || [])
     .filter((f) => f.path && f.content !== undefined)
     .map((f) => ({ path: String(f.path).replace(/^\/+/, "").slice(0, 200), content: String(f.content).slice(0, 100000) }))
@@ -104,7 +129,7 @@ export async function createTaskAndDispatch(
     task.status = "failed";
     task.log = "Dispatch failed: " + (e as Error).message + ". Ask admin to check the workflow file + repo secrets.";
     task.updatedAt = new Date().toISOString();
-    // Dispatch hoy ni — hold kora coin refund, nahole infra fail eo charge katbe
+    // Dispatch hoy ni â hold kora coin refund, nahole infra fail eo charge katbe
     const usu = db.usage.find((u) => u.userId === userId);
     if (usu) { usu.balance += est; usu.usedTotal = Math.max(0, usu.usedTotal - est); }
     task.tokensCharged = 0;
