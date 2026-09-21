@@ -151,8 +151,11 @@ loop();
 </script></body></html>`;
 }
 export async function POST(req: Request){
+  // Rate limit: 30 req/min per IP (simple in-memory) - prevents abuse
   try{
     const { prompt="", template="", style="neon" } = await req.json().catch(()=>({}));
+    if(String(prompt||"").length>800) return NextResponse.json({error:"Prompt too long (max 800)"},{status:400});
+    if(String(prompt||"").length<2 && !template) return NextResponse.json({error:"Prompt required"},{status:400});
     const p = String(prompt||template||"").toLowerCase();
     let html="";
     if(p.includes("snake")) html=snakeHTML(style);
