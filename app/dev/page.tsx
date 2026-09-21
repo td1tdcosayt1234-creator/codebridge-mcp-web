@@ -48,7 +48,7 @@ export default function DevStudio(){
       if(!j.html) throw new Error("No html returned");
       setHtml(j.html);
       setShowCode(false);
-      showToast("Game ready — preview updated");
+      showToast("Game ready â preview updated");
     }catch(e:any){
       showToast(e.message||"Failed");
     }
@@ -87,6 +87,8 @@ export default function DevStudio(){
   };
 
   return (
+    <>
+    <div className="dev-cinematic-bg" aria-hidden="true"><div className="dev-orb dev-orb-a"/><div className="dev-orb dev-orb-b"/><div className="dev-orb dev-orb-c"/></div>
     <div style={{maxWidth:1280,margin:"0 auto",position:"relative"}}>
       <style>{`
         .cinematic{position:relative;border-radius:24px;overflow:hidden;border:1px solid #ffffff14;background:linear-gradient(180deg,#0e152b 0%,#0a1020 100%);box-shadow:0 30px 80px #0008}
@@ -137,17 +139,17 @@ export default function DevStudio(){
         <div className="hero">
           <div>
             <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:10}}>
-              <span className="chip live">● LIVE PREVIEW</span>
+              <span className="chip live">â LIVE PREVIEW</span>
               <span className="chip">No deploy needed</span>
               <span className="chip">Single file</span>
             </div>
-            <h1>Game Studio <span style={{background:"linear-gradient(90deg,#6c8cff,#22d3ee)",WebkitBackgroundClip:"text",color:"transparent"}}>— Cinematic</span></h1>
-            <p>Describe any game in plain English. AI instantly crafts a playable HTML file — preview, tweak, download. Runs 100% in your browser.</p>
+            <h1>Game Studio <span style={{background:"linear-gradient(90deg,#6c8cff,#22d3ee)",WebkitBackgroundClip:"text",color:"transparent"}}>â Cinematic</span></h1>
+            <p>Describe any game in plain English. AI instantly crafts a playable HTML file â preview, tweak, download. Runs 100% in your browser.</p>
           </div>
           <div className="hero-stats">
-            <span className="chip">⚡ Instant</span>
-            <span className="chip">🎮 Playable</span>
-            <span className="chip">📦 One file</span>
+            <span className="chip">â¡ Instant</span>
+            <span className="chip">ð® Playable</span>
+            <span className="chip">ð¦ One file</span>
           </div>
         </div>
       </div>
@@ -189,9 +191,9 @@ export default function DevStudio(){
             </div>
 
             <button className="btn-primary" onClick={()=>gen()} disabled={loading}>
-              {loading?"Generating…":"Generate & Play →"}
+              {loading?"Generatingâ¦":"Generate & Play â"}
             </button>
-            <div className="hint">Tip: be specific — “snake with walls wrap and touch swipe” works better than “make a game”.</div>
+            <div className="hint">Tip: be specific â âsnake with walls wrap and touch swipeâ works better than âmake a gameâ.</div>
           </div>
         </div>
 
@@ -199,8 +201,8 @@ export default function DevStudio(){
           <div className="panel-head">
             <span>Preview</span>
             <div className="toolbar">
-              <button className="tool" onClick={refresh} title="Refresh">↻ Refresh</button>
-              <button className="tool" onClick={()=>setIsFs(v=>!v)}>{isFs?"Exit":"⛶ Fullscreen"}</button>
+              <button className="tool" onClick={refresh} title="Refresh">â» Refresh</button>
+              <button className="tool" onClick={()=>setIsFs(v=>!v)}>{isFs?"Exit":"â¶ Fullscreen"}</button>
               <button className="tool" onClick={()=>setShowCode(v=>!v)}>{showCode?"Preview":"Code"}</button>
               <button className="tool" onClick={download}>Download</button>
               <button className="tool" onClick={share}>Share</button>
@@ -211,7 +213,7 @@ export default function DevStudio(){
             {!showCode ? (
               <div className={"preview-wrap "+(isFs?"fs":"")} style={{height:isFs?"auto":460}}>
                 {loading ? (
-                  <div className="skeleton"><div className="pulse"/><div style={{fontWeight:800}}>Crafting your game…</div><div style={{opacity:.6,fontSize:12}}>This is instant — no cloud wait</div></div>
+                  <div className="skeleton"><div className="pulse"/><div style={{fontWeight:800}}>Crafting your gameâ¦</div><div style={{opacity:.6,fontSize:12}}>This is instant â no cloud wait</div></div>
                 ) : html ? (
                   <iframe ref={frameRef} title="preview" srcDoc={html} style={{width:"100%",height:"100%",border:0,background:"#020617"}} sandbox="allow-scripts allow-same-origin allow-pointer-lock" allow="fullscreen" />
                 ) : (
@@ -235,5 +237,6 @@ export default function DevStudio(){
       </div>
       {toast && <div className="toast">{toast}</div>}
     </div>
+    </>
   );
 }
