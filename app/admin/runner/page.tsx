@@ -37,12 +37,12 @@ jobs:
           for(const f of (t.files||[])){const p='task-work/'+f.path;fs.mkdirSync(require('path').dirname(p),{recursive:true});fs.writeFileSync(p,f.content);}
           console.log('files:',(t.files||[]).length,'kind:',t.kind);
           "
-          ls task-work 2>/dev/null || echo "(no files — prompt-only task)"
+          ls task-work 2>/dev/null || echo "(no files â prompt-only task)"
       - name: Run opencode (free local Ollama, no API key)
         run: |
           node -e "const t=require('./task.json');require('fs').writeFileSync('prompt.txt',t.prompt)"
           KIND=$(node -e "console.log(require('./task.json').kind||'compile')")
-          # Ollama local (100% free, unlimited, no key) — api key lagbe na
+          # Ollama local (100% free, unlimited, no key) â api key lagbe na
           curl -fsSL https://ollama.com/install.sh | sh
           (ollama serve > ollama.log 2>&1 &) 
           sleep 5
@@ -85,7 +85,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: 'stable'
-      - name: Real build (project type onujayi — Android/Node/Python/Go/Rust)
+      - name: Real build (project type onujayi â Android/Node/Python/Go/Rust)
         if: always()
         run: |
           BUILD_RAN=0
@@ -106,7 +106,7 @@ jobs:
           echo "gradle-exit=$(cat gradle-exit.code)" | tee -a agent.log
           APK=$(find . -name "*.apk" -path "*debug*" 2>/dev/null | head -n 5)
           echo "apk-files:" | tee -a agent.log; echo "$APK" | tee -a agent.log
-          # Full gradle log artifact e jabe (gradle-build.log), agent.log e sudhu tail-60 —
+          # Full gradle log artifact e jabe (gradle-build.log), agent.log e sudhu tail-60 â
           # nahole 15000-char slice + coin charge bloat hoy (19-coin test e 7500 katsilo).
           # AI exit code er sathe real gradle verdict merge: gradle fail hole task failed
           if [ "$(cat gradle-exit.code)" != "0" ]; then mark_fail "gradle"; fi
@@ -120,7 +120,7 @@ jobs:
               npm --prefix $W run build 2>&1 | tee node-build.log | tail -n 40 | tee -a agent.log
               if [ "\${PIPESTATUS[0]}" != "0" ]; then mark_fail "node-build"; else echo "node-build-exit=0" | tee -a agent.log; fi
             else
-              echo "no build script — deps install only, AI verdict stands" | tee -a agent.log
+              echo "no build script â deps install only, AI verdict stands" | tee -a agent.log
             fi
           fi
           # ---- Python (.py / requirements.txt / pyproject.toml) ----
@@ -152,9 +152,9 @@ jobs:
             if [ "\${PIPESTATUS[0]}" != "0" ]; then mark_fail "cargo-build"; else echo "cargo-build-exit=0" | tee -a agent.log; fi
           fi
           if [ "$BUILD_RAN" = "0" ]; then
-            echo "skip: kono known project type na (Android/Node/Python/Go/Rust marker nei) — AI verdict stands" | tee -a agent.log
+            echo "skip: kono known project type na (Android/Node/Python/Go/Rust marker nei) â AI verdict stands" | tee -a agent.log
           fi
-      - name: Send APK to web (thakle — web theke agent download korbe)
+      - name: Send APK to web (thakle â web theke agent download korbe)
         if: always()
         run: |
           APK=$(find . -name "*.apk" -path "*debug*" 2>/dev/null | head -n 1)
@@ -207,29 +207,29 @@ export default function AdminRunner(){
   async function load(){ const r=await fetch("/api/admin/runner"); const j=await r.json(); setSt(j); if(j.builderRepo!==undefined){ setRepo(j.builderRepo||""); setWf(j.builderWorkflow||"opencode-task.yml"); } }
   useEffect(()=>{load();},[]);
   async function save(e:any){ e.preventDefault(); const r=await fetch("/api/admin/runner",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({builderRepo:repo,builderWorkflow:wf})}); setMsg(r.ok?"Saved.":"Failed"); load(); }
-  async function regen(){ if(!confirm("Generate a new runner token? The old token will stop working.")) return; const r=await fetch("/api/admin/runner",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({regenerate:true})}); const j=await r.json(); if(r.ok){ setNewToken(j.token); setMsg("Shown only once — copy it into the repo secret now."); } load(); }
+  async function regen(){ if(!confirm("Generate a new runner token? The old token will stop working.")) return; const r=await fetch("/api/admin/runner",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({regenerate:true})}); const j=await r.json(); if(r.ok){ setNewToken(j.token); setMsg("Shown only once â copy it into the repo secret now."); } load(); }
   if(!st) return <p className="muted">Loading...</p>;
   if(st.error) return <p>Admin only. <a href="/login">Login</a></p>;
   return (<div>
-    <h2>Runner — OpenCode in Actions</h2>
-    <p className="muted small">Users send requests on the web → the web dispatches the workflow on the builder repo → OpenCode runs in Actions → output returns to the web → users read it. Users never touch repos.</p>
+    <h2>Runner â OpenCode in Actions</h2>
+    <p className="muted small">Users send requests on the web â the web dispatches the workflow on the builder repo â OpenCode runs in Actions â output returns to the web â users read it. Users never touch repos.</p>
     <div className="grid g2">
-      <div className="card"><h3>1️⃣ Builder repo</h3><form onSubmit={save}>
-        <label>Builder repo (owner/repo) — the workflow file must live here</label><input value={repo} onChange={e=>setRepo(e.target.value)} placeholder="owner/repo"/>
+      <div className="card"><h3>1ï¸â£ Builder repo</h3><form onSubmit={save}>
+        <label>Builder repo (owner/repo) â the workflow file must live here</label><input value={repo} onChange={e=>setRepo(e.target.value)} placeholder="owner/repo"/>
         <label>Workflow file</label><input value={wf} onChange={e=>setWf(e.target.value)}/>
         <div style={{marginTop:10}}><button className="btn">Save</button></div></form>{msg&&<p className="small">{msg}</p>}
-        <p className="muted small">Status: queued {st.counts?.queued||0} • running {st.counts?.running||0} • done {st.counts?.done||0} • failed {st.counts?.failed||0}</p></div>
-      <div className="card"><h3>2️⃣ Runner token {st.tokenConfigured?<span className="badge ok">set</span>:<span className="badge bad">not set</span>}</h3>
+        <p className="muted small">Status: queued {st.counts?.queued||0} â¢ running {st.counts?.running||0} â¢ done {st.counts?.done||0} â¢ failed {st.counts?.failed||0}</p></div>
+      <div className="card"><h3>2ï¸â£ Runner token {st.tokenConfigured?<span className="badge ok">set</span>:<span className="badge bad">not set</span>}</h3>
         <p className="muted small">Add it as the <code>RUNNER_TOKEN</code> secret in the builder repo.</p>
         <button className="btn-ghost" onClick={regen}>Regenerate token</button>
         {newToken&&<pre style={{marginTop:8}}>{newToken}</pre>}</div>
     </div>
-    <div className="card" style={{marginTop:12}}><h3>3️⃣ Workflow file — create <code>.github/workflows/{wf||"opencode-task.yml"}</code> in the builder repo</h3>
-      <p className="muted small">Required repo secrets: <code>WEB_URL</code> (public URL — localhost is unreachable from GitHub runners, otherwise use a self-hosted runner on your PC), <code>RUNNER_TOKEN</code> (above), <code>ANTHROPIC_API_KEY</code> (model key for OpenCode). Adjust the model line to yours.</p>
+    <div className="card" style={{marginTop:12}}><h3>3ï¸â£ Workflow file â create <code>.github/workflows/{wf||"opencode-task.yml"}</code> in the builder repo</h3>
+      <p className="muted small">Required repo secrets: <code>WEB_URL</code> (public URL â localhost is unreachable from GitHub runners, otherwise use a self-hosted runner on your PC), <code>RUNNER_TOKEN</code> (above), <code>ANTHROPIC_API_KEY</code> (model key for OpenCode). Adjust the model line to yours.</p>
       <pre>{YAML}</pre></div>
     <div className="card" style={{marginTop:12}}><h3>Recent tasks</h3>
       {(st.recent||[]).length===0&&<p className="muted small">No tasks yet.</p>}
-      {(st.recent||[]).map((t:any)=>(<div key={t.id} className="small" style={{borderBottom:"1px solid #ffffff12",padding:"6px 0"}}><span className="badge">{t.status}</span> <b>{t.title}</b> <span className="muted">{t.id} • user {t.userId} • charged {t.tokensCharged||0}</span></div>))}
+      {(st.recent||[]).map((t:any)=>(<div key={t.id} className="small" style={{borderBottom:"1px solid #ffffff12",padding:"6px 0"}}><span className="badge">{t.status}</span> <b>{t.title}</b> <span className="muted">{t.id} â¢ user {t.userId} â¢ charged {t.tokensCharged||0}</span></div>))}
     </div>
   </div>);
 }
