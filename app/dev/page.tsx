@@ -2,11 +2,12 @@
 import { useState, useRef } from "react";
 
 const TEMPLATES = [
-  { id:"snake", name:"Snake", desc:"Classic neon snake", icon:"🐍", color:"#22d3ee" },
-  { id:"flappy", name:"Flappy", desc:"Tap to fly", icon:"🐤", color:"#fde047" },
-  { id:"pong", name:"Pong", desc:"Duel paddles", icon:"🏓", color:"#6c8cff" },
-  { id:"breakout", name:"Breakout", desc:"Brick breaker", icon:"🧱", color:"#a855f7" },
-  { id:"generic", name:"Particles", desc:"Interactive burst", icon:"✨", color:"#f59e0b" },
+  { id:"racing", name:"Racing", desc:"Neon drift", icon:"🏎️", color:"#ef4444" },
+  { id:"snake", name:"Snake", desc:"Classic neon snake", icon:"ð", color:"#22d3ee" },
+  { id:"flappy", name:"Flappy", desc:"Tap to fly", icon:"ð¤", color:"#fde047" },
+  { id:"pong", name:"Pong", desc:"Duel paddles", icon:"ð", color:"#6c8cff" },
+  { id:"breakout", name:"Breakout", desc:"Brick breaker", icon:"ð§±", color:"#a855f7" },
+  { id:"generic", name:"Particles", desc:"Interactive burst", icon:"â¨", color:"#f59e0b" },
 ];
 
 export default function DevStudio(){
@@ -82,8 +83,8 @@ export default function DevStudio(){
       <div className="dev-hero">
         <div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap",alignItems:"center"}}>
           <div>
-            <h1>Game Studio <span style={{background:"linear-gradient(90deg,#6c8cff,#22d3ee)",WebkitBackgroundClip:"text",color:"transparent"}}>— AI</span></h1>
-            <p>Describe a game, generate instantly, play in preview. No setup, no MCP — runs in the browser.</p>
+            <h1>Game Studio <span style={{background:"linear-gradient(90deg,#6c8cff,#22d3ee)",WebkitBackgroundClip:"text",color:"transparent"}}>â AI</span></h1>
+            <p>Describe a game, generate instantly, play in preview. No setup, no MCP â runs in the browser.</p>
           </div>
           <div style={{display:"flex",gap:8}}>
             <span className="badge" style={{background:"#6c8cff22",border:"1px solid #6c8cff44",padding:"6px 10px",borderRadius:999,fontSize:12}}>Instant Preview</span>
@@ -129,7 +130,7 @@ export default function DevStudio(){
             <button className="btn-primary" onClick={()=>gen()} disabled={loading}>
               {loading?"Generating...":"Generate & Play"}
             </button>
-            <div className="hint">Tip: try “snake”, “flappy”, “pong”, “breakout”. Output is a single HTML file — download and host anywhere.</div>
+            <div className="hint">Tip: try âsnakeâ, âflappyâ, âpongâ, âbreakoutâ. Output is a single HTML file â download and host anywhere.</div>
           </div>
         </div>
 
