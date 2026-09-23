@@ -7,6 +7,7 @@ export default function DashShell({ children }: { children: React.ReactNode }) {
     ["/dashboard/builds", "Builds", "⚙️"],
     ["/dashboard/mcp", "Connect Agent", "🔌"],
     ["/dashboard/tokens", "My Coins", "🪙"],
+    ["/dashboard/uses", "Uses", "📈"],
     ["/dashboard/earn", "Earn Coins", "🎁"],
     ["/dashboard/settings", "Settings", "⚙"],
   ];
