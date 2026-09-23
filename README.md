@@ -72,6 +72,14 @@ AUTH_SECRET=32chars-min-secret
 TOKEN_ENC_KEY=32chars-min-key
 ```
 
+## Payments (Paddle Billing, live)
+`/pricing` Pro ($12/mo) / Team ($39/mo) pay via Paddle hosted checkout — coins auto-credit on `transaction.completed`.
+- `.env`: `PADDLE_API_KEY` (live key), `PADDLE_PRO_PRICE_ID`, `PADDLE_TEAM_PRICE_ID` (already created: Pro/Team monthly products).
+- Webhook (must for auto-credit): Paddle dashboard → Developer tools → Notifications → destination `https://<public-host>/api/billing/webhook`, event `transaction.completed` → paste notification secret as `PADDLE_WEBHOOK_SECRET`, restart. Without it payments succeed but plans stay free (503 in logs).
+- After-payment landing page: set Paddle checkout success URL to `https://<public-host>/dashboard/tokens`.
+- Account must finish Paddle onboarding (dashboard verification) or checkout creation fails with "Checkouts aren't enabled" — `/pricing` shows that message until then.
+- Test without charging: use a Paddle sandbox key + sandbox price IDs in `.env` instead (same variable names).
+
 ## Routes
 - Public: `/`, `/pricing` (Free $0), `/about`, `/mcp`, `/docs`, `/faq`, `/support`, `/terms`, `/privacy`, `/login`, `/signup`
 - User (login must): `/game` (Game Studio), `/dashboard`, `/dashboard/tasks`, `/dashboard/github` (read-only, admin token status), `/dashboard/mcp`, `/dashboard/builds`, `/dashboard/tokens` (balance), `/dashboard/tracking`, `/dashboard/settings`
