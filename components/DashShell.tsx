@@ -5,10 +5,8 @@ export default function DashShell({ children }: { children: React.ReactNode }) {
     ["/dashboard", "Overview", "📊"],
     ["/dashboard/tasks", "Requests", "📨"],
     ["/dashboard/builds", "Builds", "⚙️"],
-    ["/dashboard/github", "GitHub", "🐙"],
     ["/dashboard/mcp", "Connect Agent", "🔌"],
     ["/dashboard/tokens", "My Coins", "🪙"],
-    ["/dashboard/tracking", "Tracking", "📍"],
     ["/dashboard/earn", "Earn Coins", "🎁"],
     ["/dashboard/settings", "Settings", "⚙"],
   ];
