@@ -123,7 +123,7 @@ table.tools td:first-child{white-space:nowrap}table.tools code{color:var(--brand
   .fade-up,.rv{opacity:1;transform:none}
 }
 
-/* --- Dev Studio cinematic --- */
+/* --- Game Studio cinematic --- */
 .dev-cinematic-bg{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
 .dev-orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.4;animation:devDrift 24s ease-in-out infinite alternate}
 .dev-orb-a{width:600px;height:600px;left:-120px;top:-100px;background:radial-gradient(circle at 30% 30%,#6c8cff45,transparent 70%)}
