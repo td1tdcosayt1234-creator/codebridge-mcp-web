@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifyJwt } from "@/lib/auth";
-import { readDb } from "@/lib/db";
+import { readDb, writeDb } from "@/lib/db";
 import { PLANS, createCheckout, paddleConfigured, type PlanId } from "@/lib/billing";
 
 // POST {plan:"pro"|"team"} -> {ok, url} (Paddle hosted checkout). Login must.
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   try {
     const { url } = await createCheckout({ email: u.email, userId: u.id, plan: plan as PlanId });
     db.events.push({ id: "e_" + Date.now().toString(36), userId: u.id, action: "billing_checkout", detail: plan, at: new Date().toISOString() });
-    await (await import("@/lib/db")).writeDb(db);
+    await writeDb(db);
     return NextResponse.json({ ok: true, url, plan, coins: PLANS[plan as PlanId].coins });
   } catch (e) {
     const m = String(e).slice(0, 200);

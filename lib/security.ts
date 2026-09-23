@@ -4,6 +4,10 @@ import crypto from "crypto";
 const buckets = new Map<string, { count: number; reset: number }>();
 export function rateLimit(key: string, max: number, windowMs: number): { ok: boolean; retryAfterSec: number } {
   const now = Date.now();
+  // Bound memory: occasionally drop expired buckets.
+  if (buckets.size > 5000) {
+    buckets.forEach((b, k) => { if (now > b.reset) buckets.delete(k); });
+  }
   const b = buckets.get(key);
   if (!b || now > b.reset) {
     buckets.set(key, { count: 1, reset: now + windowMs });
@@ -15,6 +19,10 @@ export function rateLimit(key: string, max: number, windowMs: number): { ok: boo
 }
 
 export function clientIp(req: Request): string {
+  // Cloudflare Tunnel sets CF-Connecting-IP to the real client IP and
+  // overwrites any spoofed value, so prefer it (works without TRUST_PROXY).
+  const cf = (req.headers.get("cf-connecting-ip") || "").trim().slice(0, 64);
+  if (cf) return cf;
   // Only trust proxy headers when explicitly enabled behind a real reverse
   // proxy that strips client-supplied values. Otherwise the header is
   // client-controlled and would allow IP spoofing past rate limits.
