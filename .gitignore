@@ -8,5 +8,7 @@ data/apks/
 .env
 .env.local
 *.log
+cloudflared.exe
+tunnel-url.txt
 tsconfig.tsbuildinfo
 .DS_Store
