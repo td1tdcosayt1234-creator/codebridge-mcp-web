@@ -9,9 +9,12 @@ export async function GET() {
   const p = await verifyJwt(t);
   if (!p) return NextResponse.json({ error: "auth" }, { status: 401 });
   const db = await readDb();
+  const mine = db.builds.filter((b) => b.userId === p.sub);
+  const us = db.usage.find((u) => u.userId === p.sub);
   return NextResponse.json({
     configured: !!db.globalGithub?.enc,
     builderRepo: db.settings?.builderRepo || "",
     builderWorkflow: db.settings?.builderWorkflow || "opencode-task.yml",
+    uses: { githubCalls: us?.githubCalls || 0, builds: mine.length, lastBuild: mine[0]?.at || "" },
   });
 }
