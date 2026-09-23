@@ -3,9 +3,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 export default function Signup(){
-  const [email,setEmail]=useState(""); const [password,setPassword]=useState(""); const [show,setShow]=useState(false);
+  const [email,setEmail]=useState(""); const [password,setPassword]=useState(""); const [show,setShow]=useState(false); const [remember,setRemember]=useState(true);
   const [hp,setHp]=useState(""); const [err,setErr]=useState(""); const [busy,setBusy]=useState(false); const [shake,setShake]=useState(0); const r=useRouter();
-  async function go(e:any){ e.preventDefault(); setErr(""); setBusy(true); try{ const res=await fetch("/api/auth/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password,website:hp})}); const j=await res.json(); if(!res.ok){setErr(j.error||"Signup failed");setShake(s=>s+1);return;} r.push("/dashboard"); }finally{ setBusy(false); } }
+  async function go(e:any){ e.preventDefault(); setErr(""); setBusy(true); try{ const res=await fetch("/api/auth/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password,remember,website:hp})}); const j=await res.json(); if(!res.ok){setErr(j.error||"Signup failed");setShake(s=>s+1);return;} r.push("/dashboard"); }finally{ setBusy(false); } }
   return (<div className="auth-wrap fade-up">
     <div key={shake} className={"card auth-card"+(err?" shake":"")}>
       <div className="kicker"><span className="pulse-dot" />Join free</div>
@@ -14,6 +14,7 @@ export default function Signup(){
       <form onSubmit={go}><label>Email</label><input value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com"/><label>Password</label>
       <div className="pw-wrap"><input type={show?"text":"password"} value={password} onChange={e=>setPassword(e.target.value)} autoComplete="new-password" placeholder="••••••••"/><button type="button" className="pw-toggle" onClick={()=>setShow(v=>!v)}>{show?"Hide":"Show"}</button></div>
       <input name="website" value={hp} onChange={e=>setHp(e.target.value)} autoComplete="off" tabIndex={-1} aria-hidden="true" style={{position:"absolute",left:"-9999px",opacity:0,height:0}}/>
+      <label style={{display:"flex",gap:8,alignItems:"center",marginTop:12,cursor:"pointer"}}><input type="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)} style={{width:"auto"}} />Remember me — 30 days, all tabs</label>
       {err&&<p className="small" style={{marginTop:10}}><span className="badge bad">{err}</span></p>}
       <div style={{marginTop:16}}><button className="btn btn-lg" style={{width:"100%"}} type="submit" disabled={busy}>{busy?"Creating…":"Create account →"}</button></div></form>
       <p className="muted small" style={{margin:"16px 0 0",textAlign:"center"}}>Already have an account? <Link href="/login" style={{color:"var(--brand2)"}}>Login →</Link></p>

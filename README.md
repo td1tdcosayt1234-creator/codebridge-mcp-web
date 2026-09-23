@@ -110,7 +110,7 @@ bcrypt passwords, JWT httpOnly cookie, AES-256-GCM vault (tokens never shown ful
 
 ## Production security checklist (must before public deploy)
 1. **Secrets**: set long random `AUTH_SECRET` + `TOKEN_ENC_KEY` (changing them logs everyone out and wipes saved encrypted tokens — set once, keep safe).
-2. **Admin**: set `ADMIN_EMAIL` + `ADMIN_PASSWORD` (min 12 chars) before first boot; never keep `admin123` — the server warns in logs while it is active. Sessions expire after 24h.
+2. **Admin**: set `ADMIN_EMAIL` + `ADMIN_PASSWORD` (min 12 chars) before first boot; never keep `admin123` — the server warns in logs while it is active. Sessions last 24h by default, 30 days with “Remember me”.
 3. **TLS**: serve only over HTTPS (reverse proxy). HSTS/CSP/secure-cookie flags only protect real HTTPS traffic; localhost HTTP is dev-only.
 4. **Proxy**: set `TRUST_PROXY=true` only behind a proxy that strips client `x-forwarded-for`, otherwise IPs can be spoofed past rate limits.
 5. **Files**: never serve the project folder statically — `.env`, `data/db.json` and `.git` must stay off the web (safe with `next start`, dangerous on static hosts).

@@ -10,7 +10,7 @@ const LOCK_MS = 15 * 60 * 1000;
 export async function POST(req: Request) {
   if (!csrfCheck(req)) return csrfBlock();
   const ip = clientIp(req);
-  const { email, password } = await req.json().catch(() => ({}));
+  const { email, password, remember } = await req.json().catch(() => ({}));
   const mail = String(email || "").trim().toLowerCase().slice(0, 120);
   const rl = rateLimit("login:" + ip + ":" + mail, 10, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Too many attempts. Try again in " + rl.retryAfterSec + "s." }, { status: 429 });
@@ -37,8 +37,8 @@ export async function POST(req: Request) {
   db.attempts = db.attempts.filter((a) => a.email !== mail);
   db.events.push({ id: uid("e"), userId: u.id, action: "login", detail: u.email, at: new Date().toISOString() });
   await writeDb(db);
-  const token = await signJwt({ sub: u.id, email: u.email, role: u.role });
+  const token = await signJwt({ sub: u.id, email: u.email, role: u.role }, remember ? "30d" : "24h");
   const res = NextResponse.json({ ok: true, role: u.role });
-  res.cookies.set("session", token, { httpOnly: true, path: "/", maxAge: 604800, sameSite: "lax", secure: cookieSecure(req) });
+  res.cookies.set("session", token, { httpOnly: true, path: "/", maxAge: remember ? 30 * 24 * 3600 : 604800, sameSite: "lax", secure: cookieSecure(req) });
   return res;
 }

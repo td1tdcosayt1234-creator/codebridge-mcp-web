@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     await writeDb(db0);
     return NextResponse.json({ error: "VPN/Proxy connections are not allowed. Disable it and try again." }, { status: 403 });
   }
-  const { email, password } = body;
+  const { email, password, remember } = body;
   const mail = clampText(email, 120).trim().toLowerCase();
   if (!mail || !/^\S+@\S+\.\S+$/.test(mail)) return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
   const pwErr = passwordError(String(password || ""));
@@ -33,8 +33,8 @@ export async function POST(req: Request) {
   db.usage.push({ userId: u.id, mcpCalls: 0, githubCalls: 0, balance: 10000, usedTotal: 0 });
   db.events.push({ id: uid("e"), userId: u.id, action: "signup", detail: u.email, at: new Date().toISOString() });
   await writeDb(db);
-  const token = await signJwt({ sub: u.id, email: u.email, role: u.role });
+  const token = await signJwt({ sub: u.id, email: u.email, role: u.role }, remember ? "30d" : "24h");
   const res = NextResponse.json({ ok: true });
-  res.cookies.set("session", token, { httpOnly: true, path: "/", maxAge: 604800, sameSite: "lax", secure: cookieSecure(req) });
+  res.cookies.set("session", token, { httpOnly: true, path: "/", maxAge: remember ? 30 * 24 * 3600 : 604800, sameSite: "lax", secure: cookieSecure(req) });
   return res;
 }
