@@ -26,6 +26,9 @@ export async function POST(req: Request) {
   if (!userId || (plan !== "pro" && plan !== "team")) return NextResponse.json({ ok: true, ignored: "no custom_data" });
 
   const db = await readDb();
+  // Idempotency: Paddle retries until 2xx — never credit twice for one event.
+  const eventId = String(ev?.event_id || "");
+  if (eventId && db.webhookIds.includes(eventId)) return NextResponse.json({ ok: true, duplicate: true });
   const u = db.users.find((x) => x.id === userId);
   if (!u) return NextResponse.json({ ok: true, ignored: "unknown user" });
   u.plan = plan as "pro" | "team";
@@ -37,6 +40,7 @@ export async function POST(req: Request) {
   const ex = db.billing.find((b) => b.userId === userId && b.plan === plan);
   const rec = { userId, plan: plan as "pro" | "team", customerId: custId, subscriptionId: subId, status: String(d?.status || "active"), updatedAt: new Date().toISOString() };
   if (ex) Object.assign(ex, rec); else db.billing.push(rec);
+  if (eventId) { db.webhookIds.push(eventId); if (db.webhookIds.length > 500) db.webhookIds = db.webhookIds.slice(-500); }
   db.events.push({ id: "e_" + Date.now().toString(36), userId, action: "billing_paid", detail: plan + " " + (d?.id || ""), at: new Date().toISOString() });
   await writeDb(db);
   return NextResponse.json({ ok: true, plan });
