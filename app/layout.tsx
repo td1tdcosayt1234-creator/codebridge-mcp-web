@@ -1,6 +1,7 @@
 import "./globals.css";
 import Link from "next/link";
 import Footer from "../components/Footer";
+import Nav from "../components/Nav";
 import type { ReactNode } from "react";
 
 export const metadata = { title: "CodeBridge â Request to Cloud Build", description: "Send a compile request on the web, OpenCode builds it in the cloud, output comes back to you." };
@@ -16,16 +17,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <div className="nav-beam" aria-hidden="true" />
           <div className="container nav-inner">
             <Link href="/" className="logo"><span className="logo-orb" aria-hidden="true" />Code<span className="grad-anim">Bridge</span></Link>
-            <nav className="links">
-              <Link className="link-pill" href="/game" style={{background:"#6c8cff18",border:"1px solid #6c8cff33"}}>Game</Link><Link className="link-pill" href="/pricing">Pricing</Link>
-              <Link className="link-pill" href="/mcp">MCP</Link>
-              <Link className="link-pill" href="/docs">Docs</Link>
-              <Link className="link-pill" href="/faq">FAQ</Link>
-              <Link className="link-pill" href="/support">Support</Link>
-              <Link className="link-pill" href="/about">About</Link>
-              <Link className="link-pill" href="/login">Login</Link>
-              <Link href="/signup" className="btn nav-cta">Get started</Link>
-            </nav>
+            <Nav />
           </div>
         </div>
         <div className="container" style={{minHeight:"60vh",paddingTop:24}}>{children}</div>

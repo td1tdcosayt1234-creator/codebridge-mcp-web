@@ -1,8 +1,25 @@
 import Link from "next/link";
+import CopyBtn from "../../components/CopyBtn";
 export default function Docs(){
+  const cfg = `{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "codebridge": {
+      "type": "remote",
+      "url": "https://your-domain.com/api/mcp",
+      "headers": { "Authorization": "Bearer PASTE_KEY_FROM_DASHBOARD" }
+    }
+  }
+}`;
+  const task = `Title: compile app.py
+Instructions: compile the attached app.py, report errors
+Mode: fix-compile + file attached`;
   return (<div className="prose">
-    <div className="page-hero"><h1>Docs — <span className="grad">from zero to build</span></h1>
-    <p>5-minute setup. Connect once, then every run is automatic: request → AI compiles in the cloud → result comes back. Nothing to install or configure.</p></div>
+    <div className="page-hero" style={{textAlign:"center"}}>
+      <div className="kicker" style={{marginBottom:12}}><span className="pulse-dot" />5-minute setup</div>
+      <h1>Docs — <span className="grad-anim">from zero to build</span></h1>
+      <p style={{margin:"0 auto"}}>Connect once, then every run is automatic: request → AI compiles in the cloud → result comes back. Nothing to install or configure.</p>
+    </div>
 
     <h3>Step 0 — The idea (30 sec)</h3>
     <p>You send a request on the web → the cloud runner compiles it (and fixes, in fix mode) → logs/status return to the agent + dashboard. No manual steps.</p>
@@ -17,16 +34,7 @@ export default function Docs(){
 
     <h3>Step 2 — Connect your agent (optional)</h3>
     <p>Signup/login is required to use the agent tools. Copy your personal key from <Link href="/dashboard/mcp">/dashboard/mcp</Link>, add it to your project <code>opencode.json</code>, then restart the agent app:</p>
-    <pre>{`{
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "codebridge": {
-      "type": "remote",
-      "url": "https://your-domain.com/api/mcp",
-      "headers": { "Authorization": "Bearer PASTE_KEY_FROM_DASHBOARD" }
-    }
-  }
-}`}</pre>
+    <div className="codeblock"><div className="codeblock-bar"><span>opencode.json</span><CopyBtn text={cfg} /></div><pre>{cfg}</pre></div>
     <p className="muted small">Full guide: <Link href="/mcp">/mcp</Link>.</p>
 
     <h3>Step 3 — Send a request: compile / fix-with-compile</h3>
@@ -36,9 +44,7 @@ export default function Docs(){
       <li><b>Fix with compile</b> — on failure, the AI fixes it itself and retries up to 3 times.</li>
     </ul>
     <p>Bigger files cost more coins: held on request, finally charged on output size. Low balance returns <code>402</code> — then split files into smaller requests.</p>
-    <pre>{`Title: compile app.py
-Instructions: compile the attached app.py, report errors
-Mode: fix-compile + file attached`}</pre>
+    <div className="codeblock"><div className="codeblock-bar"><span>request example</span><CopyBtn text={task} /></div><pre>{task}</pre></div>
 
     <h3>🔧 Agent tools reference</h3>
     <div className="card"><table className="tools"><thead><tr><th>Tool</th><th>What</th><th>Login?</th></tr></thead><tbody>

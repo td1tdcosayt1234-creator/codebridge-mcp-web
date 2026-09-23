@@ -34,6 +34,23 @@ export default function Home(){
       <div className="marquee-track">{strip.map((l,i)=>(<span key={i}><b>◆</b> {l}</span>))}</div>
     </div>
 
+    <Reveal>
+    <div className="promo-band">
+      <div className="promo-inner">
+        <div className="promo-art">🕹️</div>
+        <div style={{flex:1,minWidth:220}}>
+          <div className="kicker"><span className="pulse-dot" />Game Studio — free</div>
+          <h2 style={{margin:"0 0 8px",letterSpacing:"-.5px"}}>Describe a game, <span className="grad-anim">play it instantly</span></h2>
+          <p className="muted small" style={{margin:0}}>No deploy, no signup walls for trying — type “neon snake” and get a playable single-file HTML game.</p>
+        </div>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+          <Link className="btn btn-lg" href="/game">Play now →</Link>
+          <Link className="btn-ghost btn-lg" href="/signup">Get coins</Link>
+        </div>
+      </div>
+    </div>
+    </Reveal>
+
     <div className="section">
       <Reveal><h2>How it works <span className="grad">(100% automatic)</span></h2>
       <p className="sub">Connect once, then the same flow runs every time — no setup, no clicks.</p></Reveal>
