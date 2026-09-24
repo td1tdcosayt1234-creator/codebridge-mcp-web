@@ -2,155 +2,121 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifyJwt } from "@/lib/auth";
 export const dynamic = "force-dynamic";
-function snakeHTML(style: string){
-  const neon = style==="neon";
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
-*{margin:0;box-sizing:border-box}body{background:${neon?"#020617":"#070b16"};color:#eaf0ff;font-family:Inter,system-ui;display:grid;place-items:center;min-height:100vh}
-.wrap{display:flex;flex-direction:column;align-items:center;gap:12px}
-canvas{background:${neon?"#0f172a":"#0e152b"};border-radius:16px;box-shadow:0 20px 60px #0008,0 0 0 1px #ffffff14;touch-action:none}
-.hud{display:flex;gap:12px;align-items:center;font-weight:700}
-.btn{padding:8px 14px;border-radius:999px;border:1px solid #ffffff18;background:#ffffff0f;color:#fff;cursor:pointer}
-.score{font-size:18px}
-</style></head><body><div class="wrap"><div class="hud"><span class="score" id="score">Score 0</span><button class="btn" onclick="reset()">Restart</button></div><canvas id="c" width="360" height="360"></canvas><div style="opacity:.6;font-size:12px">Arrow / WASD / Swipe</div></div>
-<script>
-const c=document.getElementById('c'),x=c.getContext('2d'),N=18,S=360/N;
-let dir={x:1,y:0},next={x:1,y:0},snake=[{x:9,y:9}],food={x:14,y:10},score=0,over=false,t=0;
-function rnd(){return {x:Math.floor(Math.random()*N),y:Math.floor(Math.random()*N)}}
-function place(){let p=rnd();while(snake.some(s=>s.x===p.x&&s.y===p.y))p=rnd();food=p}
-place();
-function reset(){snake=[{x:9,y:9}];dir={x:1,y:0};next={x:1,y:0};score=0;over=false;document.getElementById('score').textContent='Score 0'}
-function step(){
- if(over)return;
- dir=next;
- let h={x:snake[0].x+dir.x,y:snake[0].y+dir.y};
- if(h.x<0)h.x=N-1;if(h.x>=N)h.x=0;if(h.y<0)h.y=N-1;if(h.y>=N)h.y=0;
- if(snake.some(s=>s.x===h.x&&s.y===h.y)){over=true;return}
- snake.unshift(h);
- if(h.x===food.x&&h.y===food.y){score+=10;document.getElementById('score').textContent='Score '+score;place()} else snake.pop();
+
+// --- AI game generation: OpenCode Zen (user key) first, free Pollinations second. No templates. ---
+const ZEN_BASE = (process.env.OPENCODE_BASE_URL || "https://opencode.ai/zen/v1").replace(/\/+$/, "");
+const ZEN_MODEL = process.env.OPENCODE_MODEL || "gpt-5.4-mini";
+
+// Paid default first (best quality); free models as fallback if the account has no balance.
+const ZEN_MODELS = Array.from(
+  new Set([ZEN_MODEL, "muse-spark-1.3-contributor-free", "big-pickle", "mimo-v2.6-flash-free"]),
+);
+
+function aiConfigured(): boolean {
+  return (process.env.OPENCODE_API_KEY || "").trim().length > 10;
 }
-function draw(){
- x.clearRect(0,0,360,360);
- x.fillStyle="#22d3ee22";for(let i=0;i<N;i++){x.fillRect(i*S,0,1,360);x.fillRect(0,i*S,360,1)}
- x.fillStyle="#f59e0b";x.fillRect(food.x*S+2,food.y*S+2,S-4,S-4);
- snake.forEach((s,i)=>{x.fillStyle=i===0?"#6c8cff":"#22d3ee";x.fillRect(s.x*S+1,s.y*S+1,S-2,S-2)});
- if(over){x.fillStyle="#0008";x.fillRect(0,0,360,360);x.fillStyle="#fff";x.font="700 22px system-ui";x.textAlign="center";x.fillText("Game Over",180,175);x.font="13px system-ui";x.fillText("Press Restart",180,195)}
+
+function extractHTML(raw: string): string {
+  let s = (raw || "").trim();
+  if (!s) return "";
+  // Strip markdown fences if the model wrapped the HTML.
+  const fence = s.match(/```(?:html)?\s*([\s\S]*?)```/i);
+  if (fence && fence[1]) s = fence[1].trim();
+  return s;
 }
-function loop(ts){ if(!t||ts-t>90){t=ts;step();draw()} requestAnimationFrame(loop)}
-addEventListener('keydown',e=>{
- const k=e.key.toLowerCase();
- if((k==="arrowup"||k==="w")&&dir.y===0)next={x:0,y:-1};
- if((k==="arrowdown"||k==="s")&&dir.y===0)next={x:0,y:1};
- if((k==="arrowleft"||k==="a")&&dir.x===0)next={x:-1,y:0};
- if((k==="arrowright"||k==="d")&&dir.x===0)next={x:1,y:0};
-});
-let sx=0,sy=0;c.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY});
-c.addEventListener('touchend',e=>{let dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;if(Math.abs(dx)>Math.abs(dy)){if(dx>0&&dir.x===0)next={x:1,y:0};if(dx<0&&dir.x===0)next={x:-1,y:0}}else{if(dy>0&&dir.y===0)next={x:0,y:1};if(dy<0&&dir.y===0)next={x:0,y:-1}}});
-requestAnimationFrame(loop);
-</script></body></html>`;
+
+function looksLikeGame(html: string): boolean {
+  if (html.length < 800 || html.length > 200000) return false;
+  const lower = html.toLowerCase();
+  return lower.includes("<html") && (lower.includes("<canvas") || lower.includes("<script"));
 }
-function flappyHTML(){
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
-*{margin:0;box-sizing:border-box}body{background:#070b16;color:#fff;font-family:system-ui;display:grid;place-items:center;min-height:100vh}
-canvas{background:linear-gradient(#0ea5e9,#6c8cff);border-radius:18px;box-shadow:0 20px 60px #0008}
-.hud{position:absolute;top:12px;left:50%;transform:translateX(-50%);font:800 22px system-ui;text-shadow:0 2px 8px #000}
-.wrap{position:relative}
-</style></head><body><div class="wrap"><canvas id="c" width="360" height="520"></canvas><div class="hud" id="hud">0</div></div>
-<script>
-const c=document.getElementById('c'),x=c.getContext('2d');
-let y=250,vy=0,g=0.45,score=0,over=false,pipes=[],t=0;
-function reset(){y=250;vy=0;score=0;over=false;pipes=[];hud.textContent=0}
-function addPipe(){let h=80+Math.random()*180; pipes.push({x:360,h,passed:false})}
-c.addEventListener('click',()=>{if(over)reset();vy=-7});
-addEventListener('keydown',e=>{if(e.code==="Space"){if(over)reset();vy=-7}});
-function loop(){
- x.clearRect(0,0,360,520);
- if(!over){vy+=g;y+=vy; if(y<0)y=0; if(y>500){over=true}}
- if(t%90===0&&!over)addPipe();
- pipes.forEach(p=>{if(!over)p.x-=2.2; x.fillStyle="#0f172a"; x.fillRect(p.x,0,36,p.h); x.fillRect(p.x,p.h+110,36,520); if(!p.passed&&p.x<80){p.passed=true;score++;hud.textContent=score}});
- pipes=pipes.filter(p=>p.x>-40);
- x.fillStyle="#fde047"; x.beginPath(); x.arc(80,y,12,0,Math.PI*2); x.fill(); x.fillStyle="#fff"; x.beginPath(); x.arc(84,y-4,3,0,Math.PI*2); x.fill();
- if(over){x.fillStyle="#0007";x.fillRect(0,0,360,520);x.fillStyle="#fff";x.font="800 22px system-ui";x.textAlign="center";x.fillText("Game Over",180,240);x.font="13px system-ui";x.fillText("Click / Space to restart",180,260)}
- t++; requestAnimationFrame(loop)
+
+const GAME_SYSTEM = (style: string) =>
+  [
+    "You generate a complete, playable, single-file HTML5 game.",
+    "Output ONLY raw HTML — no markdown, no fences, no explanation.",
+    "Rules:",
+    "- One self-contained file: inline <style> and <script>, no external URLs, no CDNs, no images.",
+    "- Use <canvas> for gameplay. Support keyboard (arrows/WASD/space) AND touch/swipe.",
+    "- Include a visible score / HUD, a start or restart control, and a game-over state.",
+    "- Keep it under ~1200 lines. Must run by just opening the file in a browser.",
+    `- Visual style: ${style || "neon"} (neon glow / retro arcade / minimal clean). Dark background.`,
+  ].join("\n");
+
+// Provider 2: Pollinations (free, keyless, OpenAI-compatible). No account needed.
+async function pollinationsGame(prompt: string, style: string, signal: AbortSignal): Promise<string | null> {
+  try {
+    const res = await fetch("https://text.pollinations.ai/openai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "openai",
+        temperature: 0.7,
+        max_tokens: 6000,
+        messages: [
+          { role: "system", content: GAME_SYSTEM(style) },
+          { role: "user", content: `Game idea: ${String(prompt || "").slice(0, 500)}` },
+        ],
+      }),
+      signal,
+    });
+    if (!res.ok) return null;
+    const j = await res.json().catch(() => null);
+    const raw: string = j?.choices?.[0]?.message?.content || "";
+    const html = extractHTML(raw);
+    return looksLikeGame(html) ? html : null;
+  } catch {
+    return null;
+  }
 }
-loop();
-</script></body></html>`;
-}
-function pongHTML(){
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#020617;display:grid;place-items:center;min-height:100vh}canvas{background:#0f172a;border-radius:16px}</style></head><body><canvas id="c" width="560" height="360"></canvas>
-<script>
-const c=document.getElementById('c'),x=c.getContext('2d');
-let py=140,oy=140,by=180,bx=280,bvx=3,bvy=2,ps=0,os=0;
-c.addEventListener('mousemove',e=>{let r=c.getBoundingClientRect();py=(e.clientY-r.top)-40});
-c.addEventListener('touchmove',e=>{let r=c.getBoundingClientRect();py=(e.touches[0].clientY-r.top)-40; e.preventDefault()},{passive:false});
-function loop(){
- x.clearRect(0,0,560,360);
- x.fillStyle="#ffffff0f"; for(let i=0;i<360;i+=16){x.fillRect(279,i,2,8)}
- x.fillStyle="#6c8cff"; x.fillRect(12,py,10,80);
- x.fillStyle="#22d3ee"; x.fillRect(538,oy,10,80);
- x.fillStyle="#fff"; x.beginPath(); x.arc(bx,by,8,0,Math.PI*2); x.fill();
- bx+=bvx; by+=bvy;
- if(by<8||by>352)bvy*=-1;
- if(bx<22&&by>py&&by<py+80){bvx*=-1; bx=22}
- if(bx>528&&by>oy&&by<oy+80){bvx*=-1; bx=528}
- if(bx<0){os++; bx=280;by=180;bvx=3}
- if(bx>560){ps++; bx=280;by=180;bvx=-3}
- oy+=(by-oy-40)*0.06;
- x.fillStyle="#fff"; x.font="800 20px system-ui"; x.fillText(ps,240,30); x.fillText(os,320,30);
- requestAnimationFrame(loop)
-}
-loop();
-</script></body></html>`;
-}
-function breakoutHTML(){
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#070b16;display:grid;place-items:center;min-height:100vh}canvas{background:#0e152b;border-radius:16px}</style></head><body><canvas id="c" width="360" height="420"></canvas>
-<script>
-const c=document.getElementById('c'),x=c.getContext('2d');
-let px=150,ball={x:180,y:300,vx:2.5,vy:-3},bricks=[],score=0;
-for(let r=0;r<4;r++)for(let col=0;col<6;col++)bricks.push({x:12+col*56,y:40+r*22,w:50,h:16,alive:true, c: r===0?"#6c8cff":r===1?"#22d3ee":r===2?"#a855f7":"#f59e0b"});
-c.addEventListener('mousemove',e=>{let r=c.getBoundingClientRect();px=(e.clientX-r.left)-40});
-c.addEventListener('touchmove',e=>{let r=c.getBoundingClientRect();px=(e.touches[0].clientX-r.left)-40},{passive:false});
-function loop(){
- x.clearRect(0,0,360,420);
- bricks.forEach(b=>{if(!b.alive)return; x.fillStyle=b.c; x.fillRect(b.x,b.y,b.w,b.h)});
- x.fillStyle="#fff"; x.fillRect(px,400,80,10);
- x.fillStyle="#fde047"; x.beginPath(); x.arc(ball.x,ball.y,7,0,Math.PI*2); x.fill();
- ball.x+=ball.vx; ball.y+=ball.vy;
- if(ball.x<7||ball.x>353)ball.vx*=-1;
- if(ball.y<7)ball.vy*=-1;
- if(ball.y>393&&ball.x>px&&ball.x<px+80)ball.vy=-Math.abs(ball.vy);
- bricks.forEach(b=>{if(!b.alive)return; if(ball.x>b.x&&ball.x<b.x+b.w&&ball.y>b.y&&ball.y<b.y+b.h){b.alive=false; ball.vy*=-1; score+=10}});
- if(ball.y>420){ball.x=180;ball.y=300;ball.vx=2.5;ball.vy=-3}
- if(bricks.every(b=>!b.alive)){x.fillStyle="#fff";x.font="800 18px system-ui";x.textAlign="center";x.fillText("You Win! "+score,180,210)}
- requestAnimationFrame(loop)
-}
-loop();
-</script></body></html>`;
-}
-function genericHTML(prompt: string){
-  const safe = prompt.slice(0,120).replace(/</g,"&lt;");
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
-*{margin:0;box-sizing:border-box}body{background:#070b16;color:#eaf0ff;font-family:system-ui;display:grid;place-items:center;min-height:100vh;padding:16px}
-.card{background:#0e152b;border:1px solid #ffffff14;border-radius:20px;padding:18px;max-width:520px;width:100%;box-shadow:0 20px 60px #0006}
-canvas{width:100%;height:220px;background:#020617;border-radius:14px;display:block}
-h1{font-size:18px;margin:10px 0 6px} p{opacity:.7;font-size:13px;line-height:1.5}
-.btn{margin-top:10px;padding:10px 14px;border-radius:999px;border:0;background:linear-gradient(90deg,#6c8cff,#22d3ee);color:#fff;font-weight:700;cursor:pointer;width:100%}
-</style></head><body><div class="card"><canvas id="c"></canvas><h1>${safe}</h1><p>Tap / Click to interact. Use a prompt like "snake" "flappy" "pong" "breakout" for a full game.</p><button class="btn" onclick="burst()">Interact</button></div>
-<script>
-const c=document.getElementById('c'),x=c.getContext('2d');let w=c.width=520,h=c.height=220;
-let pts=[];
-function burst(){for(let i=0;i<20;i++)pts.push({x:w/2,y:h/2,vx:(Math.random()-0.5)*8,vy:(Math.random()-0.5)*8,r:3+Math.random()*4,c: "hsl("+(200+Math.random()*60)+",90%,60%)",a:1})}
-function loop(){
- x.clearRect(0,0,w,h);
- pts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=0.25;p.a-=0.012; x.globalAlpha=Math.max(0,p.a); x.fillStyle=p.c; x.beginPath(); x.arc(p.x,p.y,p.r,0,Math.PI*2); x.fill()});
- pts=pts.filter(p=>p.a>0);
- x.globalAlpha=1;
- x.fillStyle="#ffffff0f"; x.font="700 22px system-ui"; x.textAlign="center"; x.fillText("PLAY",w/2,h/2+6);
- requestAnimationFrame(loop)
-}
-c.addEventListener('click',burst);
-c.addEventListener('touchstart',burst);
-loop();
-</script></body></html>`;
+
+async function aiGameHTML(prompt: string, style: string): Promise<{ html: string; provider: string } | null> {
+  const cleanPrompt = String(prompt || "").slice(0, 500);
+  const system = GAME_SYSTEM(style);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 120000);
+  try {
+    // Provider 1: OpenCode Zen (user key — best quality when funded).
+    if (aiConfigured()) {
+      const key = (process.env.OPENCODE_API_KEY || "").trim();
+      for (const model of ZEN_MODELS) {
+        try {
+          const res = await fetch(`${ZEN_BASE}/chat/completions`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${key}`,
+            },
+            body: JSON.stringify({
+              model,
+              temperature: 0.7,
+              max_tokens: 6000,
+              messages: [
+                { role: "system", content: system },
+                { role: "user", content: `Game idea: ${cleanPrompt}` },
+              ],
+            }),
+            signal: ctrl.signal,
+          });
+          if (!res.ok) continue; // 402/403/429 → try next model, then provider 2
+          const j = await res.json().catch(() => null);
+          const raw: string = j?.choices?.[0]?.message?.content || "";
+          const html = extractHTML(raw);
+          if (looksLikeGame(html)) return { html, provider: "zen:" + model };
+        } catch {
+          continue;
+        }
+      }
+    }
+    // Provider 2: Pollinations (free, keyless) — real AI, no templates involved.
+    const free = await pollinationsGame(cleanPrompt, style, ctrl.signal);
+    if (free) return { html: free, provider: "pollinations" };
+    return null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 export async function POST(req: Request){
   // Login required (mirrors /game page gate).
@@ -159,18 +125,18 @@ export async function POST(req: Request){
   if(!user) return NextResponse.json({error:"Login required"},{status:401});
   // Rate limit: 30 req/min per IP (simple in-memory) - prevents abuse
   try{
-    const { prompt="", template="", style="neon" } = await req.json().catch(()=>({}));
+    const { prompt="", style="neon" } = await req.json().catch(()=>({}));
     if(String(prompt||"").length>800) return NextResponse.json({error:"Prompt too long (max 800)"},{status:400});
-    if(String(prompt||"").length<2 && !template) return NextResponse.json({error:"Prompt required"},{status:400});
-    const p = String(prompt||template||"").toLowerCase();
-    let html="";
-    if(p.includes("snake")) html=snakeHTML(style);
-    else if(p.includes("flappy")||p.includes("bird")) html=flappyHTML();
-    else if(p.includes("pong")) html=pongHTML();
-    else if(p.includes("breakout")||p.includes("brick")||p.includes("arkanoid")) html=breakoutHTML();
-    else if(p.includes("racing")||p.includes("car")||p.includes("drift")) html=`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#020617;display:grid;place-items:center;min-height:100vh}canvas{background:#0f172a;border-radius:16px}</style></head><body><canvas id="c" width="360" height="520"></canvas><script>const c=document.getElementById("c"),x=c.getContext("2d");let px=180,road=[],speed=4,score=0;for(let i=0;i<20;i++)road.push({y:i*30,off:Math.sin(i*0.5)*40});let keys={};addEventListener("keydown",e=>keys[e.key.toLowerCase()]=1);addEventListener("keyup",e=>keys[e.key.toLowerCase()]=0);c.addEventListener("touchmove",e=>{let r=c.getBoundingClientRect();px=(e.touches[0].clientX-r.left);},{passive:false});function loop(){x.clearRect(0,0,360,520);x.fillStyle="#1e293b";x.fillRect(60,0,240,520);x.fillStyle="#ffffff18";for(let i=0;i<520;i+=20){x.fillRect(179,i+(Date.now()/20)%20,2,10)}road.forEach(r=>{r.y+=speed;if(r.y>520){r.y=-30;r.off=Math.sin(Math.random()*6)*50}});let hit=false;road.forEach(r=>{let rx=180+r.off;if(Math.abs(px-rx)>100)hit=true});x.fillStyle=hit?"#ef4444":"#6c8cff";x.fillRect(px-18,420,36,22);x.fillStyle="#fff";x.font="800 14px system-ui";x.textAlign="center";x.fillText("Score "+score,180,20);if(!hit)score++;else{x.fillStyle="#0008";x.fillRect(0,0,360,520);x.fillStyle="#fff";x.font="800 20px system-ui";x.fillText("Crashed",180,250)}requestAnimationFrame(loop)}loop();</script></body></html>`;
-    else html=genericHTML(prompt || "Cool Game");
-    return NextResponse.json({ ok:true, html, name:"index.html", size: html.length });
+    if(String(prompt||"").length<2) return NextResponse.json({error:"Prompt required"},{status:400});
+    // Pure AI generation — no templates. Zen (user key) first, free Pollinations second.
+    const ai = await aiGameHTML(String(prompt || ""), String(style || "neon"));
+    if (!ai) {
+      return NextResponse.json(
+        { error: "AI generation failed. The free provider may be busy — wait a minute and try again." },
+        { status: 503 },
+      );
+    }
+    return NextResponse.json({ ok:true, html: ai.html, name:"index.html", size: ai.html.length, engine: "ai", provider: ai.provider });
   }catch(e){ return NextResponse.json({ error: String(e) }, {status:500})}
 }
-export async function GET(){ return NextResponse.json({ ok:true, service:"game-generate" });}
+export async function GET(){ return NextResponse.json({ ok:true, service:"game-generate", ai: aiConfigured(), model: aiConfigured() ? ZEN_MODEL : undefined });}

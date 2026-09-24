@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifyJwt } from "@/lib/auth";
 
-// Login gate: no session -> /login?next=/game (mirrors dashboard layout).
+// Login gate: no session -> /login (middleware preserves ?prompt= in the next param).
 export default async function GameLayout({ children }: { children: React.ReactNode }) {
   const t = cookies().get("session")?.value || "";
   const p = await verifyJwt(t);

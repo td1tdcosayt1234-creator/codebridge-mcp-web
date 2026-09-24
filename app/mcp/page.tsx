@@ -1,43 +1,160 @@
 import Link from "next/link";
 import CopyBtn from "../../components/CopyBtn";
-export default function Mcp(){
-  const opencode = `{\n  "$schema": "https://opencode.ai/config.json",\n  "mcp": {\n    "codebridge": { "type": "remote", "url": "http://localhost:3001/api/mcp", "enabled": true }\n  }\n}`;
+import PageHero from "../../components/PageHero";
+import Reveal from "../../components/Reveal";
+
+const TOOLS = [
+  ["compile", "title, prompt, files?", "live build result (all types)"],
+  ["compile_fix", "title, prompt, files?", "result with AI self-fix + retries"],
+  ["list_tasks", "query?, limit?", "search your tasks (newest first)"],
+  ["get_task_result", "task_id", "log + result of one task"],
+];
+
+export default function Mcp() {
+  const opencode = `{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "codebridge": { "type": "remote", "url": "http://localhost:3001/api/mcp", "enabled": true }
+  }
+}`;
   const cursor = `{"mcpServers":{"codebridge":{"url":"http://localhost:3001/api/mcp"}}}`;
   const claude = `{"mcpServers":{"codebridge":{"url":"http://localhost:3001/api/mcp"}}}`;
-  const manual = `{\n  "$schema": "https://opencode.ai/config.json",\n  "mcp": {\n    "codebridge": {\n      "type": "remote",\n      "url": "https://your-domain.com/api/mcp",\n      "headers": { "Authorization": "Bearer PASTE_YOUR_KEY_HERE" }\n    }\n  }\n}`;
-  const ask = `compile my attached files with codebridge compile\n(or compile_fix to repair errors automatically)`;
-  return (<div className="prose">
-    <div className="page-hero" style={{textAlign:"center"}}>
-      <div className="kicker" style={{marginBottom:12}}><span className="pulse-dot" />6 tools • OAuth + keys</div>
-      <h1>Agent Connect — <span className="grad-anim">one click</span></h1>
-      <p style={{margin:"0 auto"}}>This web is an MCP server (<code>/api/mcp</code>). <b>Easiest (Notion-style):</b> add only the URL below — your client opens a browser login, you click <b>Connect</b>, done. No key pasting. Prefer manual keys? Copy one from <Link href="/dashboard/mcp">/dashboard/mcp</Link>.</p>
+  const manual = `{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "codebridge": {
+      "type": "remote",
+      "url": "https://your-domain.com/api/mcp",
+      "headers": { "Authorization": "Bearer PASTE_YOUR_KEY_HERE" }
+    }
+  }
+}`;
+  const ask = `compile my attached files with codebridge compile
+(or compile_fix to repair errors automatically)`;
+
+  return (
+    <div className="prose">
+      <PageHero
+        kicker="4 tools · OAuth + keys"
+        title={<>Agent Connect — <span className="grad-anim text-glow">one click</span></>}
+        sub={
+          <>
+            This site is an MCP server (<code>/api/mcp</code>). <strong>Easiest path:</strong> add only the URL below —
+            your client opens a browser login, you click <strong>Connect</strong>, done. Prefer keys? Copy one from{" "}
+            <Link href="/dashboard/mcp">/dashboard/mcp</Link>.
+          </>
+        }
+      />
+
+      <Reveal variant="scale">
+        <div className="card holo">
+          <h3>Connect your client</h3>
+          <div className="step-card">
+            <div className="stepnum">1</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <strong>Add the server URL</strong> <span className="muted small">(nothing else)</span>
+              <div className="codeblock">
+                <div className="codeblock-bar">
+                  <span>opencode.json</span>
+                  <CopyBtn text={opencode} />
+                </div>
+                <pre className="small">
+                  {"// opencode.json "}
+                  {opencode}
+                  {"\n\n// Cursor settings.json\n"}
+                  {cursor}
+                  {"\n\n// Claude Desktop\n"}
+                  {claude}
+                </pre>
+              </div>
+            </div>
+          </div>
+          <div className="step-card">
+            <div className="stepnum">2</div>
+            <div>
+              <strong>Use any tool once</strong>
+              <p className="muted small" style={{ margin: "8px 0 0" }}>
+                The client opens <code>/api/oauth/authorize</code> in your browser. Signup/login, click{" "}
+                <strong>Connect</strong>, return to the client. Connected until you revoke it in /dashboard/mcp.
+              </p>
+            </div>
+          </div>
+        </div>
+      </Reveal>
+
+      <div className="grid g2" style={{ marginTop: 18 }}>
+        <Reveal variant="left">
+          <div className="card" style={{ height: "100%" }}>
+            <h3>Manual key <span className="muted small">(headless agents)</span></h3>
+            <p className="muted small">
+              <Link href="/signup">Signup</Link> / <Link href="/login">login</Link>, then open{" "}
+              <Link href="/dashboard/mcp">/dashboard/mcp</Link> — your personal key is shown there (never share it). Put
+              it in your project <code>opencode.json</code>:
+            </p>
+            <div className="codeblock">
+              <div className="codeblock-bar">
+                <span>opencode.json</span>
+                <CopyBtn text={manual} />
+              </div>
+              <pre>{manual}</pre>
+            </div>
+            <p className="muted small">
+              <strong>Restart the agent afterwards</strong> — otherwise no tools appear. Wrong key? You get a clear{" "}
+              <code>invalid_token</code> error. Key leaked? Regenerate it in /dashboard/mcp.
+            </p>
+          </div>
+        </Reveal>
+        <Reveal variant="right" delay={110}>
+          <div className="card" style={{ height: "100%" }}>
+            <h3>Tell the agent</h3>
+            <div className="codeblock">
+              <div className="codeblock-bar">
+                <span>prompt</span>
+                <CopyBtn text={ask} />
+              </div>
+              <pre>{ask}</pre>
+            </div>
+            <p className="muted small">
+              Each call waits for the live result and returns logs plus artifacts. Bigger files cost more coins. Use{" "}
+              <code>list_tasks</code> to search past tasks and <code>get_task_result</code> to fetch one.
+            </p>
+          </div>
+        </Reveal>
+      </div>
+
+      <Reveal variant="left">
+        <h3>Tools</h3>
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <div className="table-wrap" style={{ border: 0 }}>
+            <table className="tools">
+              <thead>
+                <tr>
+                  <th>Tool</th>
+                  <th>Input</th>
+                  <th>Output</th>
+                </tr>
+              </thead>
+              <tbody>
+                {TOOLS.map(([name, input, output]) => (
+                  <tr key={name}>
+                    <td><code>{name}</code></td>
+                    <td className="small">{input}</td>
+                    <td className="small">{output}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </Reveal>
+
+      <Reveal variant="left">
+        <h3>Verify it works</h3>
+        <ul className="check">
+          <li>After restart, tell the agent: <em>&ldquo;compile hello with codebridge compile&rdquo;</em> — a live result means connected.</li>
+          <li>If not: is the web server running? URL correct? Logged in on the website? See <Link href="/docs">docs troubleshooting</Link>.</li>
+        </ul>
+      </Reveal>
     </div>
-    <div className="card card-glow" style={{marginTop:12}}>
-      <h3 style={{marginTop:0}}>🔌 Connect your client</h3>
-      <div className="step-card"><div className="stepnum">1</div><div style={{flex:1,minWidth:0}}><b>Add the server URL</b> <span className="muted small">(nothing else)</span>
-        <div className="codeblock"><div className="codeblock-bar"><span>opencode.json</span><CopyBtn text={opencode} /></div><pre className="small">{"// opencode.json "}{opencode}{"\n\n// Cursor settings.json\n"}{cursor}{"\n\n// Claude Desktop\n"}{claude}</pre></div>
-      </div></div>
-      <div className="step-card"><div className="stepnum">2</div><div><b>Use any tool once</b><p className="muted small" style={{margin:"6px 0 0"}}>The client opens <code>/api/oauth/authorize</code> in your browser. <b>Signup/login</b>, click <b>Connect</b>, return to the client. Connected forever (revoke anytime in /dashboard/mcp).</p></div></div>
-    </div>
-    <div className="grid g2">
-      <div className="card"><h3 style={{marginTop:0}}>🔑 Manual key <span className="muted small">(headless agents)</span></h3><p className="muted small"><Link href="/signup">Signup</Link> / <Link href="/login">login</Link>, then open <Link href="/dashboard/mcp">/dashboard/mcp</Link> — your personal key is shown there (never share it). Put this in your project <code>opencode.json</code>:</p>
-        <div className="codeblock"><div className="codeblock-bar"><span>opencode.json</span><CopyBtn text={manual} /></div><pre>{manual}</pre></div>
-        <p className="muted small"><b>Restart the agent app afterwards</b> — otherwise no tools appear. Wrong key? You get a clear <code>invalid_token</code> error — just re-copy the fresh key. Key leaked? Regenerate it in /dashboard/mcp.</p></div>
-      <div className="card"><h3 style={{marginTop:0}}>💬 Tell the agent</h3>
-        <div className="codeblock"><div className="codeblock-bar"><span>prompt</span><CopyBtn text={ask} /></div><pre>{ask}</pre></div>
-        <p className="muted small">Each call waits up to ~45s and returns the live result. Bigger files cost more coins. Use <code>list_tasks</code> to search past tasks and <code>get_task_result</code> to fetch one.</p></div>
-    </div>
-    <h3>🧰 6 tools</h3>
-    <div className="card"><div className="table-wrap" style={{border:0}}><table className="tools"><thead><tr><th>Tool</th><th>Input</th><th>Output</th></tr></thead><tbody>
-      <tr><td><code>compile</code></td><td className="small">title, prompt, files?</td><td className="small">live compile result (all types)</td></tr>
-      <tr><td><code>compile_fix</code></td><td className="small">title, prompt, files?</td><td className="small">result with AI self-fix + retries</td></tr>
-      <tr><td><code>list_tasks</code></td><td className="small">query?, limit?</td><td className="small">search your tasks (newest first)</td></tr>
-      <tr><td><code>get_task_result</code></td><td className="small">task_id</td><td className="small">log + result of one task</td></tr>
-    </tbody></table></div></div>
-    <h3>✅ Verify it works</h3>
-    <ul>
-      <li>After restart, tell the agent: <i>“compile hello with codebridge compile”</i> — a live result means connected.</li>
-      <li>If not: is the web server running? URL correct? Logged in on the website? See <Link href="/docs">docs troubleshooting</Link>.</li>
-    </ul>
-  </div>);
+  );
 }

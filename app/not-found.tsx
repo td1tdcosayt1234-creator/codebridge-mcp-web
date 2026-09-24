@@ -1,15 +1,34 @@
 import Link from "next/link";
+
 export default function NotFound() {
   return (
-    <div style={{ padding: "70px 0", textAlign: "center" }} className="fade-up">
-      <div className="kicker" style={{ marginBottom: 14 }}><span className="pulse-dot" />Lost in space</div>
-      <div style={{ fontSize: 96, fontWeight: 900, letterSpacing: "-4px", lineHeight: 1 }} className="grad-anim">404</div>
-      <h1 style={{ margin: "12px 0 8px", letterSpacing: "-.5px" }}>Page not found</h1>
-      <p className="muted" style={{ maxWidth: 440, margin: "0 auto 22px" }}>This page does not exist, or you do not have access. Dashboards require login — admins get 404 on non-admin areas too.</p>
-      <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-        <Link className="btn btn-lg" href="/login">Login →</Link>
-        <Link className="btn-ghost btn-lg" href="/">Home</Link>
-        <Link className="btn-ghost btn-lg" href="/game">🎮 Game</Link>
+    <div className="section fade-up" style={{ textAlign: "center", padding: "110px 0 90px" }}>
+      <div className="hero-orbit" aria-hidden="true">
+        <div className="ring ring--1" />
+        <div className="ring ring--2" />
+      </div>
+      <div className="kicker" style={{ marginBottom: 16 }}>
+        <span className="pulse-dot" />
+        Signal lost
+      </div>
+      <div className="grad-anim text-glow" style={{ fontSize: 118, fontWeight: 800, letterSpacing: "-0.06em", lineHeight: 1 }}>
+        404
+      </div>
+      <h1 style={{ margin: "14px 0 10px", fontSize: 30 }}>This frame never rendered</h1>
+      <p className="muted" style={{ maxWidth: 460, margin: "0 auto 26px" }}>
+        The page does not exist, or your session cannot see it. Dashboards require login — admin areas return 404 for
+        everyone else.
+      </p>
+      <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+        <Link className="btn btn-lg shine" href="/">
+          Back home
+        </Link>
+        <Link className="btn-ghost btn-lg" href="/login">
+          Login
+        </Link>
+        <Link className="btn-ghost btn-lg" href="/game">
+          Game Studio
+        </Link>
       </div>
     </div>
   );

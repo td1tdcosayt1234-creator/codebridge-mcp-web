@@ -15,10 +15,68 @@ const STYLES = [
   { id: "minimal", name: "Minimal", icon: "○", desc: "Clean" },
 ];
 
+
+const GAME_CSS = `
+        .dev-grid-bg{position:absolute;inset:0;background-image:linear-gradient(#ffffff08 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px);background-size:52px 52px;mask-image:radial-gradient(760px 400px at 50% 0%,#000,transparent);animation:gridDrift 18s linear infinite}
+        @keyframes gridDrift{to{background-position:0 52px,0 0}}
+        .cinematic{position:relative;border-radius:26px;overflow:hidden;border:1px solid #ffffff1f;background:linear-gradient(180deg,rgba(16,14,32,.92) 0%,rgba(6,7,14,.96) 100%);box-shadow:0 44px 100px -50px #000,0 0 90px -50px #8b5cf6;backdrop-filter:blur(16px)}
+        .cinematic::before{content:"";position:absolute;inset:0;background:radial-gradient(820px 420px at 18% -10%,#8b5cf647,transparent),radial-gradient(640px 320px at 92% 16%,#2dd4bf33,transparent);pointer-events:none}
+        .cinematic::after{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#c4b5fdcc,#5eead4cc,transparent);box-shadow:0 0 22px #8b5cf699}
+        .hero{position:relative;padding:34px 30px 24px;display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:end}
+        .hero h1{font-size:38px;letter-spacing:-.04em;margin:0;line-height:1.02;font-weight:700}
+        .hero p{color:#99a1b8;margin:12px 0 0;font-size:13.5px;max-width:600px;line-height:1.7}
+        .grad-text{background:linear-gradient(100deg,#c4b5fd,#38bdf8 45%,#5eead4);background-size:220% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:gradShift 8s linear infinite;text-shadow:0 0 50px #8b5cf655}
+        @keyframes gradShift{to{background-position:220% center}}
+        .hero-stats{display:flex;gap:8px;flex-wrap:wrap}
+        .chip{padding:6px 11px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid #ffffff17;background:#ffffff0d;color:#b9c0d4;letter-spacing:.02em;backdrop-filter:blur(10px);transition:.3s}
+        .chip:hover{border-color:#c4b5fd66;color:#fff;transform:translateY(-2px)}
+        .chip.live{background:#34d3991f;border-color:#34d3994d;color:#6ee7b7;box-shadow:0 0 22px -6px #34d399aa}
+        .live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#34d399;margin-right:6px;box-shadow:0 0 0 0 #34d399aa;animation:pulseDot 2s infinite;vertical-align:1px}
+        @keyframes pulseDot{70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
+        .dev-grid{display:grid;grid-template-columns:390px 1fr;gap:18px;margin-top:18px}
+        @media(max-width:980px){.dev-grid{grid-template-columns:1fr} .hero h1{font-size:28px}}
+        .panel{background:linear-gradient(180deg,rgba(18,20,34,.78),rgba(7,8,16,.9));border:1px solid #ffffff17;border-radius:20px;overflow:hidden;box-shadow:0 30px 70px -50px #000,inset 0 1px 0 #ffffff0d;backdrop-filter:blur(14px)}
+        .panel-head{padding:13px 15px;border-bottom:1px solid #ffffff12;display:flex;justify-content:space-between;align-items:center;gap:10px;font-weight:800;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:#b9c0d4}
+        .panel-body{padding:18px}
+        .field{width:100%;padding:13px 14px;border-radius:13px;border:1px solid #ffffff1a;background:#04060fd9;color:#f5f6fb;outline:none;font-size:13.5px;resize:vertical;line-height:1.6;transition:border-color .25s,box-shadow .3s,background .25s}
+        .field:focus{border-color:#c4b5fdaa;background:#0a0c1ae6;box-shadow:0 0 0 4px #8b5cf626,0 0 40px -14px #8b5cf6}
+        .idea-row{display:flex;gap:7px;margin-top:10px;flex-wrap:wrap}
+        .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:6px;background:#04060fd9;border:1px solid #ffffff12;border-radius:15px}
+        .seg button{padding:10px 6px;border-radius:11px;border:0;background:transparent;color:#8b93a8;cursor:pointer;font-size:12px;font-weight:800;transition:.25s;line-height:1.3}
+        .seg button small{display:block;font-size:10px;font-weight:600;opacity:.6}
+        .seg button:hover{color:#fff;background:#ffffff0d}
+        .seg button.active{background:linear-gradient(135deg,#8b5cf6,#2dd4bf);color:#08091a;box-shadow:0 8px 26px -10px #8b5cf6}
+        .seg button.active small{opacity:.8}
+        .btn-primary{width:100%;padding:15px;border-radius:14px;border:1px solid #ffffff1f;background:linear-gradient(110deg,#f5f6fb,#e4e6f5);color:#07080f;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 16px 40px -20px #fff;letter-spacing:.01em;transition:.3s;position:relative;overflow:hidden}
+        .btn-primary::after{content:"";position:absolute;top:0;left:-70%;width:45%;height:100%;background:linear-gradient(100deg,transparent,#ffffff99,transparent);transform:skewX(-20deg);animation:shineBtn 4.2s ease-in-out infinite}
+        @keyframes shineBtn{0%,55%{left:-70%}100%{left:180%}}
+        .btn-primary:hover{transform:translateY(-2px);box-shadow:0 22px 50px -22px #c4b5fd}
+        .btn-primary:disabled{opacity:.6;cursor:wait;transform:none}
+        .kbd{font-family:ui-monospace,monospace;font-size:10px;border:1px solid #ffffff26;border-bottom-width:2px;border-radius:6px;padding:1.5px 6px;background:#ffffff0d;color:#d7dced}
+        .preview-glow{padding:1.5px;border-radius:18px;background:conic-gradient(from 0deg,#8b5cf6aa,#2dd4bf88,#38bdf888,#8b5cf6aa);box-shadow:0 0 60px -18px #8b5cf6;animation:spin 14s linear infinite}
+        .preview-wrap{position:relative;background:#04060f;border-radius:15px;overflow:hidden;min-height:480px;display:grid;place-items:center;border:1px solid #ffffff12;box-shadow:inset 0 1px 0 #ffffff0d}
+        .preview-wrap.fs{position:fixed;inset:12px;z-index:50;min-height:auto;border-radius:18px}
+        .toolbar{display:flex;gap:6px;flex-wrap:wrap}
+        .tool{padding:7px 12px;border-radius:999px;border:1px solid #ffffff17;background:#ffffff0d;color:#e6e9f5;font-size:11px;font-weight:700;cursor:pointer;backdrop-filter:blur(10px);transition:.25s}
+        .tool:hover{background:#8b5cf633;border-color:#c4b5fd77;box-shadow:0 0 20px -6px #8b5cf6;transform:translateY(-1px)}
+        .tool:active{transform:scale(.97)}
+        .hint{font-size:11px;color:#6a7288;margin-top:10px;line-height:1.7}
+        pre{margin:0;max-height:480px;overflow:auto;background:#04060f;color:#ccd3e8;padding:16px;border-radius:13px;font-size:12px;line-height:1.7;border:1px solid #ffffff12}
+        .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:rgba(12,14,24,.97);border:1px solid #c4b5fd66;color:#fff;padding:11px 18px;border-radius:999px;font-size:12px;font-weight:700;box-shadow:0 20px 50px -20px #000,0 0 40px -14px #8b5cf6;z-index:60;animation:toastIn .3s cubic-bezier(.34,1.56,.64,1)}
+        @keyframes toastIn{from{opacity:0;transform:translate(-50%,10px) scale(.96)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
+        .skeleton{width:100%;height:100%;display:grid;place-items:center;gap:14px;padding:32px;text-align:center}
+        .pulse{width:56px;height:56px;border-radius:50%;background:conic-gradient(from 0deg,#8b5cf6,#2dd4bf,#38bdf8,#8b5cf6);animation:spin 1.1s linear infinite;mask:radial-gradient(circle 20px at 50% 50%,transparent 98%,black 100%);-webkit-mask:radial-gradient(circle 20px at 50% 50%,transparent 98%,black 100%);box-shadow:0 0 40px -10px #8b5cf6}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .empty-art{font-size:44px;filter:drop-shadow(0 0 22px #8b5cf6aa);animation:floatY 4.5s ease-in-out infinite}
+        @keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+        .label{font-size:10.5px;color:#6a7288;letter-spacing:.14em;font-weight:800;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;text-transform:uppercase}
+`;
+
 export default function GameStudio(){
   const [prompt,setPrompt]=useState("");
   const [style,setStyle]=useState("neon");
   const [html,setHtml]=useState("");
+  const [provider,setProvider]=useState("");
   const [loading,setLoading]=useState(false);
   const [showCode,setShowCode]=useState(false);
   const [isFs,setIsFs]=useState(false);
@@ -48,14 +106,16 @@ export default function GameStudio(){
     if(p.length>800){ showToast("Prompt too long (max 800)"); return; }
     setLoading(true);
     try{
-      const r = await fetch("/api/game/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:p, template:"", style})});
+      const r = await fetch("/api/game/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:p, style})});
       if(r.status===401){ showToast("Login required"); location.href="/login?next="+encodeURIComponent("/game"); return; }
+      if(r.status===503){ showToast("AI busy — wait a minute and retry"); setLoading(false); return; }
       if(!r.ok) throw new Error("Generate failed "+r.status);
       const j = await r.json();
       if(!j.html) throw new Error("No html returned");
       setHtml(j.html);
       setShowCode(false);
-      showToast("Game ready — preview updated");
+      setProvider(j.provider || "ai");
+      showToast("AI game ready — preview updated");
     }catch(e:any){
       showToast(e.message||"Failed");
     }
@@ -97,59 +157,7 @@ export default function GameStudio(){
     <>
     <div className="dev-cinematic-bg" aria-hidden="true"><div className="dev-orb dev-orb-a"/><div className="dev-orb dev-orb-b"/><div className="dev-orb dev-orb-c"/><div className="dev-grid-bg"/></div>
     <div style={{maxWidth:1280,margin:"0 auto",position:"relative"}}>
-      <style>{`
-        .dev-grid-bg{position:absolute;inset:0;background-image:linear-gradient(#ffffff06 1px,transparent 1px),linear-gradient(90deg,#ffffff06 1px,transparent 1px);background-size:44px 44px;mask-image:radial-gradient(700px 380px at 50% 0%,#000,transparent)}
-        .cinematic{position:relative;border-radius:24px;overflow:hidden;border:1px solid #ffffff14;background:linear-gradient(180deg,#0e152b 0%,#0a1020 100%);box-shadow:0 30px 80px #0008}
-        .cinematic::before{content:"";position:absolute;inset:0;background:radial-gradient(800px 400px at 20% 0%,#6c8cff22,transparent),radial-gradient(600px 300px at 90% 20%,#22d3ee18,transparent);pointer-events:none}
-        .cinematic::after{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#6c8cff88,#22d3ee88,transparent)}
-        .hero{position:relative;padding:30px 26px 22px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:end}
-        .hero h1{font-size:36px;letter-spacing:-.03em;margin:0;line-height:1}
-        .hero p{opacity:.65;margin:10px 0 0;font-size:13px;max-width:580px;line-height:1.65}
-        .grad-text{background:linear-gradient(90deg,#6c8cff,#22d3ee,#a855f7,#6c8cff);background-size:220% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:gradShift 6s linear infinite}
-        @keyframes gradShift{to{background-position:220% center}}
-        .hero-stats{display:flex;gap:8px;flex-wrap:wrap}
-        .chip{padding:6px 10px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid #ffffff14;background:#ffffff0a;letter-spacing:.02em;backdrop-filter:blur(8px)}
-        .chip.live{background:#22c55e18;border-color:#22c55e33;color:#86efac;box-shadow:0 0 18px -4px #22c55e66}
-        .live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#22c55e;margin-right:6px;box-shadow:0 0 0 0 #22c55eaa;animation:pulseDot 2s infinite;vertical-align:1px}
-        @keyframes pulseDot{70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
-        .dev-grid{display:grid;grid-template-columns:380px 1fr;gap:16px;margin-top:16px}
-        @media(max-width:960px){.dev-grid{grid-template-columns:1fr} .hero h1{font-size:27px}}
-        .panel{background:linear-gradient(180deg,#0e152bcc,#0b1226f2);border:1px solid #ffffff14;border-radius:18px;overflow:hidden;box-shadow:0 16px 40px #0005;backdrop-filter:blur(12px)}
-        .panel-head{padding:12px 14px;border-bottom:1px solid #ffffff0f;display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:12px;letter-spacing:.06em;text-transform:uppercase;opacity:.9}
-        .panel-body{padding:16px}
-        .field{width:100%;padding:12px 13px;border-radius:12px;border:1px solid #ffffff14;background:#020617d9;color:#eaf0ff;outline:none;font-size:13.5px;resize:vertical;line-height:1.55;transition:border-color .2s,box-shadow .2s}
-        .field:focus{border-color:#6c8cff88;box-shadow:0 0 0 3px #6c8cff26,0 0 24px -6px #6c8cff66}
-        .idea-row{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
-        .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:5px;background:#020617d9;border:1px solid #ffffff0f;border-radius:14px}
-        .seg button{padding:9px 6px;border-radius:10px;border:0;background:transparent;color:#8b9bb8;cursor:pointer;font-size:12px;font-weight:800;transition:.18s;line-height:1.3}
-        .seg button small{display:block;font-size:10px;font-weight:600;opacity:.6}
-        .seg button:hover{color:#fff;background:#ffffff0a}
-        .seg button.active{background:linear-gradient(135deg,#6c8cff,#22d3ee);color:#fff;box-shadow:0 4px 18px #6c8cff55}
-        .seg button.active small{opacity:.85}
-        .btn-primary{width:100%;padding:14px;border-radius:13px;border:0;background:linear-gradient(90deg,#6c8cff,#22d3ee);color:#fff;font-weight:900;font-size:14px;cursor:pointer;box-shadow:0 10px 30px #6c8cff44;letter-spacing:.02em;transition:.16s;position:relative;overflow:hidden}
-        .btn-primary::after{content:"";position:absolute;top:0;left:-70%;width:45%;height:100%;background:linear-gradient(100deg,transparent,#ffffff77,transparent);transform:skewX(-20deg);animation:shineBtn 3.8s ease-in-out infinite}
-        @keyframes shineBtn{0%,55%{left:-70%}100%{left:180%}}
-        .btn-primary:hover{transform:translateY(-1px);box-shadow:0 14px 40px #6c8cff66}
-        .btn-primary:disabled{opacity:.6;cursor:wait;transform:none}
-        .kbd{font-family:ui-monospace,monospace;font-size:10px;border:1px solid #ffffff22;border-bottom-width:2px;border-radius:6px;padding:1px 5px;background:#ffffff0a;color:#cbd5e1}
-        .preview-glow{padding:1.5px;border-radius:16px;background:linear-gradient(135deg,#6c8cff66,#22d3ee44,#a855f755);box-shadow:0 0 40px -12px #6c8cff88}
-        .preview-wrap{position:relative;background:#020617;border-radius:14px;overflow:hidden;min-height:480px;display:grid;place-items:center;border:1px solid #ffffff10;box-shadow:inset 0 1px 0 #ffffff0a}
-        .preview-wrap.fs{position:fixed;inset:12px;z-index:50;min-height:auto;border-radius:16px}
-        .toolbar{display:flex;gap:6px;flex-wrap:wrap}
-        .tool{padding:7px 11px;border-radius:999px;border:1px solid #ffffff14;background:#ffffff0a;color:#fff;font-size:11px;font-weight:700;cursor:pointer;backdrop-filter:blur(8px);transition:.15s}
-        .tool:hover{background:#6c8cff22;border-color:#6c8cff55;box-shadow:0 0 16px -4px #6c8cff88}
-        .tool:active{transform:scale(.97)}
-        .hint{font-size:11px;opacity:.55;margin-top:9px;line-height:1.65}
-        pre{margin:0;max-height:480px;overflow:auto;background:#020617;color:#cbd5e1;padding:14px;border-radius:12px;font-size:12px;line-height:1.6;border:1px solid #ffffff0f}
-        .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#0e152bf2;border:1px solid #6c8cff44;color:#fff;padding:10px 16px;border-radius:999px;font-size:12px;font-weight:700;box-shadow:0 10px 30px #0008,0 0 24px -8px #6c8cff88;z-index:60;animation:toastIn .25s ease}
-        @keyframes toastIn{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
-        .skeleton{width:100%;height:100%;display:grid;place-items:center;gap:12px;padding:32px;text-align:center}
-        .pulse{width:52px;height:52px;border-radius:50%;background:conic-gradient(from 0deg,#6c8cff,#22d3ee,#a855f7,#6c8cff);animation:spin 1s linear infinite;mask:radial-gradient(circle 19px at 50% 50%,transparent 98%,black 100%);-webkit-mask:radial-gradient(circle 19px at 50% 50%,transparent 98%,black 100%)}
-        @keyframes spin{to{transform:rotate(360deg)}}
-        .empty-art{font-size:44px;filter:drop-shadow(0 0 18px #6c8cff88);animation:floatY 4s ease-in-out infinite}
-        @keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-        .label{font-size:11px;opacity:.6;letter-spacing:.07em;font-weight:800;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center}
-      `}</style>
+      <style dangerouslySetInnerHTML={{ __html: GAME_CSS }} />
 
       <div className="cinematic">
         <div className="hero">
@@ -202,7 +210,7 @@ export default function GameStudio(){
 
         <div className="panel">
           <div className="panel-head">
-            <span>▶ Preview</span>
+            <span>▶ Preview{provider ? ` · ${provider}` : ""}</span>
             <div className="toolbar">
               <button className="tool" onClick={refresh} title="Refresh">↻ Refresh</button>
               <button className="tool" onClick={()=>setIsFs(v=>!v)}>{isFs?"Exit":"⛶ Fullscreen"}</button>

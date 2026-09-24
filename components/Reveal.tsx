@@ -1,18 +1,74 @@
 "use client";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
-export default function Reveal({ children, delay = 0, className = "" }: { children: ReactNode; delay?: number; className?: string }) {
+type Variant = "up" | "left" | "right" | "scale" | "blur";
+
+const CLASS: Record<Variant, string> = {
+  up: "",
+  left: "rv-left",
+  right: "rv-right",
+  scale: "rv-scale",
+  blur: "rv-blur",
+};
+
+type Props = {
+  children: ReactNode;
+  delay?: number;
+  className?: string;
+  variant?: Variant;
+  once?: boolean;
+  amount?: number;
+};
+
+export default function Reveal({
+  children,
+  delay = 0,
+  className = "",
+  variant = "up",
+  once = true,
+  amount = 0.16,
+}: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(false);
+
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (typeof IntersectionObserver === "undefined") { el.classList.add("rv-in"); return; }
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setShown(true);
+      return;
+    }
+
+    if (typeof IntersectionObserver === "undefined") {
+      setShown(true);
+      return;
+    }
+
     const io = new IntersectionObserver(
-      (es) => { es.forEach((e) => { if (e.isIntersecting) { el.classList.add("rv-in"); io.disconnect(); } }); },
-      { threshold: 0.12 }
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setShown(true);
+            if (once) io.disconnect();
+          } else if (!once) {
+            setShown(false);
+          }
+        });
+      },
+      { threshold: amount, rootMargin: "0px 0px -8% 0px" },
     );
     io.observe(el);
     return () => io.disconnect();
-  }, []);
-  return <div ref={ref} className={`rv ${className}`} style={{ transitionDelay: `${delay}ms` }}>{children}</div>;
+  }, [once, amount]);
+
+  return (
+    <div
+      ref={ref}
+      className={`rv ${CLASS[variant]} ${shown ? "rv-in" : ""} ${className}`}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      {children}
+    </div>
+  );
 }
