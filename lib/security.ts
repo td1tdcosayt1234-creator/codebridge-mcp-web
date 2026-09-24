@@ -51,7 +51,15 @@ export function sameOrigin(req: Request): boolean {
   if (!claimed) return false;
   try {
     const o = new URL(claimed);
-    const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").split(":")[0].toLowerCase();
+    // x-forwarded-host is client-controlled — trust it only behind a
+    // sanitising reverse proxy, same rule as clientIp().
+    const host = (
+      (process.env.TRUST_PROXY === "true" && req.headers.get("x-forwarded-host")) ||
+      req.headers.get("host") ||
+      ""
+    )
+      .split(":")[0]
+      .toLowerCase();
     return o.hostname.toLowerCase() === host;
   } catch {
     return false;
@@ -88,10 +96,28 @@ export function isProd(): boolean {
 }
 
 // Secure cookies only when actually served over HTTPS (proxy header or localhost dev).
+function isLocalHost(host: string): boolean {
+  const h = (host || "").split(":")[0].trim().toLowerCase();
+  return h === "localhost" || h === "127.0.0.1" || h === "::1";
+}
+function isPrivateHost(host: string): boolean {
+  const h = (host || "").split(":")[0].trim();
+  if (isLocalHost(h)) return true;
+  if (/^10\./.test(h) || /^192\.168\./.test(h) || /^100\.(6[4-9]|[7-9]\d|1[0-1]\d|12[0-7])\./.test(h)) return true;
+  const m172 = h.match(/^172\.(\d+)\./);
+  if (m172) { const n = Number(m172[1]); if (n >= 16 && n <= 31) return true; }
+  if (h.startsWith("[")) return true; // IPv6 literals (link-local/tailnet)
+  return false;
+}
 export function cookieSecure(req: Request): boolean {
-  const proto = (req.headers.get("x-forwarded-proto") || "").split(",")[0].trim();
-  if (proto) return proto === "https";
-  const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").split(":")[0];
-  if (host === "localhost" || host === "127.0.0.1") return false;
+  // Trust the proto header only behind a sanitising reverse proxy —
+  // otherwise any same-origin page could flip the Secure flag.
+  const proto = (req.headers.get("x-forwarded-proto") || "").split(",")[0].trim().toLowerCase();
+  if (proto === "https" && process.env.TRUST_PROXY === "true") return true;
+  if (proto === "http") return false;
+  // Without a trusted proxy we cannot prove TLS: set Secure only for public
+  // hosts in production (plain-HTTP tailnet/LAN stays working), never locally.
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "";
+  if (isLocalHost(host) || isPrivateHost(host)) return false;
   return isProd();
 }

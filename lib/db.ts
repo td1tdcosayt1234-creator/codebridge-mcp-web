@@ -1,5 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
+import crypto from "crypto";
 import { encWith, decWith } from "./crypto";
 export type User = { id:string; email:string; passHash:string; role:"user"|"admin"; plan:"free"|"pro"|"team"; createdAt:string };
 export type EventItem = { id:string; userId:string; action:string; detail:string; ip?:string; at:string };
@@ -62,7 +63,7 @@ async function ensure(){
     const bcrypt = (await import("bcryptjs")).default;
     const { password, generated } = await seedAdminPassword();
     const hash = await bcrypt.hash(password,10);
-    const seed:DbShape={users:[{id:"u_admin",email:seedAdminEmail(),passHash:hash,role:"admin",plan:"pro",createdAt:new Date().toISOString()}],events:[],builds:[],tickets:[],githubTokens:[],mcpKeys:[{userId:"u_admin",key:"cb_admin_demo_key"}],usage:[{userId:"u_admin",mcpCalls:0,githubCalls:0,balance:10000,usedTotal:0}],tasks:[],attempts:[],earnNonces:[],approvals:[],trusted:[],oauthClients:[],oauthCodes:[],billing:[],webhookIds:[]};
+    const seed:DbShape={users:[{id:"u_admin",email:seedAdminEmail(),passHash:hash,role:"admin",plan:"pro",createdAt:new Date().toISOString()}],events:[],builds:[],tickets:[],githubTokens:[],mcpKeys:[{userId:"u_admin",key:"cb_"+crypto.randomBytes(18).toString("hex")}],usage:[{userId:"u_admin",mcpCalls:0,githubCalls:0,balance:10000,usedTotal:0}],tasks:[],attempts:[],earnNonces:[],approvals:[],trusted:[],oauthClients:[],oauthCodes:[],billing:[],webhookIds:[]};
     await writeDb(seed);
     if (generated) console.warn("[codebridge] generated admin password (shown once â save it and set ADMIN_PASSWORD): " + password);
   }
@@ -80,7 +81,30 @@ export async function warnIfDefaultAdminPassword(){
       console.warn("[codebridge] SECURITY: default admin password (admin123) is still active on " + admin.email + " â change it immediately.");
   } catch { /* best effort */ }
 }
-export async function readDb():Promise<DbShape>{ await ensure(); const raw=await fs.readFile(file,"utf8"); const parsed=JSON.parse(decryptDb(raw)); if(!parsed.tasks) parsed.tasks=[]; let dirty=false;
+function readCorruptCandidates(): string[] {
+  return [file + ".bak.1", file + ".bak.2", file + ".bak.3"];
+}
+export async function readDb():Promise<DbShape>{ await ensure();
+  let raw = "";
+  try {
+    raw = await fs.readFile(file, "utf8");
+  } catch (e) {
+    // DB file vanished mid-boot (first write lost the race) — reseed path.
+    await ensure();
+    raw = await fs.readFile(file, "utf8");
+  }
+  let parsed: DbShape | null = null;
+  let lastErr: unknown = null;
+  const sources = [raw];
+  for (const bak of readCorruptCandidates()) {
+    try { sources.push(await fs.readFile(bak, "utf8")); } catch { /* ignore */ }
+  }
+  for (const src of sources) {
+    try { parsed = JSON.parse(decryptDb(src)); break; }
+    catch (e) { lastErr = e; }
+  }
+  if (!parsed) throw lastErr instanceof Error ? lastErr : new Error("Database unreadable and no backup restored.");
+  if(!parsed.tasks) parsed.tasks=[]; let dirty=false;
   for(const u of (parsed.usage||[])){ if(u.balance===undefined){ u.balance=10000; dirty=true; } if(u.usedTotal===undefined){ u.usedTotal=0; dirty=true; } }
   for(const t of (parsed.tasks||[])){ if(!t.kind) t.kind="compile"; if(!t.files) t.files=[]; if(t.tokensEst===undefined) t.tokensEst=0; if(t.tokensCharged===undefined) t.tokensCharged=0; if(!t.artifacts) { t.artifacts=[]; if((t as any).apkSize) t.artifacts.push({name:"app-debug.apk",size:(t as any).apkSize}); if((t as any).jarSize) t.artifacts.push({name:(t as any).jarName||"plugin.jar",size:(t as any).jarSize}); if(t.artifacts.length) dirty=true; } }
   if(!parsed.attempts) parsed.attempts=[];
@@ -101,15 +125,18 @@ export async function readDb():Promise<DbShape>{ await ensure(); const raw=await
 export async function writeDb(db:DbShape){
   const dir = path.dirname(file);
   await fs.mkdir(dir,{recursive:true});
+  // Bound growth: dashboard aggregations scan these arrays on every poll.
+  if (db.events.length > 3000) db.events = db.events.slice(-3000);
+  if (db.webhookIds.length > 500) db.webhookIds = db.webhookIds.slice(-500);
   // Rotating backups (latest 3) so a bad write/key never means total loss.
   try {
     await fs.access(file);
     for (let i = 3; i >= 2; i--) { try { await fs.rename(file + ".bak." + (i - 1), file + ".bak." + i); } catch {} }
     try { await fs.copyFile(file, file + ".bak.1"); } catch {}
   } catch { /* first write â nothing to back up */ }
-  // Atomic write: temp file + rename, never a half-written db.
-  const tmp = file + ".tmp." + process.pid;
+  // Atomic write: unique temp file + rename, never a half-written db.
+  const tmp = file + ".tmp." + process.pid + "." + crypto.randomBytes(6).toString("hex");
   await fs.writeFile(tmp, encryptDb(JSON.stringify(db)));
   await fs.rename(tmp, file);
 }
-export function uid(p:string){ return p+"_"+Math.random().toString(36).slice(2,9); }
+export function uid(p:string){ return p+"_"+crypto.randomBytes(7).toString("hex"); }

@@ -17,6 +17,7 @@ export async function POST(req: Request) {
   const db = await readDb();
   const u = db.users.find((x) => x.id === userId);
   if (!u) return NextResponse.json({ error: "Unknown user" }, { status: 404 });
+  if (u.plan === plan) return NextResponse.json({ ok: true, plan, unchanged: true });
   u.plan = plan;
   if (plan === "pro" || plan === "team") {
     let usage = db.usage.find((x) => x.userId === userId);

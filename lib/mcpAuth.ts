@@ -1,4 +1,5 @@
 import { readDb, writeDb, uid, type DbShape, type PendingCall } from "./db";
+import { randomBytes } from "crypto";
 export type { PendingCall, ApprovalState } from "./db";
 
 // Public web origin built from the request Host header (never the server's
@@ -24,7 +25,7 @@ export async function createPending(tool: string, args: Record<string, unknown>,
   const db = await readDb();
   pruneDb(db);
   const p: PendingCall = {
-    id: "appr_" + Math.random().toString(36).slice(2, 12),
+    id: "appr_" + randomBytes(9).toString("hex"),
     tool, args, state: "waiting", createdAt: Date.now(), fp,
   };
   db.approvals.push(p);
@@ -72,10 +73,35 @@ function fpMatch(a: { ip: string; ua: string }, b: { ip: string; ua: string }): 
   return true;
 }
 
-export async function findTrusted(fp: { ip: string; ua: string }): Promise<{ userId: string } | null> {
+// Single-flight guard for approval execution: synchronous claim (no await
+// between check and mark), so two concurrent auth_check calls for one
+// appr_ id cannot both dispatch the tool.
+const claimedApprovals = new Map<string, number>();
+
+export async function claimApproval(id: string): Promise<boolean> {
+  const key = String(id || "");
+  if (!key || claimedApprovals.has(key)) return false;
+  if (claimedApprovals.size > 2000) {
+    const cut = Date.now() - 30 * 60 * 1000;
+    claimedApprovals.forEach((at, k) => { if (at < cut) claimedApprovals.delete(k); });
+  }
+  claimedApprovals.set(key, Date.now());
+  return true;
+}
+
+export function unclaimApproval(id: string) {
+  claimedApprovals.delete(String(id || ""));
+}
+
+export async function findTrusted(fp: { ip: string; ua: string }, tool?: string): Promise<{ userId: string } | null> {
   const db = await readDb();
   const now = Date.now();
-  const hit = (db.trusted || []).find((t) => new Date(t.expiresAt).getTime() > now && fpMatch({ ip: t.ip, ua: t.ua }, fp));
+  const hit = (db.trusted || []).find(
+    (t) =>
+      new Date(t.expiresAt).getTime() > now &&
+      fpMatch({ ip: t.ip, ua: t.ua }, fp) &&
+      (!tool || !t.tool || t.tool === tool)
+  );
   if (!hit) return null;
   if (!db.users.some((u) => u.id === hit.userId)) return null;
   hit.lastUsed = new Date().toISOString();

@@ -83,8 +83,18 @@ export async function createTaskAndDispatch(
   const JUNK = /(^|\/)\.git(\/|$)|(^|\/)\.gradle(\/|$)|(^|\/)build(\/|$)|(^|\/)node_modules(\/|$)|(^|\/)\.next(\/|$)|(^|\/)__pycache__(\/|$)|(^|\/)\.idea(\/|$)|(^|\/)\.vscode(\/|$)|(^|\/)\.cxx(\/|$)|(^|\/)captures(\/|$)|(^|\/)\.externalNativeBuild(\/|$)|(^|\/)dist(\/|$)|(^|\/)out(\/|$)|(^|\/)target(\/|$)|(^|\/)\.dart_tool(\/|$)|local\.properties$|\.iml$|\.hprof$|\.bin$|\.apk$|\.aab$|\.jar$|\.war$|\.ear$|\.zip$|\.tar\.gz$|\.tgz$|\.exe$|\.dll$|\.so$|\.class$|\.o$|\.obj$|\.pyc$|\.mcpack$|\.mcaddon$/i;
   const files = (opts?.files || [])
     .filter((f) => f.path && f.content !== undefined)
-    .map((f) => ({ path: String(f.path).replace(/^\/+/, "").slice(0, 200), content: String(f.content).slice(0, 100000) }))
-    .filter((f) => !JUNK.test(f.path))
+    .map((f) => {
+      // Contain paths inside task-work/: strip leading slashes, resolve away
+      // "." / ".." segments, cap length. "…/…/secret" can never escape.
+      const clean = String(f.path)
+        .replace(/^\/+/, "")
+        .split(/[\\/]+/)
+        .filter((seg) => seg && seg !== "." && seg !== "..")
+        .join("/")
+        .slice(0, 200);
+      return { path: clean, content: String(f.content).slice(0, 100000) };
+    })
+    .filter((f) => f.path && !JUNK.test(f.path))
     .slice(0, 50).map((f) => ({ path: f.path, content: f.content }));
   if (filesBytes(files) > MAX_FILES_BYTES) return { error: "Files too large (max 200KB). Split into smaller requests.", status: 400 };
   const db = await readDb();
@@ -112,6 +122,10 @@ export async function createTaskAndDispatch(
   };
   db.tasks.push(task);
   db.events.push({ id: uid("e"), userId, action: "task_create", detail: title.trim(), at: now });
+  // Persist FIRST (hold + task record), then dispatch. If the process dies
+  // between the two, the task exists as queued — never an orphan Actions run
+  // with no DB record and no way to refund.
+  await writeDb(db);
   // Dispatch workflow -> Actions e opencode run korbe
   try {
     const { Octokit } = await import("octokit");
@@ -120,11 +134,14 @@ export async function createTaskAndDispatch(
     await oct.request("POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches", {
       owner, repo, workflow_id: builderWorkflow, ref: "main", inputs: { task_id: task.id },
     });
-    task.log = "Dispatched to " + builderRepo + " (" + builderWorkflow + "). Runner opencode start korle status running hobe.";
-    const us = db.usage.find((u) => u.userId === userId);
-    if (us) { us.mcpCalls += 1; us.githubCalls += 1; }
-    await writeDb(db);
-    return { task };
+    const db2 = await readDb();
+    const t2 = db2.tasks.find((x) => x.id === task.id);
+    if (t2) t2.log = "Dispatched to " + builderRepo + " (" + builderWorkflow + "). Runner opencode start korle status running hobe.";
+    const us2 = db2.usage.find((u) => u.userId === userId);
+    if (us2) { us2.mcpCalls += 1; us2.githubCalls += 1; }
+    await writeDb(db2);
+    const fresh = (await readDb()).tasks.find((x) => x.id === task.id) || task;
+    return { task: fresh };
   } catch (e) {
     task.status = "failed";
     task.log = "Dispatch failed: " + (e as Error).message + ". Ask admin to check the workflow file + repo secrets.";

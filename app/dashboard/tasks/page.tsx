@@ -5,7 +5,10 @@ export default function Tasks(){
   const [kind,setKind]=useState<"compile"|"fix-compile">("compile");
   const [files,setFiles]=useState<F[]>([{path:"",content:""}]);
   const [msg,setMsg]=useState(""); const [open,setOpen]=useState<string|null>(null); const [bal,setBal]=useState<number|null>(null); const [hp,setHp]=useState("");
-  async function load(){ const r=await fetch("/api/overview"); const j=await r.json(); if(r.ok){ setBal(j.usage?.balance??null); } const t=await fetch("/api/tasks"); const tj=await t.json(); if(t.ok) setTasks(tj.tasks||[]); }
+  async function load(){ try {
+    const r=await fetch("/api/overview"); const j=await r.json().catch(()=>({})); if(r.ok){ setBal(j.usage?.balance??null); }
+    const t=await fetch("/api/tasks"); const tj=await t.json().catch(()=>({})); if(t.ok) setTasks(tj.tasks||[]);
+  } catch { /* polling continues on next tick */ } }
   useEffect(()=>{ load(); const t=setInterval(load,5000); return ()=>clearInterval(t); },[]);
   const est = Math.max(1,Math.ceil(prompt.length/4)) + Math.max(1,Math.ceil(files.map(f=>f.path+"\n"+f.content).join("\n").length/4));
   const bytes = files.reduce((n,f)=>n+f.path.length+f.content.length,0);

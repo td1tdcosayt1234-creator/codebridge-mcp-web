@@ -70,11 +70,13 @@ async function pollinationsGame(prompt: string, style: string, signal: AbortSign
   }
 }
 
-async function aiGameHTML(prompt: string, style: string): Promise<{ html: string; provider: string } | null> {
+async function aiGameHTML(req: Request, prompt: string, style: string): Promise<{ html: string; provider: string } | null> {
   const cleanPrompt = String(prompt || "").slice(0, 500);
   const system = GAME_SYSTEM(style);
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 120000);
+  // Client gave up (tab closed, navigated away)? Stop the upstream calls too.
+  req.signal.addEventListener("abort", () => { try { ctrl.abort(); } catch {} });
   try {
     // Provider 1: OpenCode Zen (user key — best quality when funded).
     if (aiConfigured()) {
@@ -123,13 +125,18 @@ export async function POST(req: Request){
   const t = cookies().get("session")?.value || "";
   const user = await verifyJwt(t);
   if(!user) return NextResponse.json({error:"Login required"},{status:401});
+  const { rateLimit, csrfCheck, csrfBlock } = await import("@/lib/security");
+  if (!csrfCheck(req)) return csrfBlock();
+  // Unthrottled AI calls = unbounded cost: max 5 generations/min per user.
+  const rl = rateLimit("gamegen:" + user.sub, 5, 60 * 1000);
+  if (!rl.ok) return NextResponse.json({ error: "Too many generations. Wait " + rl.retryAfterSec + "s." }, { status: 429 });
   // Rate limit: 30 req/min per IP (simple in-memory) - prevents abuse
   try{
     const { prompt="", style="neon" } = await req.json().catch(()=>({}));
     if(String(prompt||"").length>800) return NextResponse.json({error:"Prompt too long (max 800)"},{status:400});
     if(String(prompt||"").length<2) return NextResponse.json({error:"Prompt required"},{status:400});
     // Pure AI generation — no templates. Zen (user key) first, free Pollinations second.
-    const ai = await aiGameHTML(String(prompt || ""), String(style || "neon"));
+    const ai = await aiGameHTML(req, String(prompt || ""), String(style || "neon"));
     if (!ai) {
       return NextResponse.json(
         { error: "AI generation failed. The free provider may be busy — wait a minute and try again." },

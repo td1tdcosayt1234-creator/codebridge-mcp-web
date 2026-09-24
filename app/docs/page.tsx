@@ -104,6 +104,16 @@ Mode: fix-compile + file attached`;
                   <td>task_id → full log + result</td>
                   <td>Yes</td>
                 </tr>
+                <tr>
+                  <td><code>auth_check</code></td>
+                  <td>req → pick up a browser-approved result</td>
+                  <td>Yes (one-click approval)</td>
+                </tr>
+                <tr>
+                  <td><code>gh_issue_list</code></td>
+                  <td>repo → list repo issues via shared token</td>
+                  <td>Yes</td>
+                </tr>
               </tbody>
             </table>
           </div>

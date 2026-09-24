@@ -10,7 +10,9 @@ const LOCK_MS = 15 * 60 * 1000;
 export async function POST(req: Request) {
   if (!csrfCheck(req)) return csrfBlock();
   const ip = clientIp(req);
-  const { email, password, remember } = await req.json().catch(() => ({}));
+  const { email, password, remember, website } = await req.json().catch(() => ({}));
+  const { honeypot } = await import("@/lib/antifraud");
+  if (honeypot({ website })) return NextResponse.json({ error: "Bot detected." }, { status: 400 });
   const mail = String(email || "").trim().toLowerCase().slice(0, 120);
   const rl = rateLimit("login:" + ip + ":" + mail, 10, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Too many attempts. Try again in " + rl.retryAfterSec + "s." }, { status: 429 });
@@ -20,13 +22,18 @@ export async function POST(req: Request) {
   if (att && att.until && new Date(att.until).getTime() > Date.now())
     return NextResponse.json({ error: "Account locked after failed logins. Try again later." }, { status: 423 });
   const u = db.users.find((x) => x.email.toLowerCase() === mail);
-  const ok = u ? await bcrypt.compare(String(password), u.passHash) : false;
+  // Always run the hash compare (constant-time UX): valid and invalid emails
+  // take the same time, so the response timing reveals nothing.
+  const ok = await bcrypt.compare(String(password), u?.passHash || "$2b$10$invalidinvalidinvalidinvalidinvalidinvalidinval");
   if (!u || !ok) {
     if (!att) db.attempts.push({ email: mail, fails: 1, until: "" });
     else {
       att.fails += 1;
-      if (att.fails >= MAX_FAILS && !att.until) {
+      // Re-arm the lockout every time the threshold is crossed again, so a
+      // sustained attack keeps hitting a fresh 15-minute window.
+      if (att.fails >= MAX_FAILS) {
         att.until = new Date(Date.now() + LOCK_MS).toISOString();
+        att.fails = 0;
         db.events.push({ id: uid("e"), userId: u?.id || "anon", action: "lockout", detail: mail + " locked 15m", at: new Date().toISOString() });
       }
     }
@@ -39,6 +46,7 @@ export async function POST(req: Request) {
   await writeDb(db);
   const token = await signJwt({ sub: u.id, email: u.email, role: u.role }, remember ? "30d" : "24h");
   const res = NextResponse.json({ ok: true, role: u.role });
-  res.cookies.set("session", token, { httpOnly: true, path: "/", maxAge: remember ? 30 * 24 * 3600 : 604800, sameSite: "lax", secure: cookieSecure(req) });
+  // Cookie lifetime matches the JWT lifetime — a stale cookie can never outlive its token.
+  res.cookies.set("session", token, { httpOnly: true, path: "/", maxAge: remember ? 30 * 24 * 3600 : 24 * 3600, sameSite: "lax", secure: cookieSecure(req) });
   return res;
 }

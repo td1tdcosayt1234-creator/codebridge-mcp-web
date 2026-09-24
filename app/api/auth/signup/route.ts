@@ -35,6 +35,7 @@ export async function POST(req: Request) {
   await writeDb(db);
   const token = await signJwt({ sub: u.id, email: u.email, role: u.role }, remember ? "30d" : "24h");
   const res = NextResponse.json({ ok: true });
-  res.cookies.set("session", token, { httpOnly: true, path: "/", maxAge: remember ? 30 * 24 * 3600 : 604800, sameSite: "lax", secure: cookieSecure(req) });
+  // Cookie lifetime matches the JWT lifetime — a stale cookie can never outlive its token.
+  res.cookies.set("session", token, { httpOnly: true, path: "/", maxAge: remember ? 30 * 24 * 3600 : 24 * 3600, sameSite: "lax", secure: cookieSecure(req) });
   return res;
 }

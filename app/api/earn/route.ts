@@ -7,6 +7,10 @@ import { isVpn } from "@/lib/antifraud";
 import { EARN_REWARD, EARN_SECONDS, EARN_DAILY_MAX } from "@/lib/earn";
 import crypto from "crypto";
 
+// In-memory single-flight guard: synchronous check-and-mark (no await in
+// between, so concurrent requests in this process cannot both pass).
+const consumedEarnNonces = new Set<string>();
+
 async function me() {
   const t = cookies().get("session")?.value || "";
   return await verifyJwt(t);
@@ -57,13 +61,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "VPN/Proxy detected. Disable it to earn coins." }, { status: 403 });
     }
     const rec = db.earnNonces.find((n) => n.nonce === String(nonce || ""));
-    if (!rec || rec.userId !== p.sub || rec.used)
+    if (!rec || rec.userId !== p.sub || rec.used || consumedEarnNonces.has(rec.nonce))
       return NextResponse.json({ error: "Invalid or expired ad session. Watch again." }, { status: 400 });
     const watched = (Date.now() - rec.at) / 1000;
     if (watched < EARN_SECONDS)
       return NextResponse.json({ error: "Ad skipped too early. Watch the full ad." }, { status: 400 });
     if (earnedToday(db, p.sub) >= EARN_DAILY_MAX)
       return NextResponse.json({ error: "Daily ad limit reached." }, { status: 400 });
+    // Claim synchronously BEFORE any await: a parallel duplicate with the
+    // same nonce now fails the guard above instead of double-crediting.
+    consumedEarnNonces.add(rec.nonce);
     rec.used = true;
     let us = db.usage.find((u) => u.userId === p.sub);
     if (!us) { us = { userId: p.sub, mcpCalls: 0, githubCalls: 0, balance: 10000, usedTotal: 0 }; db.usage.push(us); }

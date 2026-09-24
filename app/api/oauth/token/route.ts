@@ -18,7 +18,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "unsupported_grant_type" }, { status: 400 });
   const c = await consumeCode(g("code"));
   if (!c) return NextResponse.json({ error: "invalid_grant" }, { status: 400 });
-  if (c.clientId !== g("client_id") || (g("redirect_uri") && c.redirectUri !== g("redirect_uri")))
+  // redirect_uri must always match the one the code was issued for — a
+  // stolen code alone is useless without the exact callback.
+  if (c.clientId !== g("client_id") || !g("redirect_uri") || c.redirectUri !== g("redirect_uri"))
     return NextResponse.json({ error: "invalid_grant" }, { status: 400 });
   if (!pkceOk(c.method, c.challenge, g("code_verifier")))
     return NextResponse.json({ error: "invalid_grant" }, { status: 400 });

@@ -114,7 +114,7 @@ const AGENT_STEPS = [
 ];
 
 const FEATURES = [
-  { icon: "plug", title: "Agent-native MCP", body: "Two tools — compile and compile_fix. Connect once and builds happen without opening a browser." },
+  { icon: "plug", title: "Agent-native MCP", body: "Six tools — compile, auto-fix, task search, results, issues and one-click approval. Connect once and builds happen without opening a browser." },
   { icon: "bolt", title: "Real toolchains", body: "Not a simulator. Actual compilers and test runners execute on isolated runners and report exactly what happened." },
   { icon: "wrench", title: "Self-repairing", body: "The agent reads the error context, patches the source and retries up to three times before it gives up." },
   { icon: "coin", title: "Pay for results", body: "Coins are estimated on request, held, then charged against the real output. Nothing wasted on a failed run." },
@@ -450,7 +450,7 @@ export default function Home() {
       <section className="section" style={{ paddingTop: 0 }}>
         <div className="grid g3">
           {[
-            { v: 2, suffix: "", label: "agent tools total" },
+            { v: 6, suffix: "", label: "agent tools total" },
             { v: 10, suffix: "k", label: "free coins included" },
             { v: 0, suffix: "", label: "local setup required" },
           ].map((s, i) => (

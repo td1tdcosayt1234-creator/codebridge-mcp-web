@@ -111,7 +111,16 @@ export async function GET(req: Request) {
         '<p class="foot">No client details found in this URL.</p>'
     );
   // Lenient DCR: register unknown clients on the fly (localhost-friendly).
-  if (!(await getClient(p.clientId))) await saveClient(p.clientId, [p.redirectUri]);
+  // Known clients are pinned: a different redirect_uri is rejected so a
+  // stolen client_id cannot be reused to steal codes via an evil callback.
+  const known = await getClient(p.clientId);
+  if (!known) await saveClient(p.clientId, [p.redirectUri]);
+  else if (!known.redirectUris.includes(p.redirectUri))
+    return page(
+      "Connect",
+      '<p class="eyebrow">CodeBridge MCP</p><h1>Redirect mismatch</h1>' +
+        '<p class="muted">This agent is registered with a different callback URL. Remove + re-add the CodeBridge MCP server in your agent so it registers fresh, then try again.</p>'
+    );
   if (p.responseType && p.responseType !== "code") {
     const sep = p.redirectUri.includes("?") ? "&" : "?";
     return NextResponse.redirect(
@@ -154,11 +163,24 @@ export async function POST(req: Request) {
     );
   const form = await req.formData().catch(() => null);
   const allow = String(form?.get("allow") || "");
+  if (!p.clientId || !p.redirectUri)
+    return page(
+      "Connect",
+      '<p class="eyebrow">CodeBridge MCP</p><h1>Missing connection details</h1>' +
+        '<p class="muted">Open this page from your AI client (opencode / Cursor / Claude) so it can pass its connection details, then click Connect again.</p>'
+    );
   const sep = p.redirectUri.includes("?") ? "&" : "?";
   const errBack =
     p.redirectUri + sep + "error=access_denied" + (p.state ? "&state=" + encodeURIComponent(p.state) : "");
   if (allow !== "yes") return NextResponse.redirect(errBack);
-  if (!(await getClient(p.clientId))) await saveClient(p.clientId, [p.redirectUri]);
+  const reg = await getClient(p.clientId);
+  if (!reg) await saveClient(p.clientId, [p.redirectUri]);
+  else if (!reg.redirectUris.includes(p.redirectUri))
+    return page(
+      "Connect",
+      '<p class="eyebrow">CodeBridge MCP</p><h1>Redirect mismatch</h1>' +
+        '<p class="muted">This agent is registered with a different callback URL. Remove + re-add the CodeBridge MCP server in your agent so it registers fresh, then try again.</p>'
+    );
   const code = await issueCode(String(me.sub), p.clientId, p.redirectUri, p.challenge, p.method);
   const back =
     p.redirectUri + sep + "code=" + encodeURIComponent(code) + (p.state ? "&state=" + encodeURIComponent(p.state) : "");

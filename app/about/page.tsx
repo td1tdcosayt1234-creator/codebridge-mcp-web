@@ -15,7 +15,7 @@ export default function About() {
 
       <div className="hero-stats-row" style={{ justifyContent: "center", marginBottom: 34 }}>
         {[
-          { v: 2, label: "agent tools", suffix: "" },
+          { v: 6, label: "agent tools", suffix: "" },
           { v: 10, label: "free coins", suffix: "k" },
           { v: 0, label: "setup needed", suffix: "" },
         ].map((s, i) => (

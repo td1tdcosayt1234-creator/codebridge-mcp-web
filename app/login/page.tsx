@@ -6,6 +6,7 @@ import Link from "next/link";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [hp, setHp] = useState("");
   const [show, setShow] = useState(false);
   const [remember, setRemember] = useState(true);
   const [err, setErr] = useState("");
@@ -21,9 +22,9 @@ export default function Login() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, remember }),
+        body: JSON.stringify({ email, password, remember, website: hp }),
       });
-      const j = await res.json();
+      const j = await res.json().catch(() => ({}));
       if (!res.ok) {
         setErr(j.error || "Login failed");
         setShake((s) => s + 1);
@@ -76,6 +77,15 @@ export default function Login() {
               <span className="badge bad">{err}</span>
             </p>
           )}
+          <input
+            name="website"
+            value={hp}
+            onChange={(e) => setHp(e.target.value)}
+            autoComplete="off"
+            tabIndex={-1}
+            aria-hidden="true"
+            style={{ position: "absolute", left: "-9999px", opacity: 0, height: 0 }}
+          />
           <div style={{ marginTop: 20 }}>
             <button className="btn btn-lg shine" style={{ width: "100%" }} type="submit" disabled={busy}>
               {busy ? "Logging in…" : "Login"}

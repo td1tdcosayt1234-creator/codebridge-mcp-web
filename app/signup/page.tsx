@@ -24,7 +24,7 @@ export default function Signup() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, remember, website: hp }),
       });
-      const j = await res.json();
+      const j = await res.json().catch(() => ({}));
       if (!res.ok) {
         setErr(j.error || "Signup failed");
         setShake((s) => s + 1);

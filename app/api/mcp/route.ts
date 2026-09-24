@@ -123,7 +123,8 @@ async function resolveUser(req: Request): Promise<{ userId: string } | { sentBad
   const h = req.headers.get("authorization") || "";
   const key = h.toLowerCase().startsWith("bearer ") ? h.slice(7).trim() : "";
   if (key) {
-    const hit = db.mcpKeys.find((k) => k.key === key);
+    const { safeEqual } = await import("@/lib/security");
+    const hit = db.mcpKeys.find((k) => k.key.length === key.length && safeEqual(k.key, key));
     if (hit && db.users.some((u) => u.id === hit.userId)) return { userId: hit.userId };
     return { sentBadKey: true };
   }
@@ -161,7 +162,7 @@ async function callTool(req: Request, name: string, args: Record<string, unknown
   if (!TOOLS.some((t) => t.name === name)) return text("Unknown tool: " + name + ". Use GET /api/mcp for the tool list.", true);
   const { clientIp } = await import("@/lib/security");
   const fp = agentFp(req, clientIp(req));
-  const trusted = await findTrusted(fp);
+  const trusted = await findTrusted(fp, name);
   if (trusted) return await executeTool(trusted.userId, name, args, webOrigin(req));
   const pend = await createPending(name, args, fp);
   const url = webOrigin(req) + "/api/mcp/approve?req=" + pend.id;
@@ -177,16 +178,28 @@ async function callTool(req: Request, name: string, args: Record<string, unknown
 async function checkApproval(req: Request, args: Record<string, unknown>) {
   const id = String((args as Record<string, unknown>).req || "");
   if (!id) return text("Missing \"req\". Call compile/compile_fix first to get an approval URL.", true);
-  const { getPending, dropPending, webOrigin } = await import("@/lib/mcpAuth");
-  const p = await getPending(id);
-  if (!p) return text("Unknown or expired approval request. Call compile/compile_fix again for a fresh URL.", true);
-  if (p.state === "denied") { await dropPending(id); return text("Approval was denied in the browser.", true); }
-  if (p.state !== "approved" || !p.userId) {
-    const url = webOrigin(req) + "/api/mcp/approve?req=" + p.id;
-    return text("Still waiting for browser approval. Open " + url + ", login and Approve — then call auth_check again.", false);
+  const { getPending, dropPending, webOrigin, claimApproval, unclaimApproval } = await import("@/lib/mcpAuth");
+  // Claim first: concurrent auth_check calls for the same id cannot both run the tool.
+  if (!(await claimApproval(id))) {
+    const again = await getPending(id);
+    if (!again) return text("This approval was already used. Call compile/compile_fix again for a fresh URL.", true);
+    return text("Approval already being processed — call auth_check again in a few seconds.", false);
   }
-  dropPending(id).catch(() => {});
-  return await executeTool(p.userId, p.tool, p.args, webOrigin(req));
+  try {
+    const p = await getPending(id);
+    if (!p) return text("Unknown or expired approval request. Call compile/compile_fix again for a fresh URL.", true);
+    if (p.state === "denied") { await dropPending(id); return text("Approval was denied in the browser.", true); }
+    if (p.state !== "approved" || !p.userId) {
+      const url = webOrigin(req) + "/api/mcp/approve?req=" + p.id;
+      unclaimApproval(id);
+      return text("Still waiting for browser approval. Open " + url + ", login and Approve — then call auth_check again.", false);
+    }
+    await dropPending(id);
+    return await executeTool(p.userId, p.tool, p.args, webOrigin(req));
+  } catch (e) {
+    unclaimApproval(id);
+    throw e;
+  }
 }
 
 async function executeTool(userId: string, name: string, args: Record<string, unknown>, origin: string) {

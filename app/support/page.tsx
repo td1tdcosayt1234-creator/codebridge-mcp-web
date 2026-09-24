@@ -7,7 +7,7 @@ import Reveal from "../../components/Reveal";
 const QUICK = [
   { icon: "plug", title: "MCP will not connect?", body: (<>Web server on? URL correct? Agent restarted after the config change? Key in headers? Full walkthrough on <Link href="/mcp">/mcp</Link>.</>) },
   { icon: "key", title: "Access error?", body: (<>&ldquo;Low balance&rdquo; → earn coins in <Link href="/dashboard/earn">/dashboard/earn</Link>. &ldquo;VPN not allowed&rdquo; → disable VPN. &ldquo;Bot detected&rdquo; → fill forms manually. Details in <Link href="/docs">/docs</Link>.</>) },
-  { icon: "help", title: "Something else?", body: (<>Read the <Link href="/faq">FAQ</Link> first — 17 answers ready and most tickets never get opened after that.</>) },
+  { icon: "help", title: "Something else?", body: (<>Read the <Link href="/faq">FAQ</Link> first — 13 answers ready and most tickets never get opened after that.</>) },
 ];
 
 const ICONS = {

@@ -83,11 +83,16 @@ export default function GameStudio(){
   const [toast,setToast]=useState("");
   const frameRef=useRef<HTMLIFrameElement>(null);
   const taRef=useRef<HTMLTextAreaElement>(null);
+  const genBusy=useRef(false);
 
   useEffect(()=>{
     const sp=new URLSearchParams(location.search);
     const q=sp.get("prompt");
-    if(q){ setPrompt(q); setTimeout(()=>gen(q),400)}
+    const st=sp.get("style");
+    if(st==="neon"||st==="retro"||st==="minimal") setStyle(st);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    if(q){ setPrompt(q); timer=setTimeout(()=>gen(q),400)}
+    return ()=>{ if(timer) clearTimeout(timer); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
@@ -101,16 +106,18 @@ export default function GameStudio(){
   const showToast=(m:string)=>{ setToast(m); setTimeout(()=>setToast(""),2200)};
 
   const gen = async (customPrompt?: string)=>{
+    if(genBusy.current) return;
     const p = (customPrompt||prompt).trim();
     if(!p){ showToast("Write a prompt first"); taRef.current?.focus(); return; }
     if(p.length>800){ showToast("Prompt too long (max 800)"); return; }
+    genBusy.current = true;
     setLoading(true);
     try{
       const r = await fetch("/api/game/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:p, style})});
-      if(r.status===401){ showToast("Login required"); location.href="/login?next="+encodeURIComponent("/game"); return; }
-      if(r.status===503){ showToast("AI busy — wait a minute and retry"); setLoading(false); return; }
-      if(!r.ok) throw new Error("Generate failed "+r.status);
-      const j = await r.json();
+      if(r.status===401){ showToast("Login required"); setLoading(false); genBusy.current = false; location.href="/login?next="+encodeURIComponent("/game"); return; }
+      if(r.status===503){ showToast("AI busy — wait a minute and retry"); setLoading(false); genBusy.current = false; return; }
+      const j = await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(j.error || ("Generate failed "+r.status));
       if(!j.html) throw new Error("No html returned");
       setHtml(j.html);
       setShowCode(false);
@@ -120,6 +127,7 @@ export default function GameStudio(){
       showToast(e.message||"Failed");
     }
     setLoading(false);
+    genBusy.current = false;
   };
 
   const download = ()=>{
@@ -143,7 +151,7 @@ export default function GameStudio(){
   };
 
   const share=async()=>{
-    const url = location.origin+"/game?prompt="+encodeURIComponent(prompt);
+    const url = location.origin+"/game?prompt="+encodeURIComponent(prompt)+"&style="+encodeURIComponent(style);
     await navigator.clipboard.writeText(url);
     showToast("Link copied");
   };
@@ -227,7 +235,7 @@ export default function GameStudio(){
                 {loading ? (
                   <div className="skeleton"><div className="pulse"/><div style={{fontWeight:800}}>Crafting your game…</div><div style={{opacity:.6,fontSize:12}}>Instant — no cloud wait</div></div>
                 ) : html ? (
-                  <iframe ref={frameRef} title="preview" srcDoc={html} style={{width:"100%",height:"100%",border:0,background:"#020617"}} sandbox="allow-scripts allow-same-origin allow-pointer-lock" allow="fullscreen" />
+                  <iframe ref={frameRef} title="preview" srcDoc={html} style={{width:"100%",height:"100%",border:0,background:"#020617"}} sandbox="allow-scripts allow-pointer-lock" allow="fullscreen" />
                 ) : (
                   <div style={{textAlign:"center",padding:36,position:"relative"}}>
                     <div className="empty-art">🕹️</div>

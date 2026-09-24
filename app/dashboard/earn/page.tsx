@@ -32,12 +32,20 @@ export default function Earn(){
   }
   async function finish(){
     if(finishing.current) return; finishing.current=true;
-    const r=await fetch("/api/earn",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"complete",nonce})});
-    const j=await r.json();
-    setNonce("");
-    if(!r.ok){ setMsg(j.error||"Failed"); load(); return; }
-    setMsg("+" + j.reward + " coins earned! New balance: " + j.balance);
-    load();
+    try {
+      const r=await fetch("/api/earn",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"complete",nonce})});
+      const j=await r.json().catch(()=>({}));
+      setNonce("");
+      if(!r.ok){ setMsg(j.error||"Failed"); load(); return; }
+      setMsg("+" + j.reward + " coins earned! New balance: " + j.balance);
+      load();
+    } catch {
+      setMsg("Network failed — press Watch to try again.");
+      setNonce("");
+      load();
+    } finally {
+      finishing.current=false;
+    }
   }
   if(!info) return <p className="muted">Loading...</p>;
   return (<div>
@@ -48,9 +56,9 @@ export default function Earn(){
       <div className="card" style={{textAlign:"center",minHeight:220,display:"flex",flexDirection:"column",justifyContent:"center"}}>
         {!nonce
           ? (<div><div style={{fontSize:40}}>📺</div><p className="muted small">Sponsored slot (demo ad unit — replace with your ad network)</p>
-              <button className="btn" disabled={info.remainingToday<=0||adblock} onClick={start}>{info.remainingToday<=0?"Daily limit reached":"Watch ad (+50)"}</button></div>)
+              <button className="btn" disabled={info.remainingToday<=0||adblock} onClick={start}>{info.remainingToday<=0?"Daily limit reached":"Watch ad (+"+info.reward+")"}</button></div>)
           : (<div><div style={{fontSize:40}}>▶️</div><p><b>Ad playing... {left}s</b></p>
-              <div style={{background:"#ffffff14",borderRadius:8,height:10}}><div style={{width:((info.seconds-left)/info.seconds*100)+"%",height:10,borderRadius:8,background:"linear-gradient(90deg,#6c8cff,#22d3ee)"}}/></div>
+              <div style={{background:"#ffffff14",borderRadius:8,height:10}}><div style={{width:((info.seconds>0?(info.seconds-left)/info.seconds*100:0))+"%",height:10,borderRadius:8,background:"linear-gradient(90deg,#6c8cff,#22d3ee)"}}/></div>
               <p className="muted small">Do not close — reward is verified on the server.</p></div>)}
       </div>
       <div className="card"><h3>How it works</h3><ul className="small check"><li>Press Watch — server opens a verified session</li><li>Finish the full {info.seconds}s — skipping earns nothing</li><li>Ad blocker and VPN must be off</li><li>Max {info.dailyMax} ads/day = {info.dailyMax*info.reward} coins</li><li>Reward lands instantly in your balance</li></ul>{msg&&<p className="small">{msg}</p>}</div>

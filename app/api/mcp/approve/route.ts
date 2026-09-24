@@ -3,6 +3,10 @@ import { cookies } from "next/headers";
 import { verifyJwt } from "@/lib/auth";
 import { getPending, settlePending, webOrigin } from "@/lib/mcpAuth";
 
+function esc(s: string): string {
+  return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 function shell(inner: string): Response {
   const html = "<!doctype html><html><head><meta charset=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"/><title>CodeBridge — approve agent</title>"
     + "<style>body{margin:0;background:#070b16;color:#eaf0ff;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:20px}"
@@ -28,8 +32,8 @@ export async function GET(req: Request) {
   }
   return shell(
     "<h1>Allow this agent?</h1>" +
-    "<p class=\"muted\">Your coding agent wants to run <b>" + p.tool + "</b> as <b>" + (me.email || me.sub) + "</b>. Approving spends YOUR coins when the task runs.</p>" +
-    "<form method=\"POST\" action=\"/api/mcp/approve\"><input type=\"hidden\" name=\"req\" value=\"" + p.id + "\"/>" +
+    "<p class=\"muted\">Your coding agent wants to run <b>" + esc(p.tool) + "</b> as <b>" + esc(String(me.email || me.sub)) + "</b>. Approving spends YOUR coins when the task runs.</p>" +
+    "<form method=\"POST\" action=\"/api/mcp/approve\"><input type=\"hidden\" name=\"req\" value=\"" + esc(p.id) + "\"/>" +
     "<label style=\"display:flex;gap:8px;align-items:center;justify-content:center;font-size:14px;color:#8b9bb8;margin:12px 0\"><input type=\"checkbox\" name=\"always\" value=\"yes\" checked style=\"width:auto\"/> Always allow this agent (approve once, never ask again)</label>" +
     "<div class=\"row\"><button class=\"yes\" name=\"allow\" value=\"yes\" type=\"submit\">Approve</button>" +
     "<button class=\"no\" name=\"allow\" value=\"no\" type=\"submit\">Deny</button></div></form>"

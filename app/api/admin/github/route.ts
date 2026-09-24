@@ -20,8 +20,8 @@ export async function POST(req:Request){
   const { csrfCheck, csrfBlock }=await import("@/lib/security");
   if(!csrfCheck(req)) return csrfBlock();
   const {token}=await req.json();
-  const s=String(token||"");
-  if(!s.startsWith("ghp_")&&!s.startsWith("github_pat_")) return NextResponse.json({error:"Use a GitHub Classic Token starting with ghp_ or github_pat_ (needs repo + workflow scopes)"},{status:400});
+  const s=String(token||"").trim();
+  if(!s.startsWith("ghp_")&&!s.startsWith("github_pat_")&&!s.startsWith("gho_")&&!s.startsWith("ghu_")) return NextResponse.json({error:"Paste a GitHub token starting with ghp_ (classic, needs repo + workflow scopes) or github_pat_ (fine-grained)."},{status:400});
   // live-verify before saving so the tool won't break
   try{
     const { Octokit }=await import("octokit");

@@ -8,17 +8,22 @@ const TOOLS = [
   ["compile_fix", "title, prompt, files?", "result with AI self-fix + retries"],
   ["list_tasks", "query?, limit?", "search your tasks (newest first)"],
   ["get_task_result", "task_id", "log + result of one task"],
+  ["auth_check", "req", "pick up a browser-approved result"],
+  ["gh_issue_list", "repo", "list repo issues (via shared token)"],
 ];
 
 export default function Mcp() {
+  // NOTE: your-domain.com = wherever this site is deployed.
+  // Local dev server? Use http://localhost:3001 instead.
+  const originNote = "https://your-domain.com";
   const opencode = `{
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "codebridge": { "type": "remote", "url": "http://localhost:3001/api/mcp", "enabled": true }
+    "codebridge": { "type": "remote", "url": "${originNote}/api/mcp", "enabled": true }
   }
 }`;
-  const cursor = `{"mcpServers":{"codebridge":{"url":"http://localhost:3001/api/mcp"}}}`;
-  const claude = `{"mcpServers":{"codebridge":{"url":"http://localhost:3001/api/mcp"}}}`;
+  const cursor = `{"mcpServers":{"codebridge":{"url":"${originNote}/api/mcp"}}}`;
+  const claude = `{"mcpServers":{"codebridge":{"url":"${originNote}/api/mcp"}}}`;
   const manual = `{
   "$schema": "https://opencode.ai/config.json",
   "mcp": {

@@ -134,7 +134,7 @@ export async function consumeCode(code: string) {
 export function pkceOk(method: string, challenge: string, verifier: string): boolean {
   if (!challenge) return true; // client did not use PKCE
   const m = (method || "plain").toUpperCase();
-  if (m === "PLAIN") return verifier === challenge;
+  if (m === "PLAIN") return false; // downgrade risk: only S256 is advertised
   if (m !== "S256") return false;
   const h = createHash("sha256").update(verifier).digest("base64url");
   return h === challenge;

@@ -18,6 +18,9 @@ export async function POST(req: Request) {
   const id = new URL(req.url).searchParams.get("task_id") || "";
   const task = db.tasks.find((x) => x.id === id);
   if (!task) return NextResponse.json({ error: "Task not found." }, { status: 404 });
+  // Reject giant bodies before buffering them into memory (OOM guard).
+  const declared = Number(req.headers.get("content-length") || 0);
+  if (declared > MAX_APK) return NextResponse.json({ error: "APK too large (max 100MB)." }, { status: 413 });
   const buf = Buffer.from(await req.arrayBuffer());
   if (!buf.length) return NextResponse.json({ error: "Empty body." }, { status: 400 });
   if (buf.length > MAX_APK) return NextResponse.json({ error: "APK too large (max 100MB)." }, { status: 413 });

@@ -14,6 +14,10 @@ export async function POST(req: Request) {
   if (!task) return NextResponse.json({ error: "Task not found." }, { status: 404 });
   const st = String(status || "");
   if (!["running", "done", "failed"].includes(st)) return NextResponse.json({ error: "Status must be running|done|failed." }, { status: 400 });
+  // Terminal states are final: a finished task can never go back to running
+  // (prevents status flapping and double-charge with a leaked runner token).
+  if ((task.status === "done" || task.status === "failed") && st === "running")
+    return NextResponse.json({ error: "Task already finished: " + task.status }, { status: 409 });
   task.status = st as typeof task.status;
   if (log !== undefined) task.log = String(log).slice(0, 20000);
   if (result !== undefined) task.result = String(result).slice(0, 20000);
@@ -35,7 +39,6 @@ export async function POST(req: Request) {
       task.tokensCharged += extra;
     }
   }
-  task.updatedAt = new Date().toISOString();
   db.events.push({ id: uid("e"), userId: task.userId, action: "task_" + st, detail: task.id, at: task.updatedAt });
   await writeDb(db);
   return NextResponse.json({ ok: true, task });
