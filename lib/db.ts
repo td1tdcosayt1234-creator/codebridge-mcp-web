@@ -18,7 +18,7 @@ export type TrustedAgent = { id:string; userId:string; ip:string; ua:string; too
 export type OAuthClient = { id:string; redirectUris:string[]; createdAt:string };
 export type OAuthCode = { code:string; userId:string; clientId:string; redirectUri:string; challenge:string; method:string; expires:number };
 export type BillingSub = { userId:string; plan:"pro"|"team"; customerId:string; subscriptionId:string; status:string; updatedAt:string };
-export type DbShape = { users:User[]; events:EventItem[]; builds:Build[]; tickets:Ticket[]; githubTokens:{userId:string; enc:string}[]; mcpKeys:{userId:string; key:string}[]; usage:Usage[]; globalGithub?:{enc:string; updatedBy:string; updatedAt:string}; tasks:Task[]; settings?:RunnerSettings; attempts:LoginAttempt[]; earnNonces:EarnNonce[]; approvals:PendingCall[]; trusted:TrustedAgent[]; oauthClients:OAuthClient[]; oauthCodes:OAuthCode[]; billing:BillingSub[]; webhookIds:string[] };
+export type DbShape = { users:User[]; events:EventItem[]; builds:Build[]; tickets:Ticket[]; githubTokens:{userId:string; enc:string}[]; mcpKeys:{userId:string; key:string}[]; usage:Usage[]; globalGithub?:{enc:string; updatedBy:string; updatedAt:string}; globalAI?:{enc:string; baseUrl:string; model:string; updatedBy:string; updatedAt:string}; tasks:Task[]; settings?:RunnerSettings; attempts:LoginAttempt[]; earnNonces:EarnNonce[]; approvals:PendingCall[]; trusted:TrustedAgent[]; oauthClients:OAuthClient[]; oauthCodes:OAuthCode[]; billing:BillingSub[]; webhookIds:string[] };
 const file = process.env.DB_FILE || (process.env.VERCEL ? "/tmp/codebridge-db.json" : path.join(process.cwd(), "data", "db.json"));
 
 // ---- At-rest encryption (AES-256-GCM via lib/crypto) ----

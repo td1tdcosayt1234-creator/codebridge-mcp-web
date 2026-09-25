@@ -9,12 +9,6 @@ const IDEAS = [
   "racing neon drift",
 ];
 
-const STYLES = [
-  { id: "neon", name: "Neon", icon: "✦", desc: "Glow" },
-  { id: "retro", name: "Retro", icon: "◐", desc: "Arcade" },
-  { id: "minimal", name: "Minimal", icon: "○", desc: "Clean" },
-];
-
 
 const GAME_CSS = `
         .dev-grid-bg{position:absolute;inset:0;background-image:linear-gradient(#ffffff08 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px);background-size:52px 52px;mask-image:radial-gradient(760px 400px at 50% 0%,#000,transparent);animation:gridDrift 18s linear infinite}
@@ -40,13 +34,14 @@ const GAME_CSS = `
         .panel-body{padding:18px}
         .field{width:100%;padding:13px 14px;border-radius:13px;border:1px solid #ffffff1a;background:#04060fd9;color:#f5f6fb;outline:none;font-size:13.5px;resize:vertical;line-height:1.6;transition:border-color .25s,box-shadow .3s,background .25s}
         .field:focus{border-color:#c4b5fdaa;background:#0a0c1ae6;box-shadow:0 0 0 4px #8b5cf626,0 0 40px -14px #8b5cf6}
+        select.field{cursor:pointer}
+        select.field option{background:#0a0c1a;color:#f5f6fb}
         .idea-row{display:flex;gap:7px;margin-top:10px;flex-wrap:wrap}
-        .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:6px;background:#04060fd9;border:1px solid #ffffff12;border-radius:15px}
-        .seg button{padding:10px 6px;border-radius:11px;border:0;background:transparent;color:#8b93a8;cursor:pointer;font-size:12px;font-weight:800;transition:.25s;line-height:1.3}
-        .seg button small{display:block;font-size:10px;font-weight:600;opacity:.6}
-        .seg button:hover{color:#fff;background:#ffffff0d}
-        .seg button.active{background:linear-gradient(135deg,#8b5cf6,#2dd4bf);color:#08091a;box-shadow:0 8px 26px -10px #8b5cf6}
-        .seg button.active small{opacity:.8}
+        .chat-thread{display:flex;flex-direction:column;gap:10px;max-height:300px;overflow-y:auto;padding:4px 2px}
+        .msg{padding:10px 13px;border-radius:13px;font-size:13px;line-height:1.65;max-width:100%;white-space:pre-wrap;word-break:break-word}
+        .msg-user{background:linear-gradient(135deg,#8b5cf633,#2dd4bf22);border:1px solid #8b5cf64d;color:#eef;align-self:flex-end;border-bottom-right-radius:4px}
+        .msg-ai{background:#ffffff0a;border:1px solid #ffffff14;color:#c6cddd;align-self:flex-start;border-bottom-left-radius:4px}
+        .msg-ai.err{border-color:#f8717155;color:#fca5a5}
         .btn-primary{width:100%;padding:15px;border-radius:14px;border:1px solid #ffffff1f;background:linear-gradient(110deg,#f5f6fb,#e4e6f5);color:#07080f;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 16px 40px -20px #fff;letter-spacing:.01em;transition:.3s;position:relative;overflow:hidden}
         .btn-primary::after{content:"";position:absolute;top:0;left:-70%;width:45%;height:100%;background:linear-gradient(100deg,transparent,#ffffff99,transparent);transform:skewX(-20deg);animation:shineBtn 4.2s ease-in-out infinite}
         @keyframes shineBtn{0%,55%{left:-70%}100%{left:180%}}
@@ -72,9 +67,14 @@ const GAME_CSS = `
         .label{font-size:10.5px;color:#6a7288;letter-spacing:.14em;font-weight:800;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;text-transform:uppercase}
 `;
 
+type Msg = { role: "user" | "ai"; text: string; err?: boolean };
+
 export default function GameStudio(){
-  const [prompt,setPrompt]=useState("");
-  const [style,setStyle]=useState("neon");
+  const [msgs,setMsgs]=useState<Msg[]>([]);
+  const [input,setInput]=useState("");
+  const [context,setContext]=useState("");
+  const [models,setModels]=useState<string[]>([]);
+  const [modelSel,setModelSel]=useState("auto");
   const [html,setHtml]=useState("");
   const [provider,setProvider]=useState("");
   const [loading,setLoading]=useState(false);
@@ -83,16 +83,21 @@ export default function GameStudio(){
   const [toast,setToast]=useState("");
   const frameRef=useRef<HTMLIFrameElement>(null);
   const taRef=useRef<HTMLTextAreaElement>(null);
+  const threadRef=useRef<HTMLDivElement>(null);
   const genBusy=useRef(false);
+  const autoRan=useRef(false);
 
   useEffect(()=>{
+    threadRef.current?.scrollTo({top: 999999});
+  },[msgs,loading]);
+
+  useEffect(()=>{
+    fetch("/api/game/generate",{cache:"no-store"}).then(r=>r.json()).then(j=>{
+      if(Array.isArray(j?.freeModels)) setModels(j.freeModels);
+    }).catch(()=>{});
     const sp=new URLSearchParams(location.search);
     const q=sp.get("prompt");
-    const st=sp.get("style");
-    if(st==="neon"||st==="retro"||st==="minimal") setStyle(st);
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    if(q){ setPrompt(q); timer=setTimeout(()=>gen(q),400)}
-    return ()=>{ if(timer) clearTimeout(timer); };
+    if(q && !autoRan.current){ autoRan.current=true; send(q); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
@@ -105,26 +110,44 @@ export default function GameStudio(){
 
   const showToast=(m:string)=>{ setToast(m); setTimeout(()=>setToast(""),2200)};
 
-  const gen = async (customPrompt?: string)=>{
-    if(genBusy.current) return;
-    const p = (customPrompt||prompt).trim();
-    if(!p){ showToast("Write a prompt first"); taRef.current?.focus(); return; }
-    if(p.length>800){ showToast("Prompt too long (max 800)"); return; }
+  const send = async (raw?: string)=>{
+    const text = (raw ?? input).trim();
+    if(!text || genBusy.current) return;
+    if(text.length>800){ showToast("Message too long (max 800)"); return; }
+    // Whole chat becomes the build spec — every message rebuilds the full
+    // game from scratch (pure AI output, no templates). Trimmed to fit the
+    // API's 800-char prompt cap.
+    const ctx = ((context ? context + "\n" : "") + text).slice(-700);
+    setContext(ctx);
+    setMsgs(m=>[...m,{role:"user",text}]);
+    setInput("");
+    await gen(ctx);
+  };
+
+  const gen = async (ctx: string)=>{
     genBusy.current = true;
     setLoading(true);
     try{
-      const r = await fetch("/api/game/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:p, style})});
-      if(r.status===401){ showToast("Login required"); setLoading(false); genBusy.current = false; location.href="/login?next="+encodeURIComponent("/game"); return; }
-      if(r.status===503){ showToast("AI busy — wait a minute and retry"); setLoading(false); genBusy.current = false; return; }
+      const r = await fetch("/api/game/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:ctx, style:"auto", model: modelSel === "auto" ? "" : modelSel})});
+      if(r.status===401){ showToast("Login required"); setLoading(false); genBusy.current = false; location.href="/login?next="+encodeURIComponent("/game?prompt="+ctx.slice(-200)); return; }
+      if(r.status===503){
+        const j503 = await r.json().catch(()=>({}));
+        setMsgs(m=>[...m,{role:"ai",text:j503.error || "AI busy — wait a minute and retry",err:true}]);
+        setLoading(false); genBusy.current = false; return;
+      }
       const j = await r.json().catch(()=>({}));
       if(!r.ok) throw new Error(j.error || ("Generate failed "+r.status));
       if(!j.html) throw new Error("No html returned");
       setHtml(j.html);
       setShowCode(false);
       setProvider(j.provider || "ai");
-      showToast("AI game ready — preview updated");
+      setMsgs(m=>[...m,{role:"ai",text:"Game ready — live preview updated ("+(j.provider||"ai")+"). Keep chatting to refine it."}]);
     }catch(e:any){
-      showToast(e.message||"Failed");
+      const raw = e?.message || "Failed";
+      const friendly = /failed to fetch|networkerror|load failed|abort/i.test(raw)
+        ? "Server unreachable — page reload kore abar try koro. Server down thakle start korte hobe."
+        : raw;
+      setMsgs(m=>[...m,{role:"ai",text:friendly,err:true}]);
     }
     setLoading(false);
     genBusy.current = false;
@@ -136,7 +159,7 @@ export default function GameStudio(){
     const a=document.createElement("a");
     const url=URL.createObjectURL(blob);
     a.href=url;
-    a.download=(prompt||"game").replace(/[^a-z0-9]+/gi,"-").slice(0,30)+".html";
+    a.download=(context.split("\n")[0]||"game").replace(/[^a-z0-9]+/gi,"-").slice(0,30)+".html";
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -151,7 +174,7 @@ export default function GameStudio(){
   };
 
   const share=async()=>{
-    const url = location.origin+"/game?prompt="+encodeURIComponent(prompt)+"&style="+encodeURIComponent(style);
+    const url = location.origin+"/game?prompt="+encodeURIComponent((context || input).slice(-500));
     await navigator.clipboard.writeText(url);
     showToast("Link copied");
   };
@@ -172,11 +195,11 @@ export default function GameStudio(){
           <div>
             <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:12,flexWrap:"wrap"}}>
               <span className="chip live"><span className="live-dot"/>LIVE PREVIEW</span>
-              <span className="chip">No deploy needed</span>
-              <span className="chip">Single file</span>
+              <span className="chip">Chat to build</span>
+              <span className="chip">Real AI output</span>
             </div>
-            <h1>Game Studio <span className="grad-text">— Instant Play</span></h1>
-            <p>Describe any game in plain English. AI instantly crafts a playable HTML file — preview, tweak, download. Runs 100% in your browser. Press <span className="kbd">Ctrl</span> + <span className="kbd">Enter</span> to generate.</p>
+            <h1>Game Studio <span className="grad-text">— Chat & Play</span></h1>
+            <p>Just chat in plain English. Every message builds a real playable game — keep chatting to refine it, the preview updates live. Press <span className="kbd">Ctrl</span> + <span className="kbd">Enter</span> to send.</p>
           </div>
           <div className="hero-stats">
             <span className="chip">⚡ Instant</span>
@@ -188,31 +211,42 @@ export default function GameStudio(){
 
       <div className="dev-grid">
         <div className="panel">
-          <div className="panel-head"><span>✦ Create</span><span style={{opacity:.5,fontWeight:600}}>/game</span></div>
-          <div className="panel-body" style={{display:"grid",gap:16}}>
+          <div className="panel-head"><span>✦ Chat</span><span style={{opacity:.5,fontWeight:600}}>/game</span></div>
+          <div className="panel-body" style={{display:"grid",gap:12}}>
+            <div ref={threadRef} className="chat-thread">
+              {msgs.length===0 && !loading && (
+                <div className="hint" style={{marginTop:0}}>No messages yet — describe your game below. AI builds a real single-file HTML game, no templates involved.</div>
+              )}
+              {msgs.map((m,i)=>(
+                <div key={i} className={"msg "+(m.role==="user" ? "msg-user" : "msg-ai"+(m.err?" err":""))}>{m.text}</div>
+              ))}
+              {loading && <div className="msg msg-ai">Crafting…</div>}
+            </div>
+
             <div>
-              <div className="label"><span>DESCRIBE YOUR GAME</span><span style={{opacity:.6}}>{prompt.length}/800</span></div>
-              <textarea ref={taRef} className="field" rows={4} value={prompt} onChange={e=>setPrompt(e.target.value)} onKeyDown={e=>{ if((e.ctrlKey||e.metaKey)&&e.key==="Enter") gen(); }} placeholder="e.g. Neon snake with glow, wrap walls and swipe controls…" maxLength={800} />
+              <div className="label"><span>MODEL — FREE</span><span style={{opacity:.6}}>{provider || "auto"}</span></div>
+              <select className="field" value={modelSel} onChange={e=>setModelSel(e.target.value)} style={{padding:"11px 14px"}}>
+                <option value="auto">✦ Auto — best available</option>
+                {models.map(m=>(
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <div className="label"><span>CHAT — DESCRIBE OR REFINE</span><span style={{opacity:.6}}>{input.length}/800</span></div>
+              <textarea ref={taRef} className="field" rows={3} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{ if((e.ctrlKey||e.metaKey)&&e.key==="Enter") send(); }} placeholder="e.g. Neon snake with glow… then: add swipe controls, faster levels" maxLength={800} />
               <div className="idea-row">
                 {IDEAS.map(s=>(
-                  <button key={s} className="tool" onClick={()=>setPrompt(s)}>{s}</button>
+                  <button key={s} className="tool" onClick={()=>{ setInput(s); taRef.current?.focus(); }}>{s}</button>
                 ))}
               </div>
             </div>
 
-            <div>
-              <div className="label"><span>STYLE</span></div>
-              <div className="seg">
-                {STYLES.map(s=>(
-                  <button key={s.id} className={style===s.id?"active":""} onClick={()=>setStyle(s.id)}>{s.icon} {s.name}<small>{s.desc}</small></button>
-                ))}
-              </div>
-            </div>
-
-            <button className="btn-primary" onClick={()=>gen()} disabled={loading}>
-              {loading?"Crafting…":"Generate & Play →"}
+            <button className="btn-primary" onClick={()=>send()} disabled={loading}>
+              {loading?"Crafting…":(html?"Send & Update →":"Send & Build →")}
             </button>
-            <div className="hint">Tip: be specific — “snake with walls wrap and touch swipe” beats “make a game”. <span className="kbd">Ctrl</span>+<span className="kbd">Enter</span> works too.</div>
+            <div className="hint">Each message rebuilds the full game from the whole chat — preview updates live on the right.</div>
           </div>
         </div>
 
@@ -233,25 +267,25 @@ export default function GameStudio(){
               <div className="preview-glow">
               <div className={"preview-wrap "+(isFs?"fs":"")} style={{height:isFs?"auto":480}}>
                 {loading ? (
-                  <div className="skeleton"><div className="pulse"/><div style={{fontWeight:800}}>Crafting your game…</div><div style={{opacity:.6,fontSize:12}}>Instant — no cloud wait</div></div>
+                  <div className="skeleton"><div className="pulse"/><div style={{fontWeight:800}}>Crafting your game…</div><div style={{opacity:.6,fontSize:12}}>Real AI output — no templates</div></div>
                 ) : html ? (
                   <iframe ref={frameRef} title="preview" srcDoc={html} style={{width:"100%",height:"100%",border:0,background:"#020617"}} sandbox="allow-scripts allow-pointer-lock" allow="fullscreen" />
                 ) : (
                   <div style={{textAlign:"center",padding:36,position:"relative"}}>
                     <div className="empty-art">🕹️</div>
                     <div style={{fontSize:22,fontWeight:800,margin:"10px 0 6px"}}>Ready to build</div>
-                    <div style={{opacity:.6,fontSize:13,marginBottom:18}}>Write a prompt above and hit Generate</div>
+                    <div style={{opacity:.6,fontSize:13,marginBottom:18}}>Chat on the left and hit Send</div>
                     <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
-                      <button className="btn-primary" style={{width:"auto",padding:"10px 20px"}} onClick={()=>{setPrompt("neon snake with glow");gen("neon snake with glow")}}>Try Snake</button>
-                      <button className="tool" onClick={()=>{setPrompt("flappy bird retro sky");gen("flappy bird retro sky")}}>Try Flappy</button>
-                      <button className="tool" onClick={()=>{setPrompt("racing neon drift");gen("racing neon drift")}}>Try Racing</button>
+                      <button className="btn-primary" style={{width:"auto",padding:"10px 20px"}} onClick={()=>send("neon snake with glow")}>Try Snake</button>
+                      <button className="tool" onClick={()=>send("flappy bird retro sky")}>Try Flappy</button>
+                      <button className="tool" onClick={()=>send("racing neon drift")}>Try Racing</button>
                     </div>
                   </div>
                 )}
               </div>
               </div>
             ) : (
-              <pre>{html || "// Generate a game to see code"}</pre>
+              <pre>{html || "// Chat to generate a game"}</pre>
             )}
             <div className="hint">Preview runs locally in an iframe. Keyboard + touch ready. Download gives you a standalone HTML file.</div>
           </div>

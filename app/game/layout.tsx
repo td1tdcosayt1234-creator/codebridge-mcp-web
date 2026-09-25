@@ -1,11 +1,9 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { verifyJwt } from "@/lib/auth";
+import type { ReactNode } from "react";
 
-// Login gate: no session -> /login (middleware preserves ?prompt= in the next param).
-export default async function GameLayout({ children }: { children: React.ReactNode }) {
-  const t = cookies().get("session")?.value || "";
-  const p = await verifyJwt(t);
-  if (!p) redirect("/login?next=/game");
+// No auth check here on purpose: edge middleware (middleware.ts) is the
+// single login gate for /game and it preserves the full ?prompt=&style=
+// query in the ?next= param. A second server gate here used to redirect to
+// "/login?next=/game" (dropping the query) and caused login-loop reports.
+export default function GameLayout({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }

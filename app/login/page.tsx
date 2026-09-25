@@ -1,7 +1,15 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+
+// Single-login: already-logged-in user never sees the form again,
+// and post-login uses a full reload so server gates read the fresh cookie.
+function dest(fallbackRole: string): string {
+  if (typeof window === "undefined") return "/";
+  const nx = new URLSearchParams(window.location.search).get("next") || "";
+  if (nx.startsWith("/") && !nx.startsWith("//")) return nx;
+  return fallbackRole === "admin" ? "/admin" : "/dashboard";
+}
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -12,7 +20,17 @@ export default function Login() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [shake, setShake] = useState(0);
-  const r = useRouter();
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((x) => x.json())
+      .then((j) => {
+        if (j?.user) window.location.href = dest(j.user.role);
+        else setChecking(false);
+      })
+      .catch(() => setChecking(false));
+  }, []);
 
   async function go(e: React.FormEvent) {
     e.preventDefault();
@@ -30,12 +48,26 @@ export default function Login() {
         setShake((s) => s + 1);
         return;
       }
-      const q = new URLSearchParams(window.location.search);
-      const nx = q.get("next") || "";
-      r.push(nx.startsWith("/") && !nx.startsWith("//") ? nx : j.role === "admin" ? "/admin" : "/dashboard");
+      // Full reload (not router.push): server layouts/middleware must
+      // re-read the freshly-set session cookie, otherwise they bounce
+      // straight back to /login with a stale cached payload.
+      window.location.href = dest(j.role);
+    } catch {
+      setErr("Server unreachable — address/server check kore abar try koro.");
+      setShake((s) => s + 1);
     } finally {
       setBusy(false);
     }
+  }
+
+  if (checking) {
+    return (
+      <div className="auth-wrap fade-up">
+        <div className="card auth-card">
+          <p className="muted small">Checking session…</p>
+        </div>
+      </div>
+    );
   }
 
   return (

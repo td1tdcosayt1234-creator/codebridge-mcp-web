@@ -53,8 +53,16 @@ export default function Footer() {
             <h4>Legal</h4>
             <Link href="/terms">Terms</Link>
             <Link href="/privacy">Privacy</Link>
-            <Link href="/login">Login</Link>
-            <Link href="/signup">Sign up free</Link>
+            {me ? (
+              <Link href={me.role === "admin" ? "/admin" : "/dashboard"}>
+                {me.role === "admin" ? "Admin" : "Dashboard"}
+              </Link>
+            ) : (
+              <>
+                <Link href="/login">Login</Link>
+                <Link href="/signup">Sign up free</Link>
+              </>
+            )}
           </div>
         </div>
         <div className="footer-bottom">

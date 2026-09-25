@@ -13,6 +13,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     ["/admin", "Overview", "◈"],
     ["/admin/runner", "Runner (Actions)", "▲"],
     ["/admin/github", "GitHub Token", "⚿"],
+    ["/admin/ai", "AI Key", "✧"],
     ["/admin/users", "Users", "◎"],
     ["/admin/tokens", "Tokens", "◉"],
     ["/admin/tracking", "Tracking", "◎"],

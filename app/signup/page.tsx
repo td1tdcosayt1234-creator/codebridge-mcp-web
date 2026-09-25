@@ -1,6 +1,5 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 export default function Signup() {
@@ -12,7 +11,18 @@ export default function Signup() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [shake, setShake] = useState(0);
-  const r = useRouter();
+  const [checking, setChecking] = useState(true);
+
+  // Already logged in -> straight to dashboard, no second form.
+  useEffect(() => {
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((x) => x.json())
+      .then((j) => {
+        if (j?.user) window.location.href = j.user.role === "admin" ? "/admin" : "/dashboard";
+        else setChecking(false);
+      })
+      .catch(() => setChecking(false));
+  }, []);
 
   async function go(e: React.FormEvent) {
     e.preventDefault();
@@ -30,10 +40,24 @@ export default function Signup() {
         setShake((s) => s + 1);
         return;
       }
-      r.push("/dashboard");
+      // Full reload so server gates read the fresh session cookie.
+      window.location.href = "/dashboard";
+    } catch {
+      setErr("Server unreachable — address/server check kore abar try koro.");
+      setShake((s) => s + 1);
     } finally {
       setBusy(false);
     }
+  }
+
+  if (checking) {
+    return (
+      <div className="auth-wrap fade-up">
+        <div className="card auth-card">
+          <p className="muted small">Checking session…</p>
+        </div>
+      </div>
+    );
   }
 
   return (
