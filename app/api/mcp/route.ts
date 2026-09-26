@@ -11,7 +11,7 @@ const TOOLS = [
   {
     name: "compile",
     title: "Compile Code",
-    description: "Compile anything (all types): send title + instructions + optional files. AI compiles in the cloud and this call waits up to ~8 min for the FULL live result directly in this agent (no dashboard needed). Bigger files cost more coins. If it returns 'Still running', call get_task_result with the task_id — output ekhanei asbe.",
+    description: "Compile anything (all types): send title + instructions + optional files. AI compiles in the cloud; this call returns within ~90s (Cloudflare tunnel limit) — if the build is still going you get the task_id back, then call get_task_result for the FULL live result directly in this agent (no dashboard needed). Bigger files cost more coins.",
     annotations: { title: "Compile Code", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     inputSchema: {
       type: "object",
@@ -34,7 +34,7 @@ const TOOLS = [
   {
     name: "compile_fix",
     title: "Fix and Compile",
-    description: "Compile with AI fix: like compile, but on failure the AI repairs the code itself and retries (max 3). Fix size costs extra coins. Waits up to ~8 min for the FULL live result directly in this agent. If 'Still running', call get_task_result with the task_id.",
+    description: "Compile with AI fix: like compile, but on failure the AI repairs the code itself and retries (max 3). Fix size costs extra coins. Returns within ~90s; if 'Still running', call get_task_result with the task_id for the full result.",
     annotations: { title: "Fix and Compile", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     inputSchema: {
       type: "object",
@@ -242,14 +242,17 @@ async function executeTool(userId: string, name: string, args: Record<string, un
   await track(userId, name, out.task.id);
   const id = out.task.id;
   const head = "task_id=" + id + " (" + out.task.kind + ", ~" + out.task.tokensEst + " coins held)\n";
-  const t = await waitForResult(id, 480000);
+  // Cloudflare Quick Tunnel kills requests at 100s (524), so never hold the
+  // connection longer than ~90s. The runner posts the final result separately —
+  // the agent picks it up with get_task_result. No coins lost on timeout.
+  const t = await waitForResult(id, 90000);
   if (!t) return text(head + "Task vanished unexpectedly.", true);
   const tail = (s: string) => (s || "-").slice(-6000);
   if (t.status === "done" || t.status === "failed") {
     await track(userId, name + "_result", id);
     return text(head + "[" + t.status.toUpperCase() + "] " + t.title + " (charged " + t.tokensCharged + " coins)\n--- log ---\n" + tail(t.log) + "\n--- result ---\n" + tail(t.result) + apkLine(t));
   }
-  return text(head + "Still " + t.status + " after 8 min — runner ekhono kaj korche. Dashboard e jete hobe NA: ei agent thekei `get_task_result` tool e {\"task_id\": \"" + id + "\"} pathao, full log+result ekhanei pabe. 1-2 min por abar call koro.");
+  return text(head + "Still " + t.status + " after ~90s — runner ekhono kaj korche (full build e koyek min lage). Dashboard e jete hobe NA: ei agent thekei `get_task_result` tool e {\"task_id\": \"" + id + "\"} pathao, full log+result ekhanei pabe. 1-2 min por abar call koro.");
 }
 
 async function handleOne(req: Request, m: RpcMsg): Promise<{ resp: object | null }> {
