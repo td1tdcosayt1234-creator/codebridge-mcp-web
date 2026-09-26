@@ -23,11 +23,11 @@ jobs:
       - name: Pull task from web
         run: |
           WEB="${WEB_URL%/}"
-          curl -sf -H "Authorization: Bearer cb_run_47fc5e2d0a3fbf566e9ec90a0f29d45523880eba0fa5c332" \
+          curl -sf -H "Authorization: Bearer ${{ secrets.RUNNER_TOKEN }}" \
             "$WEB/api/runner/next?task_id=${{ inputs.task_id }}" -o task.json
           cat task.json
         env:
-          WEB_URL: https://approx-medications-tiny-michelle.trycloudflare.com
+          WEB_URL: ${{ secrets.WEB_URL }}
       - name: Write task files (isolated task-work/ dir e)
         run: |
           node -e "
@@ -199,14 +199,14 @@ jobs:
           if [ -n "$APK" ]; then
             echo "uploading $APK ($(du -h "$APK" | cut -f1))"
             WEB="${WEB_URL%/}"
-            curl -sf -X POST -H "Authorization: Bearer cb_run_47fc5e2d0a3fbf566e9ec90a0f29d45523880eba0fa5c332" --data-binary "@$APK" "$WEB/api/runner/apk?task_id=${{ inputs.task_id }}"
+            curl -sf -X POST -H "Authorization: Bearer ${{ secrets.RUNNER_TOKEN }}" --data-binary "@$APK" "$WEB/api/runner/apk?task_id=${{ inputs.task_id }}"
             echo "apk-sent=$?"
           else
             echo "no apk (non-Android ba build fail)"
           fi
         env:
-          WEB_URL: https://approx-medications-tiny-michelle.trycloudflare.com
-          RUNNER_TOKEN: cb_run_47fc5e2d0a3fbf566e9ec90a0f29d45523880eba0fa5c332
+          WEB_URL: ${{ secrets.WEB_URL }}
+          RUNNER_TOKEN: ${{ secrets.RUNNER_TOKEN }}
       - name: Send result to web
         if: always()
         run: |
@@ -219,8 +219,8 @@ jobs:
           fetch(base+'/api/runner/update',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+process.env.RUNNER_TOKEN},body:JSON.stringify({id:'${{ inputs.task_id }}',status:(ok&&code===0)?'done':'failed',log,result:log})}).then(async r=>{console.log('sent',r.status); if(!r.ok) console.log(await r.text());});
           "
         env:
-          WEB_URL: https://approx-medications-tiny-michelle.trycloudflare.com
-          RUNNER_TOKEN: cb_run_47fc5e2d0a3fbf566e9ec90a0f29d45523880eba0fa5c332
+          WEB_URL: ${{ secrets.WEB_URL }}
+          RUNNER_TOKEN: ${{ secrets.RUNNER_TOKEN }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
