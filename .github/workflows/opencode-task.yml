@@ -36,12 +36,12 @@ jobs:
           for(const f of (t.files||[])){const p='task-work/'+f.path;fs.mkdirSync(require('path').dirname(p),{recursive:true});fs.writeFileSync(p,f.content);}
           console.log('files:',(t.files||[]).length,'kind:',t.kind);
           "
-          ls task-work 2>/dev/null || echo "(no files â prompt-only task)"
+          ls task-work 2>/dev/null || echo "(no files â— prompt-only task)"
       - name: Run opencode (free local Ollama, no API key)
         run: |
           node -e "const t=require('./task.json');require('fs').writeFileSync('prompt.txt',t.prompt)"
           KIND=$(node -e "console.log(require('./task.json').kind||'compile')")
-          # Ollama local (100% free, unlimited, no key) â api key lagbe na
+          # Ollama local (100% free, unlimited, no key) â— api key lagbe na
           curl -fsSL https://ollama.com/install.sh | sh
           (ollama serve > ollama.log 2>&1 &) 
           sleep 5
@@ -119,7 +119,7 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - name: Real build (project type onujayi â Android/Node/Python/Go/Rust)
+      - name: Real build (project type onujayi â— Android/Node/Python/Go/Rust)
         if: always()
         run: |
           BUILD_RAN=0
@@ -140,7 +140,7 @@ jobs:
           echo "gradle-exit=$(cat gradle-exit.code)" | tee -a agent.log
           APK=$(find . -name "*.apk" -path "*debug*" 2>/dev/null | head -n 5)
           echo "apk-files:" | tee -a agent.log; echo "$APK" | tee -a agent.log
-          # Full gradle log artifact e jabe (gradle-build.log), agent.log e sudhu tail-60 â
+          # Full gradle log artifact e jabe (gradle-build.log), agent.log e sudhu tail-60 â—
           # nahole 15000-char slice + coin charge bloat hoy (19-coin test e 7500 katsilo).
           # AI exit code er sathe real gradle verdict merge: gradle fail hole task failed
           if [ "$(cat gradle-exit.code)" != "0" ]; then mark_fail "gradle"; fi
@@ -154,7 +154,7 @@ jobs:
               npm --prefix $W run build 2>&1 | tee node-build.log | tail -n 40 | tee -a agent.log
               if [ "${PIPESTATUS[0]}" != "0" ]; then mark_fail "node-build"; else echo "node-build-exit=0" | tee -a agent.log; fi
             else
-              echo "no build script â deps install only, AI verdict stands" | tee -a agent.log
+              echo "no build script â— deps install only, AI verdict stands" | tee -a agent.log
             fi
           fi
           # ---- Python (.py / requirements.txt / pyproject.toml) ----
@@ -186,9 +186,9 @@ jobs:
             if [ "${PIPESTATUS[0]}" != "0" ]; then mark_fail "cargo-build"; else echo "cargo-build-exit=0" | tee -a agent.log; fi
           fi
           if [ "$BUILD_RAN" = "0" ]; then
-            echo "skip: kono known project type na (Android/Node/Python/Go/Rust marker nei) â AI verdict stands" | tee -a agent.log
+            echo "skip: kono known project type na (Android/Node/Python/Go/Rust marker nei) â— AI verdict stands" | tee -a agent.log
           fi
-      - name: Send APK to web (thakle â web theke agent download korbe)
+      - name: Send APK to web (thakle â— web theke agent download korbe)
         if: always()
         run: |
           APK=$(find . -name "*.apk" -path "*debug*" 2>/dev/null | head -n 1)
