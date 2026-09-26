@@ -119,10 +119,6 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-        if: ${{ hashFiles('task-work/go.mod') != '' }}
-        uses: actions/setup-go@v5
-        with:
-          go-version: 'stable'
       - name: Real build (project type onujayi â Android/Node/Python/Go/Rust)
         if: always()
         run: |
