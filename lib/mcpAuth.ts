@@ -77,7 +77,6 @@ function fpMatch(a: { ip: string; ua: string }, b: { ip: string; ua: string }): 
 // between check and mark), so two concurrent auth_check calls for one
 // appr_ id cannot both dispatch the tool.
 const claimedApprovals = new Map<string, number>();
-
 export async function claimApproval(id: string): Promise<boolean> {
   const key = String(id || "");
   if (!key || claimedApprovals.has(key)) return false;
@@ -96,15 +95,16 @@ export function unclaimApproval(id: string) {
 export async function findTrusted(fp: { ip: string; ua: string }, tool?: string): Promise<{ userId: string } | null> {
   const db = await readDb();
   const now = Date.now();
+  void tool; // legacy param: trust is per-agent (fp), not per-tool — one approval covers all tools.
   const hit = (db.trusted || []).find(
     (t) =>
       new Date(t.expiresAt).getTime() > now &&
-      fpMatch({ ip: t.ip, ua: t.ua }, fp) &&
-      (!tool || !t.tool || t.tool === tool)
+      fpMatch({ ip: t.ip, ua: t.ua }, fp)
   );
   if (!hit) return null;
   if (!db.users.some((u) => u.id === hit.userId)) return null;
   hit.lastUsed = new Date().toISOString();
+  if (hit.tool !== "*") hit.tool = "*"; // upgrade legacy per-tool entries to whole-agent trust
   await writeDb(db);
   return { userId: hit.userId };
 }
@@ -112,12 +112,17 @@ export async function findTrusted(fp: { ip: string; ua: string }, tool?: string)
 export async function addTrusted(userId: string, fp: { ip: string; ua: string }, tool: string) {
   const db = await readDb();
   const now = new Date().toISOString();
+  // Normalize: one "Always allow" trusts the whole agent ("*"), so no tool
+  // ever asks twice. `tool` param kept for logging/back-compat.
+  void tool;
+  const storedTool = "*";
   const old = db.trusted.find((t) => t.userId === userId && t.ip === fp.ip && t.ua === fp.ua);
   if (old) {
+    old.tool = storedTool;
     old.lastUsed = now;
     old.expiresAt = new Date(Date.now() + TRUST_TTL_MS).toISOString();
   } else {
-    db.trusted.push({ id: uid("ta"), userId, ip: fp.ip, ua: fp.ua, tool, createdAt: now, lastUsed: now, expiresAt: new Date(Date.now() + TRUST_TTL_MS).toISOString() });
+    db.trusted.push({ id: uid("ta"), userId, ip: fp.ip, ua: fp.ua, tool: storedTool, createdAt: now, lastUsed: now, expiresAt: new Date(Date.now() + TRUST_TTL_MS).toISOString() });
   }
   db.events.push({ id: uid("e"), userId, action: "mcp_trust", detail: "agent trusted (" + fp.ip + ")", at: now });
   await writeDb(db);

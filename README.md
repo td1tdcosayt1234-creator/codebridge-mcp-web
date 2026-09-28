@@ -20,10 +20,23 @@ Runner project marker dekhe matching builder চালায়, AI verdict shud
 | Type | Marker | Real command |
 |---|---|---|
 | Android | `settings.gradle` / `app/build.gradle` / `AndroidManifest.xml` | `assembleDebug` (Java 17, AGP 8.5.2, Kotlin 1.9.24, compileSdk 34) + APK upload |
-| Node | `task-work/package.json` | `npm ci` + `npm run build` (script thakle) |
+| Node | `task-work/package.json` | `npm ci` + `npm run build` (script thakle; na thakle entry file `node` diye 25s run + output) |
 | Python | `*.py` / `requirements.txt` / `pyproject.toml` | `pip install` + `py_compile` + `pytest` (test thakle) |
-| Go | `task-work/go.mod` | `go build ./...` |
-| Rust | `task-work/Cargo.toml` | `cargo build` |
+| Go | `task-work/go.mod` | `go build ./...` + Windows `.exe` (`GOOS=windows`, main package) + native binary `.deb` |
+| Rust | `task-work/Cargo.toml` | `cargo build` + Windows `.exe` (windows-gnu target, binary crate) |
+| Java/Maven | `task-work/pom.xml` | `mvn -q -DskipTests package` (Java 17) + JAR upload |
+| Java/Gradle | `task-work/build.gradle` (non-Android) | `gradle build -x test` (wrapper prefer) + JAR upload |
+| Minecraft | `plugin.yml` / `paper-plugin.yml` / `fabric.mod.json` / `mods.toml` | Java build diye verify + plugin JAR upload (`--- jar ---` link) |
+| C/C++ | `Makefile` / `CMakeLists.txt` / `*.c,*.cpp` | `make` / `cmake --build` / `g++` + Windows `.exe` (mingw) + native binary `.deb` (`--- exe ---` / `--- deb ---` link) |
+| Flutter | `task-work/pubspec.yaml` | Flutter SDK + `flutter pub get` + `flutter analyze` |
+| Deno | `deno.json` / `deno.lock` | `deno check` + native compile + Windows `.exe` (`--- exe ---` / `--- deb ---` link) |
+| Bun | `bun.lockb` / `bunfig.toml` | `bun install` + build script / entry-run 25s |
+| .NET | `*.csproj` / `*.sln` | `dotnet build` + best-effort win-x64 single-file `.exe` |
+| Java plain | `*.java` (build file nei) | `javac` + `jar` upload (`--- jar ---` link) |
+| PHP | `*.php` | `php -l` sob file |
+| Ruby | `*.rb` | `ruby -c` sob file |
+| Web static | `*.js/*.ts` (package manager nei) | `node --check` + `tsc --noEmit` |
+| Datapack | `pack.mcmeta` / `*.mcfunction` | sob `.json` parse check |
 | Other | kono marker nei | skip — AI verdict stands |
 
 `.git/.gradle/build/node_modules` junk file server-side filter hoy (quota noshto hoy na, max 50 files / 200KB).

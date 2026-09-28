@@ -203,10 +203,19 @@ async function checkApproval(req: Request, args: Record<string, unknown>) {
 }
 
 async function executeTool(userId: string, name: string, args: Record<string, unknown>, origin: string) {
-  const apkLine = (t: { id: string; apkSize?: number }) =>
-    t.apkSize
+  const apkLine = (t: { id: string; apkSize?: number; jarSize?: number; jarName?: string; exeSize?: number; exeName?: string; debSize?: number; debName?: string }) =>
+    (t.apkSize
       ? "\n--- apk ---\napp-debug.apk (" + (t.apkSize / 1048576).toFixed(1) + " MB): " + origin + "/api/tasks/" + t.id + "/apk — same Bearer key header diye ei agent ei download koro."
-      : "";
+      : "") +
+    (t.jarSize
+      ? "\n--- jar ---\n" + (t.jarName || "plugin.jar") + " (" + (t.jarSize / 1048576).toFixed(1) + " MB): " + origin + "/api/tasks/" + t.id + "/jar — same Bearer key header diye ei agent ei download koro."
+      : "") +
+    (t.exeSize
+      ? "\n--- exe ---\n" + (t.exeName || "app.exe") + " (" + (t.exeSize / 1048576).toFixed(1) + " MB): " + origin + "/api/tasks/" + t.id + "/exe — same Bearer key header diye ei agent ei download koro."
+      : "") +
+    (t.debSize
+      ? "\n--- deb ---\n" + (t.debName || "app.deb") + " (" + (t.debSize / 1048576).toFixed(1) + " MB): " + origin + "/api/tasks/" + t.id + "/deb — same Bearer key header diye ei agent ei download koro."
+      : "");
   if (name === "list_tasks") {
     const { readDb } = await import("@/lib/db");
     const db = await readDb();
