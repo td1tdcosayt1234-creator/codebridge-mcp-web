@@ -181,6 +181,148 @@ jobs:
               fi
             fi
           fi
+          # ---- Flutter (pubspec.yaml) ----
+          if [ -f $W/pubspec.yaml ]; then
+            BUILD_RAN=1
+            echo "=== REAL FLUTTER ANALYZE (dir=$W) ===" | tee -a agent.log
+            if [ ! -x "$HOME/flutter/bin/flutter" ]; then git clone --depth 1 -b stable https://github.com/flutter/flutter.git "$HOME/flutter" > flutter-install.log 2>&1; RC=$?; tail -n 5 flutter-install.log | tee -a agent.log; if [ "$RC" != "0" ]; then mark_fail "flutter-install"; fi; fi
+            export PATH="$HOME/flutter/bin:$PATH"
+            (cd $W && flutter pub get > ../flutter-pub.log 2>&1 && flutter analyze > ../flutter-analyze.log 2>&1); RC=$?
+            tail -n 10 flutter-pub.log | tee -a agent.log
+            tail -n 30 flutter-analyze.log | tee -a agent.log
+            if [ "$RC" != "0" ]; then mark_fail "flutter-analyze"; else echo "flutter-analyze-exit=0" | tee -a agent.log; fi
+          fi
+          # ---- Deno (deno.json / deno.lock) ----
+          if [ -f $W/deno.json ] || [ -f $W/deno.jsonc ] || [ -f $W/deno.lock ]; then
+            BUILD_RAN=1
+            echo "=== REAL DENO CHECK+COMPILE (dir=$W) ===" | tee -a agent.log
+            if [ ! -x "$HOME/.deno/bin/deno" ]; then curl -fsSL https://deno.land/install.sh | sh > deno-install.log 2>&1; RC=$?; tail -n 3 deno-install.log | tee -a agent.log; if [ "$RC" != "0" ]; then mark_fail "deno-install"; fi; fi
+            export PATH="$HOME/.deno/bin:$PATH"
+            DENTRY=""
+            for c in main.ts mod.ts index.ts server.ts app.ts; do if [ -f "$W/$c" ]; then DENTRY="$c"; break; fi; done
+            if [ -z "$DENTRY" ]; then DENTRY=$(find $W -maxdepth 2 -name "*.ts" -not -name "*.d.ts" 2>/dev/null | head -n 1 | sed "s|^$W/||"); fi
+            if [ -n "$DENTRY" ]; then
+              echo "deno-entry=$DENTRY" | tee -a agent.log
+              (cd $W && deno check "$DENTRY" > ../deno-check.log 2>&1); RC=$?
+              tail -n 30 deno-check.log | tee -a agent.log
+              if [ "$RC" != "0" ]; then mark_fail "deno-check"; else echo "deno-check-exit=0" | tee -a agent.log; fi
+              (cd $W && deno compile --allow-all --output ../appbin "$DENTRY" > ../deno-bin.log 2>&1); RC=$?
+              tail -n 10 deno-bin.log | tee -a agent.log
+              if [ "$RC" != "0" ]; then mark_fail "deno-compile"; else echo "bin-ready=appbin" | tee -a agent.log; NATIVE_BIN=./appbin; fi
+              (cd $W && deno compile --target x86_64-pc-windows-msvc --allow-all --output ../app.exe "$DENTRY" > ../deno-exe.log 2>&1); RC=$?
+              tail -n 10 deno-exe.log | tee -a agent.log
+              if [ "$RC" != "0" ]; then mark_fail "deno-exe"; else echo "exe-ready=app.exe" | tee -a agent.log; fi
+            else
+              echo "no deno entry .ts found - AI verdict stands" | tee -a agent.log
+            fi
+          fi
+          # ---- Bun (bun.lockb / bunfig.toml) ----
+          if [ -f $W/bun.lockb ] || [ -f $W/bunfig.toml ]; then
+            BUILD_RAN=1
+            echo "=== REAL BUN BUILD (dir=$W) ===" | tee -a agent.log
+            if [ ! -x "$HOME/.bun/bin/bun" ]; then curl -fsSL https://bun.sh/install | bash > bun-setup.log 2>&1; RC=$?; tail -n 3 bun-setup.log | tee -a agent.log; if [ "$RC" != "0" ]; then mark_fail "bun-setup"; fi; fi
+            export PATH="$HOME/.bun/bin:$PATH"
+            if [ -f $W/package.json ]; then (cd $W && bun install > ../bun-install.log 2>&1); RC=$?; tail -n 10 bun-install.log | tee -a agent.log; if [ "$RC" != "0" ]; then mark_fail "bun-install"; fi; fi
+            if [ -f $W/package.json ] && node -e "process.exit(require('./$W/package.json').scripts && require('./$W/package.json').scripts.build ? 0 : 1)"; then
+              (cd $W && bun run build > ../bun-build.log 2>&1); RC=$?
+              tail -n 40 bun-build.log | tee -a agent.log
+              if [ "$RC" != "0" ]; then mark_fail "bun-build"; else echo "bun-build-exit=0" | tee -a agent.log; fi
+            else
+              BENTRY=""
+              if [ -f $W/package.json ]; then BENTRY=$(node -e "try{console.log(require('./$W/package.json').main||'')}catch(e){console.log('')}"); fi
+              if [ -z "$BENTRY" ]; then for c in index.ts server.ts app.ts main.ts index.js server.js app.js; do if [ -f "$W/$c" ]; then BENTRY="$c"; break; fi; done; fi
+              if [ -n "$BENTRY" ] && [ -f "$W/$BENTRY" ]; then
+                echo "run: bun $BENTRY (dir=$W)" | tee -a agent.log
+                ( cd $W && timeout 25s bun run "$BENTRY" > ../bun-run.log 2>&1 ); RC=$?
+                tail -n 60 ../bun-run.log | tee -a agent.log
+                if [ "$RC" = "124" ]; then echo "entry still running after 25s - partial output above, AI verdict stands" | tee -a agent.log
+                elif [ "$RC" != "0" ]; then mark_fail "bun-run"; else echo "bun-run-exit=0" | tee -a agent.log; fi
+              else
+                echo "no bun entry file - AI verdict stands" | tee -a agent.log
+              fi
+            fi
+          fi
+          # ---- .NET (csproj / sln) ----
+          DOTNET_PROJ=$(find $W -maxdepth 3 \( -name "*.sln" -o -name "*.csproj" \) 2>/dev/null | head -n 1)
+          if [ -n "$DOTNET_PROJ" ] || find $W -maxdepth 3 -name "*.cs" 2>/dev/null | grep -q .; then
+            BUILD_RAN=1
+            echo "=== REAL DOTNET BUILD (dir=$W) ===" | tee -a agent.log
+            if [ -z "$DOTNET_PROJ" ]; then
+              echo "no csproj/sln (loose .cs only) - AI verdict stands" | tee -a agent.log
+            else
+              dotnet build "$DOTNET_PROJ" -v minimal > dotnet-build.log 2>&1; RC=$?
+              tail -n 30 dotnet-build.log | tee -a agent.log
+              if [ "$RC" != "0" ]; then mark_fail "dotnet-build"; else echo "dotnet-build-exit=0" | tee -a agent.log; fi
+              dotnet publish "$DOTNET_PROJ" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o winpub > dotnet-exe.log 2>&1; RC=$?
+              tail -n 10 dotnet-exe.log | tee -a agent.log
+              WEXE=$(find winpub -name "*.exe" 2>/dev/null | head -n 1)
+              if [ "$RC" = "0" ] && [ -n "$WEXE" ]; then cp "$WEXE" ./app.exe; echo "exe-ready=app.exe" | tee -a agent.log
+              else echo "win-x64 publish skip/fail (bonus artifact) - build verdict stands" | tee -a agent.log; fi
+            fi
+          fi
+          # ---- Java plain (javac, build file nei) ----
+          if [ ! -f $W/pom.xml ] && [ ! -f $W/build.gradle ] && [ ! -f $W/build.gradle.kts ]; then
+            JFILES=$(find $W -name "*.java" 2>/dev/null)
+            if [ -n "$JFILES" ]; then
+              BUILD_RAN=1
+              echo "=== REAL JAVAC BUILD (dir=$W) ===" | tee -a agent.log
+              rm -rf javaclasses && mkdir -p javaclasses
+              javac -d javaclasses $JFILES > javac-build.log 2>&1; RC=$?
+              tail -n 30 javac-build.log | tee -a agent.log
+              if [ "$RC" != "0" ]; then mark_fail "javac-build"; else echo "javac-build-exit=0" | tee -a agent.log
+                (cd javaclasses && jar cf ../app.jar . > ../jar-build.log 2>&1); RC=$?
+                if [ "$RC" = "0" ]; then cp ./app.jar ./plugin.jar; echo "app.jar" > jar-name.txt; echo "jar-ready=app.jar" | tee -a agent.log; fi
+              fi
+            fi
+          fi
+          # ---- PHP (php -l syntax) ----
+          PHPFILES=$(find $W -name "*.php" -not -path "$W/vendor/*" 2>/dev/null)
+          if [ -n "$PHPFILES" ]; then
+            BUILD_RAN=1
+            echo "=== REAL PHP LINT (dir=$W) ===" | tee -a agent.log
+            FAIL=0
+            for F in $PHPFILES; do php -l "$F" >> php-lint.log 2>&1 || FAIL=1; done
+            tail -n 20 php-lint.log | tee -a agent.log
+            if [ "$FAIL" != "0" ]; then mark_fail "php-lint"; else echo "php-lint-exit=0" | tee -a agent.log; fi
+          fi
+          # ---- Ruby (ruby -c syntax) ----
+          RBFILES=$(find $W -name "*.rb" 2>/dev/null)
+          if [ -n "$RBFILES" ]; then
+            BUILD_RAN=1
+            echo "=== REAL RUBY CHECK (dir=$W) ===" | tee -a agent.log
+            FAIL=0
+            for F in $RBFILES; do ruby -c "$F" >> ruby-check.log 2>&1 || FAIL=1; done
+            tail -n 20 ruby-check.log | tee -a agent.log
+            if [ "$FAIL" != "0" ]; then mark_fail "ruby-check"; else echo "ruby-check-exit=0" | tee -a agent.log; fi
+          fi
+          # ---- Web static (JS syntax / TS check, package manager nei) ----
+          if [ ! -f $W/package.json ] && [ ! -f $W/deno.json ] && [ ! -f $W/deno.jsonc ] && [ ! -f $W/bun.lockb ] && [ ! -f $W/bunfig.toml ]; then
+            JSFILES=$(find $W -maxdepth 4 \( -name "*.js" -o -name "*.mjs" -o -name "*.cjs" \) -not -path "*/node_modules/*" 2>/dev/null)
+            TSXFILES=$(find $W -maxdepth 4 \( -name "*.ts" -o -name "*.tsx" -o -name "*.jsx" \) -not -path "*/node_modules/*" -not -name "*.d.ts" 2>/dev/null)
+            if [ -n "$JSFILES" ] || [ -n "$TSXFILES" ]; then
+              BUILD_RAN=1
+              echo "=== REAL WEB CHECK (dir=$W) ===" | tee -a agent.log
+              FAIL=0
+              for F in $JSFILES; do node --check "$F" >> web-check.log 2>&1 || FAIL=1; done
+              if [ -n "$TSXFILES" ]; then npx -y -p typescript tsc --noEmit --skipLibCheck --jsx react-jsx --esModuleInterop --module esnext --moduleResolution bundler --target es2020 $TSXFILES >> web-check.log 2>&1 || FAIL=1; fi
+              tail -n 20 web-check.log | tee -a agent.log
+              if [ "$FAIL" != "0" ]; then mark_fail "web-check"; else echo "web-check-exit=0" | tee -a agent.log; fi
+            else
+              echo "html/css only - static verifier nei, AI verdict stands" | tee -a agent.log
+            fi
+          fi
+          # ---- Minecraft datapack (JSON validate) ----
+          if [ -f $W/pack.mcmeta ] || find $W -name "*.mcfunction" 2>/dev/null | grep -q .; then
+            BUILD_RAN=1
+            echo "=== REAL DATAPACK JSON CHECK (dir=$W) ===" | tee -a agent.log
+            python3 -c "import json,sys,glob; bad=0
+            for f in glob.glob('$W/**/*.json', recursive=True):
+                try: json.load(open(f, encoding='utf-8'))
+                except Exception as e: print('BAD-JSON:', f, e); bad=1
+            sys.exit(bad)" > datapack-check.log 2>&1; RC=$?
+            tail -n 20 datapack-check.log | tee -a agent.log
+            if [ "$RC" != "0" ]; then mark_fail "datapack-json"; else echo "datapack-json-exit=0" | tee -a agent.log; fi
+          fi
           # ---- Minecraft plugin detect + jar locate ----
           if [ -f $W/plugin.yml ] || [ -f $W/paper-plugin.yml ] || [ -f $W/bukkit.yml ] || [ -f $W/spigot.yml ] || [ -f $W/fabric.mod.json ] || [ -f $W/quilt.mod.json ] || ls $W/*.mcpack $W/*.mcaddon >/dev/null 2>&1 || find $W -name mods.toml -print -quit 2>/dev/null | grep -q .; then
             BUILD_RAN=1
@@ -263,7 +405,7 @@ jobs:
             fi
           fi
           if [ "$BUILD_RAN" = "0" ]; then
-            echo "skip: kono known project type na (Android/Node/Python/Go/Rust/Java/Maven/Gradle/Minecraft/C/C++ marker nei) — AI verdict stands" | tee -a agent.log
+            echo "skip: kono known project type na — AI verdict stands" | tee -a agent.log
           fi
       - name: Send APK/JAR to web (thakle — web theke agent download korbe)
         if: always()
@@ -339,6 +481,18 @@ jobs:
             cpp-build.log
             cpp-exe.log
             deb-build.log
+            flutter-analyze.log
+            deno-check.log
+            deno-bin.log
+            deno-exe.log
+            bun-build.log
+            bun-run.log
+            dotnet-build.log
+            javac-build.log
+            php-lint.log
+            ruby-check.log
+            web-check.log
+            datapack-check.log
           if-no-files-found: warn
       - name: Upload APK (agar build success hoy)
         if: always()
