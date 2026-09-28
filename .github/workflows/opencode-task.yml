@@ -65,8 +65,8 @@ jobs:
           done
           echo "final_exit=$EXIT_CODE" | tee -a agent.log
           echo "$EXIT_CODE" > exit.code
-      - name: Set up Java 17 (Android project thakle only)
-        if: ${{ hashFiles('task-work/settings.gradle', 'task-work/build.gradle', 'task-work/app/build.gradle', 'task-work/**/AndroidManifest.xml') != '' }}
+      - name: Set up Java 17 (Android/Java/Maven/Gradle project hole)
+        if: ${{ hashFiles('task-work/settings.gradle', 'task-work/build.gradle', 'task-work/build.gradle.kts', 'task-work/pom.xml', 'task-work/app/build.gradle', 'task-work/**/AndroidManifest.xml', 'task-work/**/*.java') != '' }}
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -84,7 +84,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: 'stable'
-      - name: Real build (project type onujayi — Android/Node/Python/Go/Rust)
+      - name: Real build (project type onujayi — Android/Node/Python/Go/Rust/Java/Minecraft)
         if: always()
         run: |
           BUILD_RAN=0
@@ -133,6 +133,37 @@ jobs:
               fi
             fi
           fi
+          # ---- Java Maven (pom.xml) ----
+          if [ -f $W/pom.xml ]; then
+            BUILD_RAN=1
+            echo "=== REAL MAVEN BUILD (dir=$W) ===" | tee -a agent.log
+            mvn -f $W/pom.xml -q -DskipTests package 2>&1 | tee mvn-build.log | tail -n 40 | tee -a agent.log
+            if [ "${PIPESTATUS[0]}" != "0" ]; then mark_fail "maven-build"; else echo "maven-build-exit=0" | tee -a agent.log; fi
+          fi
+          # ---- Java Gradle (non-Android: build.gradle, kintu Android marker nei) ----
+          if [ -f $W/build.gradle ] || [ -f $W/build.gradle.kts ]; then
+            if [ ! -f $W/settings.gradle ] && [ ! -f $W/app/build.gradle ] && ! find $W -name AndroidManifest.xml -print -quit 2>/dev/null | grep -q .; then
+              BUILD_RAN=1
+              echo "=== REAL GRADLE BUILD (build, dir=$W) ===" | tee -a agent.log
+              if [ -f $W/gradlew ]; then chmod +x $W/gradlew; GRADLE_CMD="$W/gradlew -p $W"; elif [ -f ./gradlew ]; then chmod +x ./gradlew; GRADLE_CMD="./gradlew -p $W"; else curl -fsSL https://services.gradle.org/distributions/gradle-8.7-bin.zip -o /tmp/gradle.zip && unzip -q /tmp/gradle.zip -d /tmp && export PATH=/tmp/gradle-8.7/bin:$PATH; GRADLE_CMD="gradle -p $W"; fi
+              $GRADLE_CMD build -x test --stacktrace 2>&1 | tee gradle-build.log | tail -n 60 | tee -a agent.log
+              if [ "${PIPESTATUS[0]}" != "0" ]; then mark_fail "gradle-build"; else echo "gradle-build-exit=0" | tee -a agent.log; fi
+            fi
+          fi
+          # ---- Minecraft plugin detect + jar locate ----
+          if [ -f $W/plugin.yml ] || [ -f $W/paper-plugin.yml ] || [ -f $W/bukkit.yml ] || [ -f $W/spigot.yml ] || [ -f $W/fabric.mod.json ] || [ -f $W/quilt.mod.json ] || ls $W/*.mcpack $W/*.mcaddon >/dev/null 2>&1 || find $W -name mods.toml -print -quit 2>/dev/null | grep -q .; then
+            BUILD_RAN=1
+            echo "=== MINECRAFT PLUGIN DETECTED ===" | tee -a agent.log
+          fi
+          JAR=$(find $W -name "*.jar" -not -path "*/node_modules/*" 2>/dev/null | grep -v -e "-sources" -e "-javadoc" -e "gradle-wrapper" | head -n 1)
+          if [ -n "$JAR" ]; then
+            echo "jar-files: $JAR ($(du -h "$JAR" | cut -f1))" | tee -a agent.log
+            cp "$JAR" ./plugin.jar
+            basename "$JAR" > jar-name.txt
+            echo "jar-ready=$(cat jar-name.txt)" | tee -a agent.log
+          else
+            echo "no jar built (Java build fail hole jar thakbe na)" | tee -a agent.log
+          fi
           # ---- Python (.py / requirements.txt / pyproject.toml) ----
           if ls $W/*.py >/dev/null 2>&1 || [ -f $W/requirements.txt ] || [ -f $W/pyproject.toml ] || [ -f $W/setup.py ] || find $W -name "*.py" -not -path "$W/node_modules/*" -print -quit 2>/dev/null | grep -q .; then
             BUILD_RAN=1
@@ -162,9 +193,9 @@ jobs:
             if [ "${PIPESTATUS[0]}" != "0" ]; then mark_fail "cargo-build"; else echo "cargo-build-exit=0" | tee -a agent.log; fi
           fi
           if [ "$BUILD_RAN" = "0" ]; then
-            echo "skip: kono known project type na (Android/Node/Python/Go/Rust marker nei) — AI verdict stands" | tee -a agent.log
+            echo "skip: kono known project type na (Android/Node/Python/Go/Rust/Java/Maven/Gradle/Minecraft marker nei) — AI verdict stands" | tee -a agent.log
           fi
-      - name: Send APK to web (thakle — web theke agent download korbe)
+      - name: Send APK/JAR to web (thakle — web theke agent download korbe)
         if: always()
         run: |
           APK=$(find . -name "*.apk" -path "*debug*" 2>/dev/null | head -n 1)
@@ -175,6 +206,15 @@ jobs:
             echo "apk-sent=$?"
           else
             echo "no apk (non-Android ba build fail)"
+          fi
+          if [ -f ./plugin.jar ]; then
+            JARNAME=$(cat jar-name.txt 2>/dev/null || echo "plugin.jar")
+            echo "uploading jar $JARNAME ($(du -h ./plugin.jar | cut -f1))"
+            WEB="${WEB_URL%/}"
+            curl -sf -X POST -H "Authorization: Bearer ${{ secrets.RUNNER_TOKEN }}" --data-binary "@./plugin.jar" "$WEB/api/runner/apk?task_id=${{ inputs.task_id }}&kind=jar&name=$JARNAME"
+            echo "jar-sent=$?"
+          else
+            echo "no jar (non-Java ba build fail)"
           fi
         env:
           WEB_URL: ${{ secrets.WEB_URL }}
@@ -200,14 +240,20 @@ jobs:
           path: |
             agent.log
             gradle-build.log
+            mvn-build.log
+            node-build.log
+            node-run.log
           if-no-files-found: warn
       - name: Upload APK (agar build success hoy)
         if: always()
         run: |
           ls -lh task-work/app/build/outputs/apk/debug/ 2>/dev/null || echo "no apk dir (gradle fail hole APK thakbe na)"
+          ls -lh plugin.jar 2>/dev/null || echo "no plugin.jar (non-Java ba build fail)"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: task-${{ inputs.task_id }}-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            plugin.jar
           if-no-files-found: warn
