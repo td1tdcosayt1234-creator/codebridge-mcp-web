@@ -84,12 +84,13 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: 'stable'
-      - name: Real build (project type onujayi — Android/Node/Python/Go/Rust/Java/Minecraft)
+      - name: Real build (project type auto-detect)
         if: always()
         run: |
           BUILD_RAN=0
           mark_fail() { if [ -f exit.code ] && [ "$(cat exit.code)" = "0" ]; then echo "1" > exit.code; fi; echo "override: AI exit 0 kintu real $1 fail -> task failed" | tee -a agent.log; }
           W=task-work
+          NATIVE_BIN=""
           # ---- Android Gradle ----
           if [ -f $W/settings.gradle ] || [ -f $W/build.gradle ] || [ -f $W/app/build.gradle ] || find $W -name AndroidManifest.xml -print -quit 2>/dev/null | grep -q .; then
             BUILD_RAN=1
@@ -150,6 +151,36 @@ jobs:
               if [ "${PIPESTATUS[0]}" != "0" ]; then mark_fail "gradle-build"; else echo "gradle-build-exit=0" | tee -a agent.log; fi
             fi
           fi
+          # ---- C/C++ (Makefile / CMake / single file) ----
+          if [ -f $W/Makefile ] || [ -f $W/makefile ] || [ -f $W/GNUmakefile ] || [ -f $W/CMakeLists.txt ] || find $W -maxdepth 3 \( -name "*.c" -o -name "*.cpp" -o -name "*.cc" \) 2>/dev/null | grep -q .; then
+            BUILD_RAN=1
+            echo "=== REAL C/C++ BUILD (dir=$W) ===" | tee -a agent.log
+            sudo apt-get update -qq 2>&1 | tail -n 1 | tee -a agent.log
+            sudo apt-get install -y -qq mingw-w64 2>&1 | tail -n 2 | tee -a agent.log
+            if [ -f $W/CMakeLists.txt ]; then
+              cmake -S $W -B cppbuild -DCMAKE_BUILD_TYPE=Release > cmake-config.log 2>&1; RC=$?
+              tail -n 10 cmake-config.log | tee -a agent.log
+              if [ "$RC" != "0" ]; then mark_fail "cmake-config"; else cmake --build cppbuild --config Release > cpp-build.log 2>&1; RC=$?; tail -n 30 cpp-build.log | tee -a agent.log; if [ "$RC" != "0" ]; then mark_fail "cmake-build"; else echo "cmake-build-exit=0" | tee -a agent.log; fi; fi
+            elif [ -f $W/Makefile ] || [ -f $W/makefile ] || [ -f $W/GNUmakefile ]; then
+              make -C $W > cpp-build.log 2>&1; RC=$?
+              tail -n 30 cpp-build.log | tee -a agent.log
+              if [ "$RC" != "0" ]; then mark_fail "make-build"; else echo "make-build-exit=0" | tee -a agent.log; fi
+            else
+              SRC=$(find $W -maxdepth 2 \( -name "*.cpp" -o -name "*.cc" -o -name "*.c" \) 2>/dev/null | head -n 2)
+              COUNT=$(echo "$SRC" | grep -c .)
+              if [ "$COUNT" = "1" ]; then
+                case "$SRC" in *.cpp|*.cc) CC=g++; MCC=x86_64-w64-mingw32-g++;; *) CC=gcc; MCC=x86_64-w64-mingw32-gcc;; esac
+                $CC -O2 "$SRC" -o ./appbin > cpp-build.log 2>&1; RC=$?
+                tail -n 30 cpp-build.log | tee -a agent.log
+                if [ "$RC" != "0" ]; then mark_fail "cpp-compile"; else echo "cpp-compile-exit=0 ($SRC)" | tee -a agent.log; NATIVE_BIN=./appbin; fi
+                $MCC -O2 "$SRC" -o ./app.exe > cpp-exe.log 2>&1; RC=$?
+                tail -n 20 cpp-exe.log | tee -a agent.log
+                if [ "$RC" != "0" ]; then mark_fail "mingw-exe"; else echo "exe-ready=app.exe" | tee -a agent.log; fi
+              else
+                echo "multi-file C++ without Makefile/CMake - AI verdict stands (native check skip)" | tee -a agent.log
+              fi
+            fi
+          fi
           # ---- Minecraft plugin detect + jar locate ----
           if [ -f $W/plugin.yml ] || [ -f $W/paper-plugin.yml ] || [ -f $W/bukkit.yml ] || [ -f $W/spigot.yml ] || [ -f $W/fabric.mod.json ] || [ -f $W/quilt.mod.json ] || ls $W/*.mcpack $W/*.mcaddon >/dev/null 2>&1 || find $W -name mods.toml -print -quit 2>/dev/null | grep -q .; then
             BUILD_RAN=1
@@ -163,6 +194,19 @@ jobs:
             echo "jar-ready=$(cat jar-name.txt)" | tee -a agent.log
           else
             echo "no jar built (Java build fail hole jar thakbe na)" | tee -a agent.log
+          fi
+          # ---- Linux .deb package (native binary thakle) ----
+          if [ -n "$NATIVE_BIN" ] && [ -f "$NATIVE_BIN" ]; then
+            PKGNAME=$(basename "$NATIVE_BIN" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9+.-')
+            if [ -z "$PKGNAME" ]; then PKGNAME=app; fi
+            rm -rf debpkg && mkdir -p debpkg/DEBIAN debpkg/usr/local/bin
+            cp "$NATIVE_BIN" "debpkg/usr/local/bin/$PKGNAME"
+            printf "Package: %s\nVersion: 1.0.0\nArchitecture: amd64\nMaintainer: codebridge <noreply@local>\nDescription: Auto-built by CodeBridge\n" "$PKGNAME" > debpkg/DEBIAN/control
+            dpkg-deb --build debpkg "./$PKGNAME.deb" > deb-build.log 2>&1; RC=$?
+            tail -n 5 deb-build.log | tee -a agent.log
+            if [ "$RC" != "0" ]; then mark_fail "deb-build"; else echo "deb-ready=$PKGNAME.deb" | tee -a agent.log; fi
+          else
+            echo "no native binary - deb skip" | tee -a agent.log
           fi
           # ---- Python (.py / requirements.txt / pyproject.toml) ----
           if ls $W/*.py >/dev/null 2>&1 || [ -f $W/requirements.txt ] || [ -f $W/pyproject.toml ] || [ -f $W/setup.py ] || find $W -name "*.py" -not -path "$W/node_modules/*" -print -quit 2>/dev/null | grep -q .; then
@@ -184,6 +228,18 @@ jobs:
             echo "=== REAL GO BUILD (dir=$W) ===" | tee -a agent.log
             (cd $W && go build ./...) 2>&1 | tee ../go-build.log | tail -n 30 | tee -a agent.log
             if [ "${PIPESTATUS[0]}" != "0" ]; then mark_fail "go-build"; else echo "go-build-exit=0" | tee -a agent.log; fi
+            PKG=$(cd $W && go list -e -f '{{if eq .Name "main"}}{{.ImportPath}} {{end}}' ./... 2>/dev/null | awk '{print $1}')
+            if [ -n "$PKG" ]; then
+              echo "go-main-pkg=$PKG" | tee -a agent.log
+              (cd $W && GOOS=windows GOARCH=amd64 go build -o ../app.exe "$PKG" > ../go-exe.log 2>&1); RC=$?
+              tail -n 20 go-exe.log | tee -a agent.log
+              if [ "$RC" != "0" ]; then mark_fail "go-exe"; else echo "exe-ready=app.exe" | tee -a agent.log; fi
+              (cd $W && go build -o ../appbin "$PKG" > ../go-bin.log 2>&1); RC=$?
+              tail -n 20 go-bin.log | tee -a agent.log
+              if [ "$RC" != "0" ]; then mark_fail "go-bin"; else echo "bin-ready=appbin" | tee -a agent.log; NATIVE_BIN=./appbin; fi
+            else
+              echo "no main package (library?) - exe/deb skip" | tee -a agent.log
+            fi
           fi
           # ---- Rust (Cargo.toml) ----
           if [ -f $W/Cargo.toml ]; then
@@ -191,9 +247,23 @@ jobs:
             echo "=== REAL RUST BUILD (dir=$W) ===" | tee -a agent.log
             (cd $W && cargo build) 2>&1 | tee ../rust-build.log | tail -n 30 | tee -a agent.log
             if [ "${PIPESTATUS[0]}" != "0" ]; then mark_fail "cargo-build"; else echo "cargo-build-exit=0" | tee -a agent.log; fi
+            RNAME=$(grep -m1 '^name' $W/Cargo.toml | cut -d'"' -f2)
+            if [ -n "$RNAME" ] && [ -f "$W/target/debug/$RNAME" ]; then
+              NATIVE_BIN=$W/target/debug/$RNAME
+              echo "bin-ready=$NATIVE_BIN" | tee -a agent.log
+              sudo apt-get update -qq 2>&1 | tail -n 1 | tee -a agent.log
+              sudo apt-get install -y -qq mingw-w64 2>&1 | tail -n 2 | tee -a agent.log
+              mkdir -p $W/.cargo
+              printf '[target.x86_64-pc-windows-gnu]\nlinker = "x86_64-w64-mingw32-gcc"\n' > $W/.cargo/config.toml
+              (cd $W && rustup target add x86_64-pc-windows-gnu > ../rust-target.log 2>&1 && cargo build --target x86_64-pc-windows-gnu > ../rust-exe.log 2>&1); RC=$?
+              tail -n 20 rust-exe.log | tee -a agent.log
+              if [ "$RC" != "0" ]; then mark_fail "rust-exe"; else cp "$W/target/x86_64-pc-windows-gnu/debug/$RNAME.exe" ./app.exe; echo "exe-ready=app.exe" | tee -a agent.log; fi
+            else
+              echo "lib crate or no binary (name=$RNAME) - exe skip" | tee -a agent.log
+            fi
           fi
           if [ "$BUILD_RAN" = "0" ]; then
-            echo "skip: kono known project type na (Android/Node/Python/Go/Rust/Java/Maven/Gradle/Minecraft marker nei) — AI verdict stands" | tee -a agent.log
+            echo "skip: kono known project type na (Android/Node/Python/Go/Rust/Java/Maven/Gradle/Minecraft/C/C++ marker nei) — AI verdict stands" | tee -a agent.log
           fi
       - name: Send APK/JAR to web (thakle — web theke agent download korbe)
         if: always()
@@ -215,6 +285,26 @@ jobs:
             echo "jar-sent=$?"
           else
             echo "no jar (non-Java ba build fail)"
+          fi
+          EXE=$(ls ./*.exe 2>/dev/null | head -n 1)
+          if [ -n "$EXE" ]; then
+            EXENAME=$(basename "$EXE")
+            echo "uploading exe $EXENAME ($(du -h "$EXE" | cut -f1))"
+            WEB="${WEB_URL%/}"
+            curl -sf -X POST -H "Authorization: Bearer ${{ secrets.RUNNER_TOKEN }}" --data-binary "@$EXE" "$WEB/api/runner/apk?task_id=${{ inputs.task_id }}&kind=exe&name=$EXENAME"
+            echo "exe-sent=$?"
+          else
+            echo "no exe"
+          fi
+          DEB=$(ls ./*.deb 2>/dev/null | head -n 1)
+          if [ -n "$DEB" ]; then
+            DEBNAME=$(basename "$DEB")
+            echo "uploading deb $DEBNAME ($(du -h "$DEB" | cut -f1))"
+            WEB="${WEB_URL%/}"
+            curl -sf -X POST -H "Authorization: Bearer ${{ secrets.RUNNER_TOKEN }}" --data-binary "@$DEB" "$WEB/api/runner/apk?task_id=${{ inputs.task_id }}&kind=deb&name=$DEBNAME"
+            echo "deb-sent=$?"
+          else
+            echo "no deb"
           fi
         env:
           WEB_URL: ${{ secrets.WEB_URL }}
@@ -243,12 +333,19 @@ jobs:
             mvn-build.log
             node-build.log
             node-run.log
+            go-exe.log
+            go-bin.log
+            rust-exe.log
+            cpp-build.log
+            cpp-exe.log
+            deb-build.log
           if-no-files-found: warn
       - name: Upload APK (agar build success hoy)
         if: always()
         run: |
           ls -lh task-work/app/build/outputs/apk/debug/ 2>/dev/null || echo "no apk dir (gradle fail hole APK thakbe na)"
           ls -lh plugin.jar 2>/dev/null || echo "no plugin.jar (non-Java ba build fail)"
+          ls -lh ./*.exe ./*.deb 2>/dev/null || echo "no exe/deb"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -256,4 +353,6 @@ jobs:
           path: |
             app/build/outputs/apk/debug/*.apk
             plugin.jar
+            *.exe
+            *.deb
           if-no-files-found: warn
