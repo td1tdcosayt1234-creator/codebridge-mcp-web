@@ -38,32 +38,51 @@ jobs:
           console.log('files:',(t.files||[]).length,'kind:',t.kind);
           "
           ls task-work 2>/dev/null || echo "(no files — prompt-only task)"
-      - name: Run opencode (free local Ollama, no API key)
+      - name: Run opencode (Zen free Muse Spark, fallback Ollama)
+        env:
+          OPENCODE_API_KEY: \${{ secrets.OPENCODE_API_KEY }}
         run: |
           node -e "const t=require('./task.json');require('fs').writeFileSync('prompt.txt',t.prompt)"
           KIND=$(node -e "console.log(require('./task.json').kind||'compile')")
-          # Ollama local (100% free, unlimited, no key) — api key lagbe na
-          curl -fsSL https://ollama.com/install.sh | sh
-          (ollama serve > ollama.log 2>&1 &) 
-          sleep 5
-          ollama pull qwen2.5-coder:1.5b
-          node -e "require('fs').writeFileSync('opencode.json', JSON.stringify({\$schema:'https://opencode.ai/config.json', provider:{ ollama:{ npm:'@ai-sdk/openai-compatible', name:'Ollama (local free)', options:{ baseURL:'http://localhost:11434/v1' }, models:{ 'qwen2.5-coder:1.5b':{ name:'Qwen2.5-Coder 1.5B (local free)' } } } } }, null, 2))"
-          cat opencode.json
           # fix-compile mode retries up to 3 times, compile mode runs once
           MAX_TRY=1
           if [ "$KIND" = "fix-compile" ]; then MAX_TRY=3; fi
-          echo "kind=$KIND max_try=$MAX_TRY model=ollama/qwen2.5-coder:1.5b"
           : > agent.log
           EXIT_CODE=1
-          for i in $(seq 1 $MAX_TRY); do
-            echo "=== attempt $i/$MAX_TRY ($KIND) ===" | tee -a agent.log
-            opencode run --auto -m ollama/qwen2.5-coder:1.5b "$(cat prompt.txt)" 2>&1 | tee -a agent.log
-            EXIT_CODE=\${PIPESTATUS[0]}
-            echo "attempt $i exit=$EXIT_CODE" | tee -a agent.log
-            if [ "$EXIT_CODE" = "0" ]; then break; fi
-            if [ "$KIND" != "fix-compile" ]; then break; fi
-            echo "Retrying with fix context..." | tee -a agent.log
-          done
+          # 1) Zen free (Muse Spark, by-default free via OpenCode CLI) — needs OPENCODE_API_KEY secret
+          if [ -n "$OPENCODE_API_KEY" ]; then
+            echo "model=opencode/muse-spark-1.3-contributor-free (zen free)" | tee -a agent.log
+            export OPENCODE_API_KEY
+            for i in $(seq 1 $MAX_TRY); do
+              echo "=== attempt $i/$MAX_TRY ($KIND, zen) ===" | tee -a agent.log
+              opencode run --auto -m opencode/muse-spark-1.3-contributor-free "$(cat prompt.txt)" 2>&1 | tee -a agent.log
+              EXIT_CODE=\${PIPESTATUS[0]}
+              echo "attempt $i exit=$EXIT_CODE" | tee -a agent.log
+              if [ "$EXIT_CODE" = "0" ]; then break; fi
+              if [ "$KIND" != "fix-compile" ]; then break; fi
+              echo "Retrying with fix context..." | tee -a agent.log
+            done
+          fi
+          # 2) Fallback: Ollama local (100% free, unlimited, no key)
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "zen skip/fail — fallback to Ollama local" | tee -a agent.log
+            curl -fsSL https://ollama.com/install.sh | sh
+            (ollama serve > ollama.log 2>&1 &)
+            sleep 5
+            ollama pull qwen2.5-coder:1.5b
+            node -e "require('fs').writeFileSync('opencode.json', JSON.stringify({\$schema:'https://opencode.ai/config.json', provider:{ ollama:{ npm:'@ai-sdk/openai-compatible', name:'Ollama (local free)', options:{ baseURL:'http://localhost:11434/v1' }, models:{ 'qwen2.5-coder:1.5b':{ name:'Qwen2.5-Coder 1.5B (local free)' } } } } }, null, 2))"
+            cat opencode.json
+            echo "kind=$KIND max_try=$MAX_TRY model=ollama/qwen2.5-coder:1.5b" | tee -a agent.log
+            for i in $(seq 1 $MAX_TRY); do
+              echo "=== attempt $i/$MAX_TRY ($KIND, ollama) ===" | tee -a agent.log
+              opencode run --auto -m ollama/qwen2.5-coder:1.5b "$(cat prompt.txt)" 2>&1 | tee -a agent.log
+              EXIT_CODE=\${PIPESTATUS[0]}
+              echo "attempt $i exit=$EXIT_CODE" | tee -a agent.log
+              if [ "$EXIT_CODE" = "0" ]; then break; fi
+              if [ "$KIND" != "fix-compile" ]; then break; fi
+              echo "Retrying with fix context..." | tee -a agent.log
+            done
+          fi
           echo "final_exit=$EXIT_CODE" | tee -a agent.log
           echo "$EXIT_CODE" > exit.code
       - name: Set up Java 17 (Android/Java/Maven/Gradle project hole)
@@ -535,7 +554,7 @@ export default function AdminRunner(){
         {newToken&&<pre style={{marginTop:8}}>{newToken}</pre>}</div>
     </div>
     <div className="card" style={{marginTop:12}}><h3>3️⃣ Workflow file — create <code>.github/workflows/{wf||"opencode-task.yml"}</code> in the builder repo</h3>
-      <p className="muted small">Required repo secrets: <code>WEB_URL</code> (public URL — localhost is unreachable from GitHub runners, otherwise use a self-hosted runner on your PC), <code>RUNNER_TOKEN</code> (above), <code>ANTHROPIC_API_KEY</code> (model key for OpenCode). Adjust the model line to yours.</p>
+      <p className="muted small">Required repo secrets: <code>WEB_URL</code> (public URL — localhost is unreachable from GitHub runners, otherwise use a self-hosted runner on your PC), <code>RUNNER_TOKEN</code> (above), <code>OPENCODE_API_KEY</code> (Zen key for free Muse Spark — without it Ollama fallback runs).</p>
       <pre>{YAML}</pre></div>
     <div className="card" style={{marginTop:12}}><h3>Recent tasks</h3>
       {(st.recent||[]).length===0&&<p className="muted small">No tasks yet.</p>}
