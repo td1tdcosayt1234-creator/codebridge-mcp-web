@@ -24,6 +24,7 @@ export async function POST(req: Request) {
   if (!mail || !/^\S+@\S+\.\S+$/.test(mail)) return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
   const pwErr = passwordError(String(password || ""));
   if (pwErr) return NextResponse.json({ error: pwErr }, { status: 400 });
+  if (String(password).length > 128) return NextResponse.json({ error: "Password too long (max 128 characters)." }, { status: 400 });
   const db = await readDb();
   if (db.users.find((u) => u.email.toLowerCase() === mail)) return NextResponse.json({ error: "Account already exists. Please log in." }, { status: 409 });
   const passHash = await bcrypt.hash(String(password), 10);

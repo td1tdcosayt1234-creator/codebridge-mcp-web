@@ -21,7 +21,11 @@ export async function POST(req: Request) {
   task.status = st as typeof task.status;
   if (log !== undefined) task.log = String(log).slice(0, 20000);
   if (result !== undefined) task.result = String(result).slice(0, 20000);
-  if (run_url !== undefined) task.runUrl = String(run_url);
+  if (run_url !== undefined) {
+    const u = String(run_url).slice(0, 500);
+    if (u && !/^https?:\/\//i.test(u)) return NextResponse.json({ error: "run_url must be http(s)." }, { status: 400 });
+    task.runUrl = u;
+  }
   task.updatedAt = new Date().toISOString();
   // Final charge: bigger output (incl. fixes) costs more — charge extra above the estimate.
   // Cap: infra log bloat (gradle stacktrace) jeno choto test ke na mare —

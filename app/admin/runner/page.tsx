@@ -42,6 +42,7 @@ jobs:
         env:
           OPENCODE_API_KEY: \${{ secrets.OPENCODE_API_KEY }}
         run: |
+          set +e # verdicts are tracked manually via EXIT_CODE/exit.code — never die early
           node -e "const t=require('./task.json');require('fs').writeFileSync('prompt.txt',t.prompt)"
           KIND=$(node -e "console.log(require('./task.json').kind||'compile')")
           # fix-compile mode retries up to 3 times, compile mode runs once
@@ -69,7 +70,7 @@ jobs:
             curl -fsSL https://ollama.com/install.sh | sh
             (ollama serve > ollama.log 2>&1 &)
             sleep 5
-            ollama pull qwen2.5-coder:1.5b
+            ollama pull qwen2.5-coder:1.5b || echo "ollama pull failed — opencode run will fail, verdict recorded" | tee -a agent.log
             node -e "require('fs').writeFileSync('opencode.json', JSON.stringify({\$schema:'https://opencode.ai/config.json', provider:{ ollama:{ npm:'@ai-sdk/openai-compatible', name:'Ollama (local free)', options:{ baseURL:'http://localhost:11434/v1' }, models:{ 'qwen2.5-coder:1.5b':{ name:'Qwen2.5-Coder 1.5B (local free)' } } } } }, null, 2))"
             cat opencode.json
             echo "kind=$KIND max_try=$MAX_TRY model=ollama/qwen2.5-coder:1.5b" | tee -a agent.log
@@ -108,6 +109,7 @@ jobs:
         if: always()
         run: |
           BUILD_RAN=0
+          set +e # every check records via mark_fail/exit.code — a failing real build must not kill the step early
           mark_fail() { if [ -f exit.code ] && [ "$(cat exit.code)" = "0" ]; then echo "1" > exit.code; fi; echo "override: AI exit 0 kintu real $1 fail -> task failed" | tee -a agent.log; }
           W=task-work
           mkdir -p "$W" # prompt-only task: no files -> dir missing -> bare find $W exits 1 under bash -e
@@ -382,7 +384,7 @@ jobs:
               if [ "\${PIPESTATUS[0]}" != "0" ]; then mark_fail "python-compile"; else echo "python-compile-exit=0" | tee -a agent.log; fi
             fi
             if [ -f $W/pytest.ini ] || [ -d $W/tests ] || find $W -name "test_*.py" -print -quit 2>/dev/null | grep -q .; then
-              (cd $W && python3 -m pytest -q) 2>&1 | tail -n 20 | tee -a agent.log || mark_fail "pytest"
+              (cd $W && python3 -m pytest -q) 2>&1 | tail -n 20 | tee -a agent.log; if [ "\${PIPESTATUS[0]}" != "0" ]; then mark_fail "pytest"; else echo "pytest-exit=0" | tee -a agent.log; fi
             fi
           fi
           # ---- Go (go.mod) ----
@@ -435,7 +437,7 @@ jobs:
           if [ -n "$APK" ]; then
             echo "uploading $APK ($(du -h "$APK" | cut -f1))"
             WEB="\${WEB_URL%/}"
-            curl -sf -X POST -H "Authorization: Bearer \${{ secrets.RUNNER_TOKEN }}" --data-binary "@$APK" "$WEB/api/runner/apk?task_id=\${{ inputs.task_id }}"
+            curl -sf -X POST -H "Authorization: Bearer \${{ secrets.RUNNER_TOKEN }}" --data-binary "@$APK" "$WEB/api/runner/apk?task_id=\${{ inputs.task_id }}" || echo "apk upload failed (continuing)"
             echo "apk-sent=$?"
           else
             echo "no apk (non-Android ba build fail)"
@@ -444,7 +446,7 @@ jobs:
             JARNAME=$(cat jar-name.txt 2>/dev/null || echo "plugin.jar")
             echo "uploading jar $JARNAME ($(du -h ./plugin.jar | cut -f1))"
             WEB="\${WEB_URL%/}"
-            curl -sf -X POST -H "Authorization: Bearer \${{ secrets.RUNNER_TOKEN }}" --data-binary "@./plugin.jar" "$WEB/api/runner/apk?task_id=\${{ inputs.task_id }}&kind=jar&name=$JARNAME"
+            curl -sf -X POST -H "Authorization: Bearer \${{ secrets.RUNNER_TOKEN }}" --data-binary "@./plugin.jar" "$WEB/api/runner/apk?task_id=\${{ inputs.task_id }}&kind=jar&name=$JARNAME" || echo "jar upload failed (continuing)"
             echo "jar-sent=$?"
           else
             echo "no jar (non-Java ba build fail)"
@@ -454,7 +456,7 @@ jobs:
             EXENAME=$(basename "$EXE")
             echo "uploading exe $EXENAME ($(du -h "$EXE" | cut -f1))"
             WEB="\${WEB_URL%/}"
-            curl -sf -X POST -H "Authorization: Bearer \${{ secrets.RUNNER_TOKEN }}" --data-binary "@$EXE" "$WEB/api/runner/apk?task_id=\${{ inputs.task_id }}&kind=exe&name=$EXENAME"
+            curl -sf -X POST -H "Authorization: Bearer \${{ secrets.RUNNER_TOKEN }}" --data-binary "@$EXE" "$WEB/api/runner/apk?task_id=\${{ inputs.task_id }}&kind=exe&name=$EXENAME" || echo "exe upload failed (continuing)"
             echo "exe-sent=$?"
           else
             echo "no exe"
@@ -464,7 +466,7 @@ jobs:
             DEBNAME=$(basename "$DEB")
             echo "uploading deb $DEBNAME ($(du -h "$DEB" | cut -f1))"
             WEB="\${WEB_URL%/}"
-            curl -sf -X POST -H "Authorization: Bearer \${{ secrets.RUNNER_TOKEN }}" --data-binary "@$DEB" "$WEB/api/runner/apk?task_id=\${{ inputs.task_id }}&kind=deb&name=$DEBNAME"
+            curl -sf -X POST -H "Authorization: Bearer \${{ secrets.RUNNER_TOKEN }}" --data-binary "@$DEB" "$WEB/api/runner/apk?task_id=\${{ inputs.task_id }}&kind=deb&name=$DEBNAME" || echo "deb upload failed (continuing)"
             echo "deb-sent=$?"
           else
             echo "no deb"
@@ -476,12 +478,17 @@ jobs:
         if: always()
         run: |
           node -e "
+          (async()=>{
           const fs=require('fs');
           const ok=fs.existsSync('agent.log');
           const log=ok?fs.readFileSync('agent.log','utf8').slice(-15000):'no log';
           let code=1; try{ code=parseInt(fs.readFileSync('exit.code','utf8').trim(),10); }catch{}
           const base=(process.env.WEB_URL||'').replace(/\/+$/,'');
-          fetch(base+'/api/runner/update',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+process.env.RUNNER_TOKEN},body:JSON.stringify({id:'\${{ inputs.task_id }}',status:(ok&&code===0)?'done':'failed',log,result:log})}).then(async r=>{console.log('sent',r.status); if(!r.ok) console.log(await r.text());});
+          try{
+            const r=await fetch(base+'/api/runner/update',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+process.env.RUNNER_TOKEN},body:JSON.stringify({id:'\${{ inputs.task_id }}',status:(ok&&code===0)?'done':'failed',log,result:log})});
+            console.log('sent',r.status); if(!r.ok) console.log(await r.text());
+          }catch(e){ console.log('send failed:', String(e).slice(0,200)); process.exitCode=1; }
+          })();
           "
         env:
           WEB_URL: \${{ secrets.WEB_URL }}

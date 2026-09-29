@@ -19,7 +19,7 @@ export async function POST(req:Request){
   const p=await admin(); if(!p) return NextResponse.json({error:"admin only"},{status:403});
   const { csrfCheck, csrfBlock }=await import("@/lib/security");
   if(!csrfCheck(req)) return csrfBlock();
-  const {token}=await req.json();
+  const {token} = await req.json().catch(() => ({}));
   const s=String(token||"").trim();
   if(!s.startsWith("ghp_")&&!s.startsWith("github_pat_")&&!s.startsWith("gho_")&&!s.startsWith("ghu_")) return NextResponse.json({error:"Paste a GitHub token starting with ghp_ (classic, needs repo + workflow scopes) or github_pat_ (fine-grained)."},{status:400});
   // live-verify before saving so the tool won't break

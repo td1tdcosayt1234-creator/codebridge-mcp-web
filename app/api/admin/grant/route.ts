@@ -10,6 +10,8 @@ export async function POST(req: Request) {
   const t = cookies().get("session")?.value || "";
   const p = await verifyJwt(t);
   if (!p || p.role !== "admin") return NextResponse.json({ error: "admin only" }, { status: 403 });
+  const { csrfCheck, csrfBlock } = await import("@/lib/security");
+  if (!csrfCheck(req)) return csrfBlock();
   const { userId = "", plan = "" } = await req.json().catch(() => ({}));
   if (!userId || (plan !== "free" && plan !== "pro" && plan !== "team")) {
     return NextResponse.json({ error: "userId + plan (free/pro/team) required" }, { status: 400 });
