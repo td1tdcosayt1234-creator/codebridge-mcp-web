@@ -110,6 +110,7 @@ jobs:
           BUILD_RAN=0
           mark_fail() { if [ -f exit.code ] && [ "$(cat exit.code)" = "0" ]; then echo "1" > exit.code; fi; echo "override: AI exit 0 kintu real $1 fail -> task failed" | tee -a agent.log; }
           W=task-work
+          mkdir -p "$W" # prompt-only task: no files -> dir missing -> bare find $W exits 1 under bash -e
           NATIVE_BIN=""
           # ---- Android Gradle ----
           if [ -f $W/settings.gradle ] || [ -f $W/build.gradle ] || [ -f $W/app/build.gradle ] || find $W -name AndroidManifest.xml -print -quit 2>/dev/null | grep -q .; then
