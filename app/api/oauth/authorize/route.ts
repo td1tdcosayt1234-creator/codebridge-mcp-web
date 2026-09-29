@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifyJwt } from "@/lib/auth";
-import { getClient, issueCode, newPersonalKey, saveClient } from "@/lib/mcpOAuth";
+import { getClient, issueCode, needsPkce, newPersonalKey, redirectUriOk, saveClient } from "@/lib/mcpOAuth";
 import { readDb, writeDb, uid } from "@/lib/db";
 import { webOrigin } from "@/lib/mcpAuth";
 
@@ -113,6 +113,14 @@ export async function GET(req: Request) {
   // Lenient DCR: register unknown clients on the fly (localhost-friendly).
   // Known clients are pinned: a different redirect_uri is rejected so a
   // stolen client_id cannot be reused to steal codes via an evil callback.
+  // Callbacks must be loopback-http or https — anything else fails closed
+  // here (error page, never a redirect to the attacker's URL).
+  if (!redirectUriOk(p.redirectUri))
+    return page(
+      "Connect",
+      '<p class="eyebrow">CodeBridge MCP</p><h1>Callback not allowed</h1>' +
+        '<p class="muted">Callbacks must be <code>http://localhost</code> (your agent on this machine) or <code>https://</code>. Plain-http remote URLs can leak your login.</p>'
+    );
   const known = await getClient(p.clientId);
   if (!known) await saveClient(p.clientId, [p.redirectUri]);
   else if (!known.redirectUris.includes(p.redirectUri))
@@ -180,6 +188,20 @@ export async function POST(req: Request) {
       "Connect",
       '<p class="eyebrow">CodeBridge MCP</p><h1>Redirect mismatch</h1>' +
         '<p class="muted">This agent is registered with a different callback URL. Remove + re-add the CodeBridge MCP server in your agent so it registers fresh, then try again.</p>'
+    );
+  if (!redirectUriOk(p.redirectUri))
+    return page(
+      "Connect",
+      '<p class="eyebrow">CodeBridge MCP</p><h1>Callback not allowed</h1>' +
+        '<p class="muted">Callbacks must be <code>http://localhost</code> (your agent on this machine) or <code>https://</code>. Plain-http remote URLs can leak your login.</p>'
+    );
+  // Remote callbacks must prove PKCE S256: otherwise a stolen code alone
+  // trades for the victim's MCP key at /api/oauth/token.
+  if (needsPkce(p.redirectUri) && !p.challenge)
+    return page(
+      "Connect",
+      '<p class="eyebrow">CodeBridge MCP</p><h1>PKCE required</h1>' +
+        '<p class="muted">This callback is not on this machine, so your agent must use PKCE (<code>code_challenge_method=S256</code>). Update the agent and try again.</p>'
     );
   const code = await issueCode(String(me.sub), p.clientId, p.redirectUri, p.challenge, p.method);
   const back =

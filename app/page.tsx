@@ -1,6 +1,7 @@
 import Link from "next/link";
 import CopyBtn from "../components/CopyBtn";
 import Counter from "../components/Counter";
+import LiveStatus from "../components/LiveStatus";
 import Reveal from "../components/Reveal";
 import TerminalDemo from "../components/TerminalDemo";
 import Tilt from "../components/Tilt";
@@ -192,9 +193,7 @@ export default function Home() {
             </div>
 
             <div className="hero-meta fade-up d7">
-              <span className="chip">
-                <b>●</b> runners online
-              </span>
+              <LiveStatus />
               <span className="chip">no credit card</span>
               <span className="chip">cancel anytime</span>
             </div>

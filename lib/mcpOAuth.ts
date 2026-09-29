@@ -82,6 +82,34 @@ export function unauthorizedNoAuth(req: Request) {
   );
 }
 
+// ---- redirect policy (open-redirect / code-exfil guard) ----
+// Codes are bearer credentials for 10 min: the callback must never go to
+// an attacker host. Allow loopback http (MCP clients listen on ephemeral
+// localhost ports) and any https. Plain-http remote + custom schemes are
+// rejected — fail closed with an error page, never a redirect.
+export function redirectUriOk(uri: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(uri);
+  } catch {
+    return false;
+  }
+  const host = u.hostname.toLowerCase();
+  const loopback = host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1";
+  if (u.protocol === "https:") return true;
+  if (u.protocol === "http:" && loopback) return true;
+  return false;
+}
+// Remote (non-loopback) callbacks must use PKCE S256: without it a stolen
+// code + exact redirect_uri is enough to trade for the victim's MCP key.
+export function needsPkce(uri: string): boolean {
+  try {
+    const host = new URL(uri).hostname.toLowerCase();
+    return !(host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1");
+  } catch {
+    return true;
+  }
+}
 // ---- DCR store (persisted in db.json — Next.js route bundles do NOT share
 // module-level memory, so in-process Maps lose codes between /authorize and
 // /token) ----

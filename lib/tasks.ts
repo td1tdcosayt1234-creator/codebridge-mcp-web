@@ -77,6 +77,9 @@ export async function createTaskAndDispatch(
   opts?: { kind?: "compile" | "fix-compile"; files?: { path: string; content: string }[] }
 ): Promise<{ task: DbShape["tasks"][number] } | { error: string; status: number }> {
   if (!title.trim() || !prompt.trim()) return { error: "Title and prompt are both required.", status: 400 };
+  // Cap inputs BEFORE estimate/storage: giant prompts = memory/CPU DoS + huge holds.
+  title = title.trim().slice(0, 200);
+  prompt = prompt.trim().slice(0, 20000);
   const kind = opts?.kind === "fix-compile" ? "fix-compile" : "compile";
   // Junk filter: .git/.gradle/build/node_modules etc. khabe na â age .git/hooks quota kheye
   // asol source batil hoye hallucination hoto (task_pl1jeie: 20tar 17tai .git/hooks chilo).

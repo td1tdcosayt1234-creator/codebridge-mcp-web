@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { newClientId, saveClient } from "@/lib/mcpOAuth";
+import { newClientId, redirectUriOk, saveClient } from "@/lib/mcpOAuth";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +18,10 @@ export async function POST(req: Request) {
   }
   const uris = Array.isArray(body.redirect_uris) ? body.redirect_uris.filter(Boolean).slice(0, 10) : [];
   if (uris.length === 0)
+    return NextResponse.json({ error: "invalid_redirect_uri" }, { status: 400 });
+  // Loopback http or any https only — plain-http remote + custom schemes
+  // would let anyone harvest auth codes.
+  if (!uris.every((u) => redirectUriOk(String(u))))
     return NextResponse.json({ error: "invalid_redirect_uri" }, { status: 400 });
   const clientId = newClientId();
   await saveClient(clientId, uris.map(String));
