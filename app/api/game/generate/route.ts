@@ -4,7 +4,7 @@ import { verifyJwt } from "@/lib/auth";
 import { zenConfig, zenKeyOk } from "@/lib/ai";
 export const dynamic = "force-dynamic";
 
-// --- AI game generation: OpenCode Zen (admin-panel key > .env key) first, free Pollinations second. No templates. ---
+// --- AI game generation: OpenCode Zen (admin-panel key > .env key) first, Kilo CLI free second, Pollinations free third. No templates. ---
 function baseModels(defaultModel: string) {
   return Array.from(
     new Set([defaultModel, "muse-spark-1.3-contributor-free", "big-pickle", "mimo-v2.6-flash-free"]),
@@ -26,9 +26,30 @@ const FREE_MODELS = [
 ];
 // Only allow known models — the key owner pays for anything outside free tier.
 function cleanModel(m: unknown, defaultModel: string): string {
-  const s = String(m || "").slice(0, 80);
+  const s = String(m || "").slice(0, 120);
   if (!/^[A-Za-z0-9._:\/-]+$/.test(s)) return "";
-  return FREE_MODELS.includes(s) || s === defaultModel ? s : "";
+  if (FREE_MODELS.includes(s) || s === defaultModel) return s;
+  // Kilo CLI free Gateway models pass through to the Kilo provider.
+  if (s.startsWith("kilo/")) {
+    const KILO_OK = [
+      "kilo/kilo-auto/free",
+      "kilo/cohere/north-mini-code:free",
+      "kilo/dots-studio/dots-3-note-preview:free",
+      "kilo/inclusionai/ling-3.0-flash-sante:free",
+      "kilo/liquid/lfm-2.5-2.6b:free",
+      "kilo/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "kilo/nvidia/nemotron-3-super-120b-a12b:free",
+      "kilo/nvidia/nemotron-3-ultra-550b-a55b:free",
+      "kilo/nvidia/nemotron-3.5-lightning:free",
+      "kilo/poolside/laguna-s-2.1:free",
+      "kilo/poolside/laguna-xs-2.1:free",
+      "kilo/qwen/qwen3.8-27b:free",
+      "kilo/stepfun/step-3.7-flash:free",
+      "kilo/thinkingmachines/inkling-small:free",
+    ];
+    if (KILO_OK.includes(s)) return s;
+  }
+  return "";
 }
 
 function extractHTML(raw: string): string {
@@ -162,7 +183,17 @@ async function aiGameHTML(req: Request, prompt: string, style: string, preferred
         }
       }
     }
-    // Provider 2: Pollinations (free, keyless) — real AI, no templates involved.
+    // Provider 2: Kilo Code CLI (free Gateway models, local `kilo auth login` once).
+    // Best free quality when the server is logged in — otherwise falls through.
+    try {
+      const { kiloGameHTML, KILO_DEFAULT_MODEL } = await import("@/lib/kilo");
+      const kiloModel = preferred.startsWith("kilo/") ? preferred : KILO_DEFAULT_MODEL;
+      const kilo = await kiloGameHTML(cleanPrompt, styleLabel, system, kiloModel);
+      if (kilo) return kilo;
+    } catch {
+      /* fall through to Pollinations */
+    }
+    // Provider 3: Pollinations (free, keyless) — real AI, no templates involved.
     const free = await pollinationsGame(cleanPrompt, styleLabel, ctrl.signal);
     if (free) return { html: free, provider: "pollinations" };
     console.warn("[game] all providers failed (zen 402/403 + pollinations 3x) — returning 503");
@@ -203,5 +234,6 @@ export async function POST(req: Request){
 export async function GET(){
   const cfg = await zenConfig();
   const ok = zenKeyOk(cfg.key);
-  return NextResponse.json({ ok:true, service:"game-generate", ai: ok, model: ok ? cfg.model : undefined, source: ok ? cfg.source : "none", freeModels: FREE_MODELS });
+  const { KILO_FREE_MODELS, KILO_DEFAULT_MODEL } = await import("@/lib/kilo");
+  return NextResponse.json({ ok:true, service:"game-generate", ai: ok, model: ok ? cfg.model : undefined, source: ok ? cfg.source : "none", freeModels: FREE_MODELS, kiloModels: KILO_FREE_MODELS, kiloDefault: KILO_DEFAULT_MODEL });
 }
