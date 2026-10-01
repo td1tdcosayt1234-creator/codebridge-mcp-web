@@ -77,6 +77,13 @@ const GAME_SYSTEM = (style: string) =>
     "- Include a visible score / HUD, a start or restart control, and a game-over state.",
     "- Keep it under ~1200 lines. Must run by just opening the file in a browser.",
     `- Visual style: ${style || "neon"} (neon glow / retro arcade / minimal clean). Dark background.`,
+    "Game feel (cool-html-game skill) — ALL required, keep each tiny:",
+    "- Particles on score/death (cap ~200), trauma-based screen shake, 80ms hit-stop on big moments.",
+    "- 2-layer parallax background, shadowBlur glow on player/pickups, floating '+N' score popups.",
+    "- Combo multiplier for quick successive scores (resets after 2s idle).",
+    "- WebAudio beep(freq,dur) SFX for eat/shoot/hit/win (AudioContext on first gesture) + M mute key.",
+    "- Difficulty ramps with score (speed/spawn), LEVEL UP flash, forgiving first 10s.",
+    "- Best score in localStorage. Fixed-timestep logic so speed is device-independent.",
   ].join("\n");
 
 // Provider 2: Pollinations (free, keyless, OpenAI-compatible). No account needed.

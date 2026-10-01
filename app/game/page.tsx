@@ -65,9 +65,39 @@ const GAME_CSS = `
         .empty-art{font-size:44px;filter:drop-shadow(0 0 22px #8b5cf6aa);animation:floatY 4.5s ease-in-out infinite}
         @keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
         .label{font-size:10.5px;color:#6a7288;letter-spacing:.14em;font-weight:800;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;text-transform:uppercase}
+        .stage-bar{width:min(320px,80%);height:8px;border-radius:99px;background:#ffffff14;border:1px solid #ffffff1a;overflow:hidden;margin-top:6px}
+        .stage-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#8b5cf6,#38bdf8,#5eead4,#8b5cf6);background-size:220% auto;animation:gradShift 2.2s linear infinite,fillSlide .5s ease;transition:width .6s cubic-bezier(.34,1.3,.64,1);box-shadow:0 0 16px #8b5cf6aa}
+        @keyframes fillSlide{from{filter:brightness(1.8)}to{filter:brightness(1)}}
+        .stage-list{display:flex;flex-direction:column;gap:5px;margin-top:10px;width:min(320px,84%)}
+        .stage-row{display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:700;padding:7px 12px;border-radius:11px;border:1px solid transparent;animation:stageIn .45s cubic-bezier(.34,1.4,.64,1);transition:.3s}
+        @keyframes stageIn{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+        .stage-row.done{color:#6ee7b7;background:#34d39912;border-color:#34d3992e}
+        .stage-row.active{color:#fff;background:linear-gradient(135deg,#8b5cf633,#2dd4bf22);border-color:#c4b5fd55;box-shadow:0 0 24px -8px #8b5cf6}
+        .stage-row.todo{color:#5b6378;background:#ffffff06}
+        .stage-ico{width:18px;text-align:center}
+        .stage-dots span{display:inline-block;animation:blinkDot 1.2s infinite}
+        .stage-dots span:nth-child(2){animation-delay:.2s}
+        .stage-dots span:nth-child(3){animation-delay:.4s}
+        @keyframes blinkDot{0%,60%,100%{opacity:.2;transform:none}30%{opacity:1;transform:translateY(-2px)}}
 `;
 
 type Msg = { role: "user" | "ai"; text: string; err?: boolean };
+
+// Live build stages shown while the AI works (timed, honest labels).
+const STAGES = [
+  { at: 0, icon: "📋", en: "Preparing", bn: "idea sajano hocche" },
+  { at: 8, icon: "🎨", en: "Designing", bn: "look + level design" },
+  { at: 20, icon: "💻", en: "Coding", bn: "game code likhche" },
+  { at: 45, icon: "🔧", en: "Fixing", bn: "bug fix + test" },
+  { at: 70, icon: "✏️", en: "Editing", bn: "tune + balance" },
+  { at: 95, icon: "✨", en: "Modifying", bn: "juice + polish" },
+  { at: 130, icon: "🚀", en: "Finalizing", bn: "final file ready hocche" },
+];
+const stageFor = (sec: number) => {
+  let i = 0;
+  STAGES.forEach((s, k) => { if (sec >= s.at) i = k; });
+  return i;
+};
 
 export default function GameStudio(){
   const [msgs,setMsgs]=useState<Msg[]>([]);
@@ -78,6 +108,9 @@ export default function GameStudio(){
   const [html,setHtml]=useState("");
   const [provider,setProvider]=useState("");
   const [loading,setLoading]=useState(false);
+  const [stageIdx,setStageIdx]=useState(0);
+  const [elapsed,setElapsed]=useState(0);
+  const [kiloModels,setKiloModels]=useState<string[]>([]);
   const [showCode,setShowCode]=useState(false);
   const [isFs,setIsFs]=useState(false);
   const [toast,setToast]=useState("");
@@ -89,11 +122,24 @@ export default function GameStudio(){
 
   useEffect(()=>{
     threadRef.current?.scrollTo({top: 999999});
-  },[msgs,loading]);
+  },[msgs,loading,stageIdx]);
+
+  // Stage timer while generating — advances Preparing → … → Finalizing.
+  useEffect(()=>{
+    if(!loading){ setStageIdx(0); setElapsed(0); return; }
+    const t0 = Date.now();
+    const iv = setInterval(()=>{
+      const sec = Math.floor((Date.now()-t0)/1000);
+      setElapsed(sec);
+      setStageIdx(stageFor(sec));
+    },1000);
+    return ()=>clearInterval(iv);
+  },[loading]);
 
   useEffect(()=>{
     fetch("/api/game/generate",{cache:"no-store"}).then(r=>r.json()).then(j=>{
       if(Array.isArray(j?.freeModels)) setModels(j.freeModels);
+      if(Array.isArray(j?.kiloModels)) setKiloModels(j.kiloModels);
     }).catch(()=>{});
     const sp=new URLSearchParams(location.search);
     const q=sp.get("prompt");
@@ -127,6 +173,7 @@ export default function GameStudio(){
   const gen = async (ctx: string)=>{
     genBusy.current = true;
     setLoading(true);
+    const t0 = Date.now();
     try{
       const r = await fetch("/api/game/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:ctx, style:"auto", model: modelSel === "auto" ? "" : modelSel})});
       if(r.status===401){ showToast("Login required"); setLoading(false); genBusy.current = false; location.href="/login?next="+encodeURIComponent("/game?prompt="+ctx.slice(-200)); return; }
@@ -141,7 +188,8 @@ export default function GameStudio(){
       setHtml(j.html);
       setShowCode(false);
       setProvider(j.provider || "ai");
-      setMsgs(m=>[...m,{role:"ai",text:"Game ready — live preview updated ("+(j.provider||"ai")+"). Keep chatting to refine it."}]);
+      const secs = Math.round((Date.now()-t0)/1000);
+      setMsgs(m=>[...m,{role:"ai",text:`✅ Game ready in ${secs}s — live preview updated (${j.provider||"ai"}). Keep chatting to refine it.`}]);
     }catch(e:any){
       const raw = e?.message || "Failed";
       const friendly = /failed to fetch|networkerror|load failed|abort/i.test(raw)
@@ -220,16 +268,27 @@ export default function GameStudio(){
               {msgs.map((m,i)=>(
                 <div key={i} className={"msg "+(m.role==="user" ? "msg-user" : "msg-ai"+(m.err?" err":""))}>{m.text}</div>
               ))}
-              {loading && <div className="msg msg-ai">Crafting…</div>}
+              {loading && <div className="msg msg-ai">{STAGES[stageIdx].icon} {STAGES[stageIdx].en}… <span style={{opacity:.6}}>({STAGES[stageIdx].bn} · {elapsed}s)</span></div>}
             </div>
 
             <div>
               <div className="label"><span>MODEL — FREE</span><span style={{opacity:.6}}>{provider || "auto"}</span></div>
               <select className="field" value={modelSel} onChange={e=>setModelSel(e.target.value)} style={{padding:"11px 14px"}}>
                 <option value="auto">✦ Auto — best available</option>
-                {models.map(m=>(
-                  <option key={m} value={m}>{m}</option>
-                ))}
+                {models.length>0 && (
+                  <optgroup label="Zen free">
+                    {models.map(m=>(
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {kiloModels.length>0 && (
+                  <optgroup label="Kilo free (no key)">
+                    {kiloModels.map(m=>(
+                      <option key={m} value={m}>{m.replace(/^kilo\//,"")}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </div>
 
@@ -267,7 +326,21 @@ export default function GameStudio(){
               <div className="preview-glow">
               <div className={"preview-wrap "+(isFs?"fs":"")} style={{height:isFs?"auto":480}}>
                 {loading ? (
-                  <div className="skeleton"><div className="pulse"/><div style={{fontWeight:800}}>Crafting your game…</div><div style={{opacity:.6,fontSize:12}}>Real AI output — no templates</div></div>
+                  <div className="skeleton" style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
+                    <div className="pulse"/>
+                    <div style={{fontWeight:800,fontSize:17}}>{STAGES[stageIdx].icon} {STAGES[stageIdx].en}…</div>
+                    <div style={{opacity:.6,fontSize:12}}>{STAGES[stageIdx].bn} · {elapsed}s · {provider || "ai working"}</div>
+                    <div className="stage-bar"><div className="stage-fill" style={{width:Math.min(100,((stageIdx+1)/STAGES.length)*100)+"%"}}/></div>
+                    <div className="stage-list">
+                      {STAGES.map((s,k)=>(
+                        <div key={s.en} className={"stage-row "+(k<stageIdx?"done":k===stageIdx?"active":"todo")}>
+                          <span className="stage-ico">{k<stageIdx?"✅":s.icon}</span>
+                          <span>{s.en}</span>
+                          {k===stageIdx && <span className="stage-dots"><span>.</span><span>.</span><span>.</span></span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 ) : html ? (
                   <iframe ref={frameRef} title="preview" srcDoc={html} style={{width:"100%",height:"100%",border:0,background:"#020617"}} sandbox="allow-scripts allow-pointer-lock" allow="fullscreen" />
                 ) : (
