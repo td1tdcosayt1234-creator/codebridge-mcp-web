@@ -5,7 +5,7 @@ function key(){
   const s=process.env.TOKEN_ENC_KEY||DEV_KEY;
   // Fail closed: in production a missing/short key would make every stored
   // GitHub/AI/runner token decryptable with a public default. Refuse to boot.
-  if (process.env.NODE_ENV==="production" && (s===DEV_KEY || s.trim().length<16))
+  if (process.env.NODE_ENV==="production" && (s===DEV_KEY || s.trim().length<16 || s.toLowerCase().startsWith("change-me")))
     throw new Error("TOKEN_ENC_KEY missing or too short (min 16 chars) — refusing to boot in production.");
   return crypto.createHash("sha256").update(s).digest();
 }

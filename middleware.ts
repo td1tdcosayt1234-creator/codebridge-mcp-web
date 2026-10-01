@@ -16,7 +16,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.rewrite(new URL("/api/oauth/auth-server", req.url));
   }
   // Game Studio gate: keep the full path incl. ?prompt= so shared links survive login.
-  if (p === "/game") {
+  if (p === "/game" || p.startsWith("/game/")) {
     const t = req.cookies.get("session")?.value || "";
     const user = await verifyJwt(t);
     if (!user) {
@@ -28,5 +28,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/.well-known/:path*", "/game"],
+  matcher: ["/.well-known/:path*", "/game", "/game/:path*"],
 };

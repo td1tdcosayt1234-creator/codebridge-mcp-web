@@ -90,12 +90,13 @@ export async function createTaskAndDispatch(
       // Contain paths inside task-work/: strip leading slashes, resolve away
       // "." / ".." segments, cap length. "…/…/secret" can never escape.
       const clean = String(f.path)
+        .replace(/\0/g, "")
         .replace(/^\/+/, "")
         .split(/[\\/]+/)
         .filter((seg) => seg && seg !== "." && seg !== "..")
         .join("/")
         .slice(0, 200);
-      return { path: clean, content: String(f.content).slice(0, 100000) };
+      return { path: clean, content: String(f.content).replace(/\0/g, "").slice(0, 100000) };
     })
     .filter((f) => f.path && !JUNK.test(f.path))
     .slice(0, 50).map((f) => ({ path: f.path, content: f.content }));

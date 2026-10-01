@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { readDb, writeDb, uid } from "@/lib/db";
 import { bearerToken, verifyRunner } from "@/lib/tasks";
 
+export const dynamic = "force-dynamic";
+
 // A runner that dies after claiming (crash, cancelled workflow) would leave
 // the task "running" forever with the user's coins held. Sweep anything
 // claimed longer than this back to failed + refund on every poll.
@@ -9,6 +11,9 @@ const STUCK_MS = 45 * 60 * 1000;
 
 // Actions runner: take the next job. ?task_id= takes that task, otherwise the oldest queued one.
 export async function GET(req: Request) {
+  const { rateLimit, clientIp } = await import("@/lib/security");
+  const rl = rateLimit("runner:" + clientIp(req), 60, 60 * 1000);
+  if (!rl.ok) return NextResponse.json({ error: "Rate limited. Retry in " + rl.retryAfterSec + "s." }, { status: 429 });
   const db = await readDb();
   if (!verifyRunner(db, bearerToken(req))) return NextResponse.json({ error: "bad runner token" }, { status: 403 });
   const now = new Date().toISOString();
@@ -37,7 +42,7 @@ export async function GET(req: Request) {
   if (task.status === "running") {
     // Same runner retrying (not a second runner): hand the job back without
     // wiping the progress log it may already have posted.
-    await writeDb(db);
+    if (swept) await writeDb(db);
     return NextResponse.json({ id: task.id, title: task.title, prompt: task.prompt, kind: task.kind, files: task.files, status: task.status, resumed: true });
   }
   task.status = "running";

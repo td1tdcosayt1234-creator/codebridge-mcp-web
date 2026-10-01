@@ -1,9 +1,10 @@
 import * as jose from "jose";
 const DEV_SECRET="dev-secret-change-me-please-32chars";
+const BLOCKED_PREFIXES=["change-me", "dev-secret-change-me"];
 const secret=()=>{
   const s=process.env.AUTH_SECRET||DEV_SECRET;
   // Fail closed: a default AUTH_SECRET lets anyone forge admin sessions.
-  if (process.env.NODE_ENV==="production" && (s===DEV_SECRET || s.trim().length<32))
+  if (process.env.NODE_ENV==="production" && (s===DEV_SECRET || s.trim().length<32 || BLOCKED_PREFIXES.some(p=>s.toLowerCase().startsWith(p))))
     throw new Error("AUTH_SECRET missing or too short (min 32 chars) — refusing to boot in production.");
   return new TextEncoder().encode(s);
 };

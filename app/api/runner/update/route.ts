@@ -3,6 +3,8 @@ import { readDb, writeDb, uid } from "@/lib/db";
 import { bearerToken, verifyRunner } from "@/lib/tasks";
 import { estimateResult } from "@/lib/tokens";
 
+export const dynamic = "force-dynamic";
+
 // Actions runner: send OpenCode output back to the web.
 export async function POST(req: Request) {
   const { csrfCheck, csrfBlock } = await import("@/lib/security");

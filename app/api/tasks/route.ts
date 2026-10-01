@@ -4,6 +4,8 @@ import { verifyJwt } from "@/lib/auth";
 import { readDb } from "@/lib/db";
 import { createTaskAndDispatch } from "@/lib/tasks";
 
+export const dynamic = "force-dynamic";
+
 async function me() {
   const t = cookies().get("session")?.value || "";
   return await verifyJwt(t);

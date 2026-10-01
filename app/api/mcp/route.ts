@@ -305,9 +305,14 @@ async function handleOne(req: Request, m: RpcMsg): Promise<{ resp: object | null
 }
 
 export async function POST(req: Request) {
-  const { rateLimit, clientIp } = await import("@/lib/security");
+  const { rateLimit, clientIp, csrfCheck, csrfBlock, hasBearer, sameOrigin } = await import("@/lib/security");
   const rl = rateLimit("mcp:" + clientIp(req), 120, 60 * 1000);
   if (!rl.ok) return err(null, -32000, "Rate limited. Retry in " + rl.retryAfterSec + "s.");
+  // Cookie-authed browser calls must be same-origin; Bearer machine clients bypass.
+  // Classic CSRF shape = cookie present + no Bearer + no valid Origin -> reject
+  // only when it would actually spend coins (compile/compile_fix via session).
+  const cookie = req.headers.get("cookie") || "";
+  if (!hasBearer(req) && cookie.includes("session=") && !sameOrigin(req)) return csrfBlock() as unknown as ReturnType<typeof err>;
   let body: unknown;
   try {
     body = await req.json();
@@ -316,13 +321,15 @@ export async function POST(req: Request) {
   }
   const batch = Array.isArray(body) ? (body as RpcMsg[]) : [body as RpcMsg];
   const out: object[] = [];
+  const batchId = Array.isArray(body) ? null : ((body as RpcMsg)?.id ?? null);
   for (const m of batch) {
     try {
       const r = await handleOne(req, m);
       if (r.resp) out.push(r.resp);
     } catch (e) {
       if (e instanceof Response) return e; // e.g. invalid Bearer -> 401 JSON
-      throw e;
+      const mid = (m as RpcMsg)?.id ?? batchId ?? null;
+      out.push({ jsonrpc: "2.0", id: mid, error: { code: -32603, message: "Internal error" } });
     }
   }
   if (out.length === 0) return new Response(null, { status: 202 });

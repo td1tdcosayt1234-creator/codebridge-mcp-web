@@ -60,15 +60,6 @@ npm run dev -- -p 3001 -H 0.0.0.0
 
 Demo admin `.env` theke ase (`ADMIN_EMAIL` / `ADMIN_PASSWORD`, min 12 chars).
 
-## Quick start (localhost)
-```bash
-npm install
-npm run dev
-# open http://localhost:3000
-```
-
-Demo admin `.env` theke ase (`ADMIN_EMAIL` / `ADMIN_PASSWORD`, min 12 chars).
-
 ## Access over Tailscale (tailnet)
 Bind all interfaces and open the firewall once:
 ```bash
