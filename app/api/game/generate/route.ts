@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifyJwt } from "@/lib/auth";
-import { zenConfig, zenKeyOk } from "@/lib/ai";
 export const dynamic = "force-dynamic";
 
-// --- AI game generation: OpenCode Zen (admin-panel key > .env key) first, Kilo CLI free second, Pollinations free third. No templates. ---
+// --- AI game generation: Kilo Code only. No templates, no other providers. ---
 function baseModels(defaultModel: string) {
   return Array.from(
     new Set([defaultModel, "muse-spark-1.3-contributor-free", "big-pickle", "mimo-v2.6-flash-free"]),
@@ -29,26 +28,9 @@ function cleanModel(m: unknown, defaultModel: string): string {
   const s = String(m || "").slice(0, 120);
   if (!/^[A-Za-z0-9._:\/-]+$/.test(s)) return "";
   if (FREE_MODELS.includes(s) || s === defaultModel) return s;
-  // Kilo CLI free Gateway models pass through to the Kilo provider.
-  if (s.startsWith("kilo/")) {
-    const KILO_OK = [
-      "kilo/kilo-auto/free",
-      "kilo/cohere/north-mini-code:free",
-      "kilo/dots-studio/dots-3-note-preview:free",
-      "kilo/inclusionai/ling-3.0-flash-sante:free",
-      "kilo/liquid/lfm-2.5-2.6b:free",
-      "kilo/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-      "kilo/nvidia/nemotron-3-super-120b-a12b:free",
-      "kilo/nvidia/nemotron-3-ultra-550b-a55b:free",
-      "kilo/nvidia/nemotron-3.5-lightning:free",
-      "kilo/poolside/laguna-s-2.1:free",
-      "kilo/poolside/laguna-xs-2.1:free",
-      "kilo/qwen/qwen3.8-27b:free",
-      "kilo/stepfun/step-3.7-flash:free",
-      "kilo/thinkingmachines/inkling-small:free",
-    ];
-    if (KILO_OK.includes(s)) return s;
-  }
+  // Kilo CLI + opencode CLI free models pass through to their providers.
+  // Each provider re-validates against its own allow-list (lib/kilo.ts, lib/opencode.ts).
+  if (s.startsWith("kilo/") || s.startsWith("opencode/")) return s;
   return "";
 }
 
@@ -86,58 +68,6 @@ const GAME_SYSTEM = (style: string) =>
     "- Best score in localStorage. Fixed-timestep logic so speed is device-independent.",
   ].join("\n");
 
-// Provider 2: Pollinations (free, keyless, OpenAI-compatible). No account needed.
-// Free shared service is flaky (slow/empty/bad output) — retry up to 3x
-// before giving up, so one bad roll doesn't surface as "AI busy".
-async function pollinationsGame(prompt: string, style: string, signal: AbortSignal, tries = 3): Promise<string | null> {
-  for (let i = 0; i < tries; i++) {
-    if (signal.aborted) return null;
-    // Per-try 60s cap: one hung upstream call must not eat the whole budget.
-    const tryCtrl = new AbortController();
-    const tryTimer = setTimeout(() => tryCtrl.abort(), 60000);
-    const onAbort = () => tryCtrl.abort();
-    signal.addEventListener("abort", onAbort, { once: true });
-    try {
-      const res = await fetch("https://text.pollinations.ai/openai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "openai",
-          temperature: 0.7,
-          max_tokens: 4000,
-          messages: [
-            { role: "system", content: GAME_SYSTEM(style) },
-            { role: "user", content: `Game idea: ${String(prompt || "").slice(0, 500)}` },
-          ],
-        }),
-        signal: tryCtrl.signal,
-      });
-      if (!res.ok) {
-        // 429 = free tier throttled us (often from repeated tries) — honor
-        // Retry-After so we stop hammering and actually recover.
-        const ra = Number(res.headers.get("retry-after") || 0);
-        const waitSec = res.status === 429 ? Math.min(Math.max(ra || 15, 5), 60) : 3;
-        console.warn(`[game] pollinations try ${i + 1}/${tries}: HTTP ${res.status}, waiting ${waitSec}s`);
-        if (i < tries - 1 && !signal.aborted) await new Promise((r) => setTimeout(r, waitSec * 1000));
-        continue;
-      } else {
-        const j = await res.json().catch(() => null);
-        const raw: string = j?.choices?.[0]?.message?.content || "";
-        const html = extractHTML(raw);
-        if (looksLikeGame(html)) return html;
-        console.warn(`[game] pollinations try ${i + 1}/${tries}: bad output (${raw.length} chars)`);
-      }
-    } catch (e) {
-      console.warn(`[game] pollinations try ${i + 1}/${tries}: ${signal.aborted ? "aborted" : String(e).slice(0, 120)}`);
-    } finally {
-      clearTimeout(tryTimer);
-      signal.removeEventListener("abort", onAbort);
-    }
-    if (i < tries - 1 && !signal.aborted) await new Promise((r) => setTimeout(r, 3000));
-  }
-  return null;
-}
-
 async function aiGameHTML(req: Request, prompt: string, style: string, preferred = ""): Promise<{ html: string; provider: string } | null> {
   const cleanPrompt = String(prompt || "").slice(0, 500);
   // Chat mode sends style:"auto" — no preset palettes, AI picks visuals to fit the idea.
@@ -147,63 +77,47 @@ async function aiGameHTML(req: Request, prompt: string, style: string, preferred
   const timer = setTimeout(() => ctrl.abort(), 200000);
   // Client gave up (tab closed, navigated away)? Stop the upstream calls too.
   req.signal.addEventListener("abort", () => { try { ctrl.abort(); } catch {} });
-  // Effective key: admin panel first, .env fallback. Read per request — no restart needed.
-  const cfg = await zenConfig();
-  const ZEN_MODELS = baseModels(cfg.model);
+  // Strict model routing: a user-selected model ALWAYS wins — no silent fallback
+  // to another provider's model. Auto ("") keeps opencode-first, kilo-fallback.
+  const wantOC = preferred.startsWith("opencode/");
+  const wantKilo = preferred.startsWith("kilo/");
   try {
-    // Provider 1: OpenCode Zen (admin/.env key — best quality when funded).
-    // Selected chat model goes first, then the default order as fallback.
-    if (zenKeyOk(cfg.key)) {
-      const key = cfg.key.trim();
-      const ordered = preferred ? Array.from(new Set([preferred, ...ZEN_MODELS])) : ZEN_MODELS;
-      for (const model of ordered) {
-        try {
-          const res = await fetch(`${cfg.base}/chat/completions`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${key}`,
-            },
-            body: JSON.stringify({
-              model,
-              temperature: 0.7,
-              max_tokens: 6000,
-              messages: [
-                { role: "system", content: system },
-                { role: "user", content: `Game idea: ${cleanPrompt}` },
-              ],
-            }),
-            signal: ctrl.signal,
-          });
-          if (!res.ok) {
-            // 402 = key has no funds, 403 = free-tier blocked outside OpenCode, 429 = throttled.
-            console.warn(`[game] zen ${model}: HTTP ${res.status}`);
-            continue; // try next model, then provider 2
-          }
-          const j = await res.json().catch(() => null);
-          const raw: string = j?.choices?.[0]?.message?.content || "";
-          const html = extractHTML(raw);
-          if (looksLikeGame(html)) return { html, provider: "zen:" + model };
-          console.warn(`[game] zen ${model}: bad output (${raw.length} chars)`);
-        } catch {
-          continue;
-        }
+    // Provider 1: opencode CLI (free Zen models after one `opencode auth login`).
+    if (!wantKilo) {
+      try {
+        const { opencodeGameHTML, OPENCODE_DEFAULT_MODEL } = await import("@/lib/opencode");
+        const ocModel = wantOC ? preferred : OPENCODE_DEFAULT_MODEL;
+        const oc = await opencodeGameHTML(cleanPrompt, styleLabel, system, ocModel);
+        if (oc) return oc;
+      } catch {
+        /* opencode CLI unavailable / not logged in / bad output */
+      }
+      // User explicitly picked an opencode model — never silently build with kilo instead.
+      if (wantOC) {
+        console.warn("[game] selected opencode model failed — returning 503 (no cross-provider fallback)");
+        return null;
       }
     }
-    // Provider 2: Kilo Code CLI (free Gateway models, local `kilo auth login` once).
-    // Best free quality when the server is logged in — otherwise falls through.
-    try {
-      const { kiloGameHTML, KILO_DEFAULT_MODEL } = await import("@/lib/kilo");
-      const kiloModel = preferred.startsWith("kilo/") ? preferred : KILO_DEFAULT_MODEL;
-      const kilo = await kiloGameHTML(cleanPrompt, styleLabel, system, kiloModel);
-      if (kilo) return kilo;
-    } catch {
-      /* fall through to Pollinations */
+    // Provider 2: Kilo Code CLI (free Gateway models, keyless anonymous works).
+    if (!wantOC) {
+      try {
+        const { kiloGameHTML, KILO_DEFAULT_MODEL } = await import("@/lib/kilo");
+        const kiloModel = wantKilo ? preferred : KILO_DEFAULT_MODEL;
+        // Auto mode: free routes stall ~50% of the time, so rotate 3 models.
+        // Selected mode: ONLY the chosen model, retried (never another model).
+        const tries = wantKilo
+          ? [kiloModel, kiloModel]
+          : Array.from(new Set([kiloModel, "kilo/cohere/north-mini-code:free", "kilo/thinkingmachines/inkling-small:free"]));
+        for (let attempt = 0; attempt < tries.length; attempt++) {
+          const kilo = await kiloGameHTML(cleanPrompt, styleLabel, system, tries[attempt]);
+          if (kilo) return kilo;
+          console.warn(`[game] kilo attempt ${attempt + 1}/${tries.length} (${tries[attempt]}) failed`);
+        }
+      } catch {
+        /* Kilo CLI unavailable or bad output */
+      }
     }
-    // Provider 3: Pollinations (free, keyless) — real AI, no templates involved.
-    const free = await pollinationsGame(cleanPrompt, styleLabel, ctrl.signal);
-    if (free) return { html: free, provider: "pollinations" };
-    console.warn("[game] all providers failed (zen 402/403 + pollinations 3x) — returning 503");
+    console.warn("[game] all providers failed (opencode + kilo) — returning 503");
     return null;
   } catch {
     return null;
@@ -226,21 +140,40 @@ export async function POST(req: Request){
     const { prompt="", style="auto", model="" } = await req.json().catch(()=>({}));
     if(String(prompt||"").length>800) return NextResponse.json({error:"Prompt too long (max 800)"},{status:400});
     if(String(prompt||"").length<2) return NextResponse.json({error:"Prompt required"},{status:400});
-    // Pure AI generation — no templates. Zen (admin/.env key) first, free Pollinations second.
-    const cfg0 = await zenConfig();
-    const ai = await aiGameHTML(req, String(prompt || ""), String(style || "auto"), cleanModel(model, cfg0.model));
-    if (!ai) {
-      return NextResponse.json(
-        { error: "AI generation failed. The free provider may be busy — wait a minute and try again." },
-        { status: 503 },
-      );
-    }
-    return NextResponse.json({ ok:true, html: ai.html, name:"index.html", size: ai.html.length, engine: "ai", provider: ai.provider });
+    // Pure AI generation — no templates. Kilo Code only.
+    // Cloudflare Tunnel kills requests >100s (524), so run async: client polls GET ?job=id.
+    const { uid } = await import("@/lib/db");
+    const id = uid("job");
+    startJob(id, String(prompt || ""), String(style || "auto"), String(model || "").trim(), req);
+    return NextResponse.json({ ok: true, job: true, id });
   }catch(e){ return NextResponse.json({ error: String(e) }, {status:500})}
 }
-export async function GET(){
-  const cfg = await zenConfig();
-  const ok = zenKeyOk(cfg.key);
+
+// In-memory game-generation jobs. Lost on restart (acceptable: client shows error and user retries).
+const jobs = new Map<string, { status: "running" | "done" | "error"; html?: string; provider?: string; error?: string; at: number }>();
+function startJob(id: string, prompt: string, style: string, model: string, req: Request) {
+  // Prune stale jobs so the map can't grow forever.
+  jobs.forEach((v, k) => { if (Date.now() - v.at > 10 * 60 * 1000) jobs.delete(k); });
+  jobs.set(id, { status: "running", at: Date.now() });
+  aiGameHTML(req, prompt, style, model)
+    .then((ai) => {
+      const j = jobs.get(id);
+      if (!j) return;
+      if (ai) jobs.set(id, { status: "done", html: ai.html, provider: ai.provider, at: Date.now() });
+      else jobs.set(id, { status: "error", error: "AI generation failed. The free provider may be busy — wait a minute and try again.", at: Date.now() });
+    })
+    .catch((e) => jobs.set(id, { status: "error", error: String(e), at: Date.now() }));
+}
+export async function GET(req: Request){
   const { KILO_FREE_MODELS, KILO_DEFAULT_MODEL } = await import("@/lib/kilo");
-  return NextResponse.json({ ok:true, service:"game-generate", ai: ok, model: ok ? cfg.model : undefined, source: ok ? cfg.source : "none", freeModels: FREE_MODELS, kiloModels: KILO_FREE_MODELS, kiloDefault: KILO_DEFAULT_MODEL });
+  const { OPENCODE_FREE_MODELS, OPENCODE_DEFAULT_MODEL, opencodeAuthOk } = await import("@/lib/opencode");
+  const id = new URL(req.url).searchParams.get("job");
+  if (id) {
+    const j = jobs.get(id);
+    if (!j) return NextResponse.json({ error: "Unknown job" }, { status: 404 });
+    if (j.status === "running") return NextResponse.json({ ok: true, status: "running" });
+    if (j.status === "error") return NextResponse.json({ ok: false, error: j.error }, { status: 503 });
+    return NextResponse.json({ ok: true, status: "done", html: j.html, name: "index.html", size: (j.html || "").length, engine: "ai", provider: j.provider });
+  }
+  return NextResponse.json({ ok:true, service:"game-generate", ai: true, model: OPENCODE_DEFAULT_MODEL, source: "opencode+kilo", opencodeModels: OPENCODE_FREE_MODELS, opencodeDefault: OPENCODE_DEFAULT_MODEL, opencodeAuth: await opencodeAuthOk(), freeModels: KILO_FREE_MODELS, kiloModels: KILO_FREE_MODELS, kiloDefault: KILO_DEFAULT_MODEL });
 }

@@ -3,6 +3,7 @@ node_modules/
 out/
 data/db.json
 data/db.json.bak.*
+data/opencode-home/
 data/*.tmp.*
 data/apks/
 .env

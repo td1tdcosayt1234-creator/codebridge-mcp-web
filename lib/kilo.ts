@@ -3,6 +3,16 @@ import os from "os";
 import path from "path";
 import fs from "fs/promises";
 
+// Kilo Code CLI is NOT concurrency-safe on Windows (shared tmp/session files
+// under %TEMP% clobber each other -> "Command failed" / empty output).
+// Serialize every kilo run through this in-process queue.
+let kiloQueue: Promise<unknown> = Promise.resolve();
+function withKiloLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = kiloQueue.then(fn, fn);
+  kiloQueue = run.catch(() => {});
+  return run;
+}
+
 export const KILO_DEFAULT_MODEL =
   process.env.KILO_MODEL || "kilo/kilo-auto/free";
 
@@ -49,7 +59,7 @@ function looksLikeGame(html: string): boolean {
 // Game Studio provider: local Kilo Code CLI (free Gateway models).
 // Keyless free models work without `kilo auth login`; login unlocks more.
 // Returns null when CLI missing / bad output — caller falls through.
-export async function kiloGameHTML(
+async function kiloGameHTMLInner(
   prompt: string,
   styleLabel: string,
   system: string,
@@ -145,7 +155,7 @@ export async function kiloGameHTML(
     }
     const html = extractHTML(text) || extractHTML(toolHtml) || extractHTML(out);
     if (looksLikeGame(html)) return { html, provider: "kilo:" + want };
-    console.warn(`[game] kilo ${want}: bad output (${out.length} chars)`);
+    console.warn(`[game] kilo ${want}: bad output (${out.length} chars): ` + out.slice(0, 400).replace(/\s+/g, " "));
     return null;
   } catch (e) {
     console.warn(`[game] kilo ${want}: ${String(e).slice(0, 300)}`);
@@ -158,3 +168,14 @@ export async function kiloGameHTML(
     }
   }
 }
+
+export async function kiloGameHTML(
+  prompt: string,
+  styleLabel: string,
+  system: string,
+  model = "",
+  timeoutMs = 120000,
+): Promise<{ html: string; provider: string } | null> {
+  return withKiloLock(() => kiloGameHTMLInner(prompt, styleLabel, system, model, timeoutMs));
+}
+

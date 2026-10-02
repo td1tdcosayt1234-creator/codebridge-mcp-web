@@ -75,6 +75,8 @@ const GAME_CSS = `
         .stage-row.active{color:#fff;background:linear-gradient(135deg,#8b5cf633,#2dd4bf22);border-color:#c4b5fd55;box-shadow:0 0 24px -8px #8b5cf6}
         .stage-row.todo{color:#5b6378;background:#ffffff06}
         .stage-ico{width:18px;text-align:center}
+        @keyframes stagePop{0%{opacity:0;transform:translateY(14px) scale(.9)}60%{transform:translateY(-3px) scale(1.03)}100%{opacity:1;transform:none}}
+        @keyframes icoBounce{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-5px) scale(1.15)}}
         .stage-dots span{display:inline-block;animation:blinkDot 1.2s infinite}
         .stage-dots span:nth-child(2){animation-delay:.2s}
         .stage-dots span:nth-child(3){animation-delay:.4s}
@@ -138,7 +140,10 @@ export default function GameStudio(){
 
   useEffect(()=>{
     fetch("/api/game/generate",{cache:"no-store"}).then(r=>r.json()).then(j=>{
-      if(Array.isArray(j?.freeModels)) setModels(j.freeModels);
+      const oc = Array.isArray(j?.opencodeModels) ? j.opencodeModels : [];
+      const kl = Array.isArray(j?.kiloModels) ? j.kiloModels : [];
+      if (oc.length || kl.length) setModels([...oc, ...kl]);
+      else if(Array.isArray(j?.freeModels)) setModels(j.freeModels);
       if(Array.isArray(j?.kiloModels)) setKiloModels(j.kiloModels);
     }).catch(()=>{});
     const sp=new URLSearchParams(location.search);
@@ -177,13 +182,25 @@ export default function GameStudio(){
     try{
       const r = await fetch("/api/game/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:ctx, style:"auto", model: modelSel === "auto" ? "" : modelSel})});
       if(r.status===401){ showToast("Login required"); setLoading(false); genBusy.current = false; location.href="/login?next="+encodeURIComponent("/game?prompt="+ctx.slice(-200)); return; }
-      if(r.status===503){
-        const j503 = await r.json().catch(()=>({}));
-        setMsgs(m=>[...m,{role:"ai",text:j503.error || "AI busy — wait a minute and retry",err:true}]);
-        setLoading(false); genBusy.current = false; return;
+      const j0 = await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(j0.error || ("Generate failed "+r.status));
+      // New async flow: server returns a job id immediately; poll for the result
+      // so Cloudflare Tunnel's 100s request timeout (524) can't kill it.
+      let j: any = j0;
+      if (j0.job && j0.id) {
+        let done = false;
+        for (let i = 0; i < 110; i++) {
+          await new Promise(r2 => setTimeout(r2, 3000));
+          let pr: Response | null = null;
+          try { pr = await fetch("/api/game/generate?job=" + encodeURIComponent(j0.id), {cache:"no-store"}); } catch { continue; }
+          const pj = await pr.json().catch(()=>({}));
+          if (pr.status === 503) throw new Error(pj.error || "Generate failed 503");
+          if (!pr.ok && pr.status !== 404) throw new Error(pj.error || ("Generate failed "+pr.status));
+          if (pj.status === "done") { j = pj; done = true; break; }
+          if (pr.status === 404) throw new Error("Server restarted while generating — try again.");
+        }
+        if (!done && !j.html) throw new Error("Generation timed out — try again (server busy).");
       }
-      const j = await r.json().catch(()=>({}));
-      if(!r.ok) throw new Error(j.error || ("Generate failed "+r.status));
       if(!j.html) throw new Error("No html returned");
       setHtml(j.html);
       setShowCode(false);
@@ -276,13 +293,20 @@ export default function GameStudio(){
               <select className="field" value={modelSel} onChange={e=>setModelSel(e.target.value)} style={{padding:"11px 14px"}}>
                 <option value="auto">✦ Auto — best available</option>
                 {models.length>0 && (
-                  <optgroup label="Zen free">
-                    {models.map(m=>(
+                  <optgroup label="opencode free (login once)">
+                    {models.filter(m=>m.startsWith("opencode/")).map(m=>(
                       <option key={m} value={m}>{m}</option>
                     ))}
                   </optgroup>
                 )}
-                {kiloModels.length>0 && (
+                {models.filter(m=>m.startsWith("kilo/")).length>0 && (
+                  <optgroup label="Kilo free (no key)">
+                    {models.filter(m=>m.startsWith("kilo/")).map(m=>(
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {kiloModels.length>0 && models.filter(m=>m.startsWith("kilo/")).length===0 && (
                   <optgroup label="Kilo free (no key)">
                     {kiloModels.map(m=>(
                       <option key={m} value={m}>{m.replace(/^kilo\//,"")}</option>
@@ -332,17 +356,19 @@ export default function GameStudio(){
                     <div style={{opacity:.6,fontSize:12}}>{STAGES[stageIdx].bn} · {elapsed}s · {provider || "ai working"}</div>
                     <div className="stage-bar"><div className="stage-fill" style={{width:Math.min(100,((stageIdx+1)/STAGES.length)*100)+"%"}}/></div>
                     <div className="stage-list">
-                      {STAGES.map((s,k)=>(
-                        <div key={s.en} className={"stage-row "+(k<stageIdx?"done":k===stageIdx?"active":"todo")}>
-                          <span className="stage-ico">{k<stageIdx?"✅":s.icon}</span>
-                          <span>{s.en}</span>
-                          {k===stageIdx && <span className="stage-dots"><span>.</span><span>.</span><span>.</span></span>}
-                        </div>
-                      ))}
+                      {/* Show only the CURRENT stage, one at a time */}
+                      <div key={stageIdx} className="stage-row active" style={{animation:"stagePop .5s cubic-bezier(.34,1.56,.64,1)"}}>
+                        <span className="stage-ico" style={{animation:"icoBounce 1s ease-in-out infinite",display:"inline-block"}}>{STAGES[stageIdx].icon}</span>
+                        <span>{STAGES[stageIdx].en}</span>
+                        <span className="stage-dots"><span>.</span><span>.</span><span>.</span></span>
+                      </div>
+                      <div style={{opacity:.55,fontSize:11,fontWeight:600,marginTop:4,paddingLeft:4}}>
+                        step {stageIdx + 1}/{STAGES.length} · done: {STAGES.slice(0,stageIdx).map(s=>s.en).join(" → ") || "none"}
+                      </div>
                     </div>
                   </div>
                 ) : html ? (
-                  <iframe ref={frameRef} title="preview" srcDoc={html} style={{width:"100%",height:"100%",border:0,background:"#020617"}} sandbox="allow-scripts allow-pointer-lock" allow="fullscreen" />
+                  <iframe ref={frameRef} title="preview" srcDoc={html} style={{width:"100%",height:"100%",border:0,background:"#020617"}} sandbox="allow-scripts allow-same-origin allow-pointer-lock" allow="fullscreen" />
                 ) : (
                   <div style={{textAlign:"center",padding:36,position:"relative"}}>
                     <div className="empty-art">🕹️</div>
