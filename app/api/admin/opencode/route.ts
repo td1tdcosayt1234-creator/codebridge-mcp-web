@@ -11,8 +11,13 @@ import { ZEN_DEFAULT_BASE } from "@/lib/ai";
 async function admin() {
   const t = cookies().get("session")?.value || "";
   const p = await verifyJwt(t);
-  if (!p || p.role !== "admin") return null;
-  return p;
+  if (!p?.sub) return null;
+  // Never trust stale JWT role: re-read from DB.
+  const { readDb } = await import("@/lib/db");
+  const db = await readDb();
+  const u = db.users.find((x) => x.id === p.sub);
+  if (!u || u.role !== "admin") return null;
+  return { ...p, email: u.email, role: "admin" as const };
 }
 
 function authPath() {
@@ -69,8 +74,10 @@ export async function GET() {
 export async function POST(req: Request) {
   const p = await admin();
   if (!p) return NextResponse.json({ error: "admin only" }, { status: 403 });
-  const { csrfCheck, csrfBlock } = await import("@/lib/security");
+  const { csrfCheck, csrfBlock, rateLimit, clientIp } = await import("@/lib/security");
   if (!csrfCheck(req)) return csrfBlock();
+  const rl = rateLimit("admin_oc:" + clientIp(req), 20, 60 * 1000);
+  if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   const { key } = await req.json().catch(() => ({}));
   const k = String(key || "").trim();
   if (k.length < 12) return NextResponse.json({ error: "Paste a valid API key (min 12 chars)." }, { status: 400 });
@@ -92,8 +99,10 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const p = await admin();
   if (!p) return NextResponse.json({ error: "admin only" }, { status: 403 });
-  const { csrfCheck, csrfBlock } = await import("@/lib/security");
+  const { csrfCheck, csrfBlock, rateLimit, clientIp } = await import("@/lib/security");
   if (!csrfCheck(req)) return csrfBlock();
+  const rl = rateLimit("admin_oc:" + clientIp(req), 20, 60 * 1000);
+  if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   try {
     await fs.rm(authPath(), { force: true });
   } catch {

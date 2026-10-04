@@ -123,6 +123,12 @@ export async function readDb():Promise<DbShape>{ await ensure();
   void warnIfDefaultAdminPassword();
   return parsed; }
 export async function writeDb(db:DbShape){
+  // Serialize writes in-process: concurrent read-modify-write cycles would
+  // otherwise lose updates (last-writer-wins on events/usage/balances).
+  return (writeChain = writeChain.then(() => writeDbInner(db), () => writeDbInner(db)));
+}
+let writeChain: Promise<void> = Promise.resolve();
+async function writeDbInner(db:DbShape){
   const dir = path.dirname(file);
   await fs.mkdir(dir,{recursive:true});
   // Bound growth: dashboard aggregations scan these arrays on every poll.

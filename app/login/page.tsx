@@ -39,6 +39,15 @@ export default function Login() {
             if (em) setEmail(em);
             setErr("Account already exists. Please log in.");
             setShake((s) => s + 1);
+          } else if (q.get("err") === "google_failed") {
+            setErr("Google login failed — try again.");
+            setShake((s) => s + 1);
+          } else if (q.get("err") === "google_state") {
+            setErr("Google session expired — click Continue with Google again.");
+            setShake((s) => s + 1);
+          } else if (q.get("err") === "google_unverified") {
+            setErr("Google email not verified — verify it and retry.");
+            setShake((s) => s + 1);
           }
           setChecking(false);
         }

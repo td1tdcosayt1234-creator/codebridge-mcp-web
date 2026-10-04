@@ -209,7 +209,15 @@ export async function POST(req: Request) {
       '<p class="eyebrow">CodeBridge MCP</p><h1>PKCE required</h1>' +
         '<p class="muted">Your agent must use PKCE (<code>code_challenge_method=S256</code>). Update the agent and try again.</p>'
     );
-  const code = await issueCode(String(me.sub), p.clientId, p.redirectUri, p.challenge, p.method);
+  const code = await issueCode(String(me.sub), p.clientId, p.redirectUri, p.challenge, p.method).catch(() =>
+    ""
+  );
+  if (!code)
+    return page(
+      "Connect",
+      '<p class="eyebrow">CodeBridge MCP</p><h1>Too many pending logins</h1>' +
+        '<p class="muted">This agent has too many open login attempts. Complete or wait 10 minutes, then try again.</p>'
+    );
   const back =
     p.redirectUri + sep + "code=" + encodeURIComponent(code) + (p.state ? "&state=" + encodeURIComponent(p.state) : "");
   const alt = altCallback(back);

@@ -119,9 +119,16 @@ export function needsPkce(uri: string): boolean {
 export async function saveClient(clientId: string, redirectUris: string[]) {
   const { readDb, writeDb } = await import("./db");
   const db = await readDb();
+  // Validate + cap: max 10 callbacks per client, each must pass the
+  // loopback-https policy — a poisoned DCR record must never persist.
+  const clean = Array.from(new Set(redirectUris)).filter((u) => redirectUriOk(u)).slice(0, 10);
+  if (!clean.length) return;
   const hit = db.oauthClients.find((c) => c.id === clientId);
-  if (hit) hit.redirectUris = redirectUris;
-  else db.oauthClients.push({ id: clientId, redirectUris, createdAt: new Date().toISOString() });
+  if (hit) hit.redirectUris = clean;
+  else {
+    if (db.oauthClients.length >= 500) db.oauthClients = db.oauthClients.slice(-499);
+    db.oauthClients.push({ id: clientId, redirectUris: clean, createdAt: new Date().toISOString() });
+  }
   await writeDb(db);
 }
 export async function getClient(clientId: string) {
@@ -145,6 +152,9 @@ export async function issueCode(
   const db = await readDb();
   const now = Date.now();
   db.oauthCodes = db.oauthCodes.filter((c) => c.expires >= now);
+  // Per-client cap: one misbehaving agent cannot flood the code table.
+  if (db.oauthCodes.filter((c) => c.clientId === clientId).length >= 20)
+    throw new Error("too many pending codes for this client");
   const code = "cbcode_" + randomBytes(24).toString("hex");
   db.oauthCodes.push({ code, userId, clientId, redirectUri, challenge, method, expires: now + CODE_TTL_MS });
   await writeDb(db);

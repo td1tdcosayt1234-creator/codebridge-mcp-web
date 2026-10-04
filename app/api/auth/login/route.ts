@@ -14,9 +14,14 @@ export async function POST(req: Request) {
   const { honeypot } = await import("@/lib/antifraud");
   if (honeypot({ website })) return NextResponse.json({ error: "Bot detected." }, { status: 400 });
   const mail = String(email || "").trim().toLowerCase().slice(0, 120);
+  // Two buckets: per-IP+mail (targeted) AND per-IP global (rotating-mail bypass).
   const rl = rateLimit("login:" + ip + ":" + mail, 10, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Too many attempts. Try again in " + rl.retryAfterSec + "s." }, { status: 429 });
+  const rlIp = rateLimit("login_ip:" + ip, 60, 60 * 1000);
+  if (!rlIp.ok) return NextResponse.json({ error: "Too many attempts from this network. Try again later." }, { status: 429 });
   if (!mail || !password) return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
+  // Bcrypt DoS guard: unbounded passwords burn CPU per attempt.
+  if (String(password).length > 128) return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
   const db = await readDb();
   const att = db.attempts.find((a) => a.email === mail);
   if (att && att.until && new Date(att.until).getTime() > Date.now())
