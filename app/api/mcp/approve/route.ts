@@ -66,6 +66,12 @@ export async function GET(req: Request) {
   }
   const email = String(me.email || me.sub);
   const argsPreview = esc(JSON.stringify({ title: (p.args as any)?.title, prompt: String((p.args as any)?.prompt || "").slice(0, 300), files: Array.isArray((p.args as any)?.files) ? (p.args as any).files.map((f: any) => f?.path).slice(0, 10) : [] }));
+  const { clientIp: cip } = await import("@/lib/security");
+  const viewerIp = cip(req);
+  const creatorIp = p.fp?.ip || "unknown";
+  const netWarn = viewerIp && creatorIp && viewerIp !== creatorIp && viewerIp !== "local" && creatorIp !== "local"
+    ? "<div style=\"text-align:left;margin-top:12px;font-size:12.5px;background:#f59e0b18;border:1px solid #f59e0b55;padding:10px 12px;border-radius:10px\">⚠️ This request came from a <b>different network</b> (" + esc(creatorIp) + ") than this browser (" + esc(viewerIp) + "). Only Approve if you recognise it — it may be another device or someone else's agent.</div>"
+    : "";
   return shell(
     brand() +
     "<div class=\"icon\">" + ICON_SHIELD + "</div>" +
@@ -73,6 +79,8 @@ export async function GET(req: Request) {
     "<p class=\"muted\">Your coding agent wants to run as <b>" + esc(email) + "</b>. Approving spends <b>your coins</b> when the task runs.</p>" +
     "<div class=\"pill\">" + esc(p.tool) + "</div>" +
     "<div style=\"text-align:left;margin-top:12px;font-size:12px;word-break:break-all;background:#00000044;padding:10px;border-radius:10px\">" + argsPreview + "</div>" +
+    "<div style=\"margin-top:8px;font-size:11.5px;color:#66749a\">Request from " + esc(creatorIp) + " • " + esc((p.fp?.ua || "unknown agent").slice(0, 60)) + "</div>" +
+    netWarn +
     "<div class=\"user\">" + avatar(email) + "</div>" +
     "<form method=\"POST\" action=\"/api/mcp/approve\"><input type=\"hidden\" name=\"req\" value=\"" + esc(p.id) + "\"/>" +
     "<label class=\"remember\"><input type=\"checkbox\" name=\"always\" value=\"yes\" checked/><span>Always allow this agent<small>Approve once — never ask again on this device.</small></span></label>" +
@@ -98,8 +106,18 @@ export async function POST(req: Request) {
     const back = "/api/mcp/approve" + (id ? "?req=" + encodeURIComponent(id) : "");
     return NextResponse.redirect(webOrigin(req) + "/login?next=" + encodeURIComponent(back));
   }
-  const done = await settlePending(id, allow === "yes" ? String(me.sub) : null);
+  const done = await settlePending(id, allow === "yes" ? String(me.sub) : null, clientIp(req));
   if (!done) return shell(brand() + "<div class=\"icon\">" + ICON_CLOCK + "</div><h1>Link expired</h1><p class=\"muted\">Already decided or too old. Ask your agent for a fresh link.</p>");
+  // Audit cross-network approvals: creator IP vs approver IP mismatch can mean
+  // a hijacked approval URL. Logged, still honoured (cross-device is legit).
+  try {
+    const { readDb, writeDb, uid } = await import("@/lib/db");
+    if (done.fp?.ip && clientIp(req) !== done.fp.ip) {
+      const db = await readDb();
+      db.events.push({ id: uid("e"), userId: String(me.sub), action: "mcp_approve_cross_net", detail: id + " creator=" + done.fp.ip + " approver=" + clientIp(req), at: new Date().toISOString() });
+      await writeDb(db);
+    }
+  } catch { /* best effort */ }
   if (allow === "yes") {
     if (always) {
       const { addTrusted } = await import("@/lib/mcpAuth");

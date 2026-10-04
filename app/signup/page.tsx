@@ -40,6 +40,10 @@ export default function Signup() {
         setShake((s) => s + 1);
         return;
       }
+      if (j.existing) {
+        window.location.href = "/login?exists=1&email=" + encodeURIComponent(email);
+        return;
+      }
       // Full reload so server gates read the fresh session cookie.
       window.location.href = "/dashboard";
     } catch {
@@ -71,7 +75,7 @@ export default function Signup() {
           Sign up — <span className="grad-anim">free</span>
         </h1>
         <p className="muted small" style={{ marginTop: 0 }}>
-          <strong className="grad-anim">10,000 coins</strong> included. Password: min 8 characters, letters + numbers.
+          <strong className="grad-anim">10,000 coins</strong> included. Password: min 12 characters, letters + numbers.
         </p>
         <form onSubmit={go}>
           <label>Email</label>

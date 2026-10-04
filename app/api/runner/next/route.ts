@@ -42,13 +42,24 @@ export async function GET(req: Request) {
   if (task.status === "running") {
     // Same runner retrying (not a second runner): hand the job back without
     // wiping the progress log it may already have posted.
+    // Ensure a per-task nonce exists so update/apk can prove the claim.
+    if (!task.runnerNonce) {
+      const crypto = await import("crypto");
+      task.runnerNonce = crypto.randomBytes(24).toString("hex");
+      task.updatedAt = new Date().toISOString();
+    }
     if (swept) await writeDb(db);
-    return NextResponse.json({ id: task.id, title: task.title, prompt: task.prompt, kind: task.kind, files: task.files, status: task.status, resumed: true });
+    else { try { await writeDb(db); } catch {} }
+    return NextResponse.json({ id: task.id, title: task.title, prompt: task.prompt, kind: task.kind, files: task.files, status: task.status, resumed: true, runner_token: task.runnerNonce });
   }
   task.status = "running";
   task.log = "Runner started OpenCode (" + task.kind + ")...";
   task.updatedAt = new Date().toISOString();
+  {
+    const crypto = await import("crypto");
+    task.runnerNonce = crypto.randomBytes(24).toString("hex");
+  }
   db.events.push({ id: uid("e"), userId: task.userId, action: "task_running", detail: task.id, at: task.updatedAt });
   await writeDb(db);
-  return NextResponse.json({ id: task.id, title: task.title, prompt: task.prompt, kind: task.kind, files: task.files, status: task.status });
+  return NextResponse.json({ id: task.id, title: task.title, prompt: task.prompt, kind: task.kind, files: task.files, status: task.status, runner_token: task.runnerNonce });
 }

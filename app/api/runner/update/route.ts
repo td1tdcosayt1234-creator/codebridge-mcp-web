@@ -13,9 +13,17 @@ export async function POST(req: Request) {
   if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   const db = await readDb();
   if (!verifyRunner(db, bearerToken(req))) return NextResponse.json({ error: "bad runner token" }, { status: 403 });
-  const { id, status, log, result, run_url } = await req.json().catch(() => ({}));
+  const { id, status, log, result, run_url, runner_token } = await req.json().catch(() => ({}));
   const task = db.tasks.find((x) => x.id === String(id || ""));
   if (!task) return NextResponse.json({ error: "Task not found." }, { status: 404 });
+  // Per-task claim proof: /next issued runner_token on claim. Tasks claimed
+  // after this deploy require it; legacy tasks (no nonce) still accept the
+  // global token until the builder workflow is updated to forward it.
+  if (task.runnerNonce) {
+    const got = String(runner_token || req.headers.get("x-task-token") || "");
+    if (!got || got !== task.runnerNonce)
+      return NextResponse.json({ error: "bad task token (pass runner_token from /next)" }, { status: 403 });
+  }
   const st = String(status || "");
   if (!["running", "done", "failed"].includes(st)) return NextResponse.json({ error: "Status must be running|done|failed." }, { status: 400 });
   // Terminal states are final: a finished task can never go back to running

@@ -178,6 +178,10 @@ async function callTool(req: Request, name: string, args: Record<string, unknown
 async function checkApproval(req: Request, args: Record<string, unknown>) {
   const id = String((args as Record<string, unknown>).req || "");
   if (!id) return text("Missing \"req\". Call compile/compile_fix first to get an approval URL.", true);
+  const { clientIp, rateLimit } = await import("@/lib/security");
+  const pollerIp = clientIp(req);
+  const prl = rateLimit("auth_check:" + pollerIp + ":" + id.slice(0, 32), 30, 60 * 1000);
+  if (!prl.ok) return text("Too many checks. Wait " + prl.retryAfterSec + "s.", true);
   const { getPending, dropPending, webOrigin, claimApproval, unclaimApproval } = await import("@/lib/mcpAuth");
   // Claim first: concurrent auth_check calls for the same id cannot both run the tool.
   if (!(await claimApproval(id))) {
@@ -188,6 +192,13 @@ async function checkApproval(req: Request, args: Record<string, unknown>) {
   try {
     const p = await getPending(id);
     if (!p) return text("Unknown or expired approval request. Call compile/compile_fix again for a fresh URL.", true);
+    // Bind poller to creator: only the agent that created the request (same
+    // public IP) may claim its result. A remote guesser gets "still waiting"
+    // and never sees the victim's approval state or task output.
+    if (pollerIp !== "local" && p.fp?.ip && p.fp.ip !== "local" && pollerIp !== p.fp.ip) {
+      unclaimApproval(id);
+      return text("Still waiting for browser approval. Open your own approval URL, login and Approve — then call auth_check again.", false);
+    }
     if (p.state === "denied") { await dropPending(id); return text("Approval was denied in the browser.", true); }
     if (p.state !== "approved" || !p.userId) {
       const url = webOrigin(req) + "/api/mcp/approve?req=" + p.id;
@@ -320,6 +331,15 @@ export async function POST(req: Request) {
     return err(null, -32700, "Parse error");
   }
   const batch = Array.isArray(body) ? (body as RpcMsg[]) : [body as RpcMsg];
+  // Cap batch + input sizes: unbounded batch = 10k× readDb + coin drain.
+  if (batch.length > 10) return err(null, -32602, "Batch too large (max 10).");
+  for (const m of batch) {
+    const nm = String((m.params as any)?.name || (m as any)?.method || "");
+    if (nm === "tools/call") {
+      const an = String(((m.params as any)?.arguments as any)?.title || "") + String(((m.params as any)?.arguments as any)?.prompt || "");
+      if (an.length > 25000) return err((m as RpcMsg)?.id ?? null, -32602, "Arguments too large.");
+    }
+  }
   const out: object[] = [];
   const batchId = Array.isArray(body) ? null : ((body as RpcMsg)?.id ?? null);
   for (const m of batch) {

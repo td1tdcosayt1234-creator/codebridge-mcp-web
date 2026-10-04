@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import crypto from "crypto";
 import { readDb, writeDb, uid } from "@/lib/db";
 import { signJwt } from "@/lib/auth";
 import { rateLimit, clientIp, passwordError, cookieSecure, clampText, csrfCheck, csrfBlock } from "@/lib/security";
@@ -26,11 +25,18 @@ export async function POST(req: Request) {
   if (pwErr) return NextResponse.json({ error: pwErr }, { status: 400 });
   if (String(password).length > 128) return NextResponse.json({ error: "Password too long (max 128 characters)." }, { status: 400 });
   const db = await readDb();
-  if (db.users.find((u) => u.email.toLowerCase() === mail)) return NextResponse.json({ error: "Account already exists. Please log in." }, { status: 409 });
+  // Anti-enumeration: existing and new emails return the SAME 200 shape.
+  // Existing accounts get {existing:true} with NO session — frontend redirects
+  // to login with "already exists". Dummy hash keeps timing indistinguishable.
+  if (db.users.find((u) => u.email.toLowerCase() === mail)) {
+    await bcrypt.hash(String(password), 10).catch(() => "");
+    return NextResponse.json({ ok: true, existing: true });
+  }
   const passHash = await bcrypt.hash(String(password), 10);
   const u = { id: uid("u"), email: mail, passHash, role: "user" as const, plan: "free" as const, createdAt: new Date().toISOString() };
   db.users.push(u);
-  db.mcpKeys.push({ userId: u.id, key: "cb_" + crypto.randomBytes(12).toString("hex") });
+  const { newPersonalKey } = await import("@/lib/mcpOAuth");
+  db.mcpKeys.push({ userId: u.id, key: newPersonalKey() });
   db.usage.push({ userId: u.id, mcpCalls: 0, githubCalls: 0, balance: 10000, usedTotal: 0 });
   db.events.push({ id: uid("e"), userId: u.id, action: "signup", detail: u.email, at: new Date().toISOString() });
   await writeDb(db);

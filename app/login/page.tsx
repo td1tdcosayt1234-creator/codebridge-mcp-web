@@ -27,7 +27,16 @@ export default function Login() {
       .then((x) => x.json())
       .then((j) => {
         if (j?.user) window.location.href = dest(j.user.role);
-        else setChecking(false);
+        else {
+          const q = new URLSearchParams(window.location.search);
+          if (q.get("exists") === "1") {
+            const em = q.get("email") || "";
+            if (em) setEmail(em);
+            setErr("Account already exists. Please log in.");
+            setShake((s) => s + 1);
+          }
+          setChecking(false);
+        }
       })
       .catch(() => setChecking(false));
   }, []);

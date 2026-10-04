@@ -43,12 +43,12 @@ export async function getPending(id: string): Promise<PendingCall | undefined> {
   return db.approvals.find((p) => p.id === String(id || ""));
 }
 
-export async function settlePending(id: string, userId: string | null): Promise<PendingCall | undefined> {
+export async function settlePending(id: string, userId: string | null, approverIp?: string): Promise<PendingCall | undefined> {
   const db = await readDb();
   const p = db.approvals.find((x) => x.id === String(id || ""));
   if (!p || p.state !== "waiting") return undefined;
-  if (userId) { p.state = "approved"; p.userId = userId; }
-  else p.state = "denied";
+  if (userId) { p.state = "approved"; p.userId = userId; p.approverIp = (approverIp || "").slice(0, 64); }
+  else { p.state = "denied"; p.approverIp = (approverIp || "").slice(0, 64); }
   await writeDb(db);
   return p;
 }
