@@ -7,8 +7,10 @@ export const dynamic = "force-dynamic";
 
 // Actions runner: send OpenCode output back to the web.
 export async function POST(req: Request) {
-  const { csrfCheck, csrfBlock } = await import("@/lib/security");
+  const { csrfCheck, csrfBlock, rateLimit, clientIp } = await import("@/lib/security");
   if (!csrfCheck(req)) return csrfBlock();
+  const rl = rateLimit("runner_update:" + clientIp(req), 120, 60 * 1000);
+  if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   const db = await readDb();
   if (!verifyRunner(db, bearerToken(req))) return NextResponse.json({ error: "bad runner token" }, { status: 403 });
   const { id, status, log, result, run_url } = await req.json().catch(() => ({}));
@@ -25,7 +27,9 @@ export async function POST(req: Request) {
   if (result !== undefined) task.result = String(result).slice(0, 20000);
   if (run_url !== undefined) {
     const u = String(run_url).slice(0, 500);
-    if (u && !/^https?:\/\//i.test(u)) return NextResponse.json({ error: "run_url must be http(s)." }, { status: 400 });
+    // run_url is rendered in dashboard: allow only GitHub Actions URLs (no phishing hosts).
+    if (u && !/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/actions\/runs\/\d+/.test(u))
+      return NextResponse.json({ error: "run_url must be a github.com actions run URL." }, { status: 400 });
     task.runUrl = u;
   }
   task.updatedAt = new Date().toISOString();

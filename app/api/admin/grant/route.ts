@@ -9,9 +9,15 @@ import { PLANS } from "@/lib/billing";
 export async function POST(req: Request) {
   const t = cookies().get("session")?.value || "";
   const p = await verifyJwt(t);
-  if (!p || p.role !== "admin") return NextResponse.json({ error: "admin only" }, { status: 403 });
-  const { csrfCheck, csrfBlock } = await import("@/lib/security");
+  if (!p?.sub) return NextResponse.json({ error: "admin only" }, { status: 403 });
+  const { csrfCheck, csrfBlock, rateLimit, clientIp } = await import("@/lib/security");
   if (!csrfCheck(req)) return csrfBlock();
+  const rl = rateLimit("admin_grant:" + clientIp(req), 30, 60 * 1000);
+  if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
+  // Never trust stale JWT role: re-read from DB.
+  const db0 = await readDb();
+  if (db0.users.find((x) => x.id === p.sub)?.role !== "admin")
+    return NextResponse.json({ error: "admin only" }, { status: 403 });
   const { userId = "", plan = "" } = await req.json().catch(() => ({}));
   if (!userId || (plan !== "free" && plan !== "pro" && plan !== "team")) {
     return NextResponse.json({ error: "userId + plan (free/pro/team) required" }, { status: 400 });

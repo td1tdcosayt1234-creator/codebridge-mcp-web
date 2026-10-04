@@ -7,9 +7,13 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   const t = cookies().get("session")?.value || "";
   const p = await verifyJwt(t);
   if (!p) return NextResponse.json({ error: "auth" }, { status: 401 });
+  const { rateLimit } = await import("@/lib/security");
+  const rl = rateLimit("task_get:" + p.sub, 60, 60 * 1000);
+  if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   const db = await readDb();
   const task = db.tasks.find((x) => x.id === params.id);
   if (!task) return NextResponse.json({ error: "Task not found." }, { status: 404 });
-  if (task.userId !== p.sub && p.role !== "admin") return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  const role = db.users.find((u) => u.id === p.sub)?.role || "";
+  if (task.userId !== p.sub && role !== "admin") return NextResponse.json({ error: "forbidden" }, { status: 403 });
   return NextResponse.json({ task });
 }

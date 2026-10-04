@@ -65,12 +65,14 @@ export async function GET(req: Request) {
     return NextResponse.redirect(webOrigin(req) + "/login?next=" + encodeURIComponent(back));
   }
   const email = String(me.email || me.sub);
+  const argsPreview = esc(JSON.stringify({ title: (p.args as any)?.title, prompt: String((p.args as any)?.prompt || "").slice(0, 300), files: Array.isArray((p.args as any)?.files) ? (p.args as any).files.map((f: any) => f?.path).slice(0, 10) : [] }));
   return shell(
     brand() +
     "<div class=\"icon\">" + ICON_SHIELD + "</div>" +
     "<h1>Allow this agent?</h1>" +
     "<p class=\"muted\">Your coding agent wants to run as <b>" + esc(email) + "</b>. Approving spends <b>your coins</b> when the task runs.</p>" +
     "<div class=\"pill\">" + esc(p.tool) + "</div>" +
+    "<div style=\"text-align:left;margin-top:12px;font-size:12px;word-break:break-all;background:#00000044;padding:10px;border-radius:10px\">" + argsPreview + "</div>" +
     "<div class=\"user\">" + avatar(email) + "</div>" +
     "<form method=\"POST\" action=\"/api/mcp/approve\"><input type=\"hidden\" name=\"req\" value=\"" + esc(p.id) + "\"/>" +
     "<label class=\"remember\"><input type=\"checkbox\" name=\"always\" value=\"yes\" checked/><span>Always allow this agent<small>Approve once — never ask again on this device.</small></span></label>" +
@@ -81,8 +83,10 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const { csrfCheck, csrfBlock } = await import("@/lib/security");
+  const { csrfCheck, csrfBlock, rateLimit, clientIp } = await import("@/lib/security");
   if (!csrfCheck(req)) return csrfBlock();
+  const rl = rateLimit("approve:" + clientIp(req), 30, 60 * 1000);
+  if (!rl.ok) return shell(brand() + "<div class=\"icon\">" + ICON_CLOCK + "</div><h1>Too many requests</h1><p class=\"muted\">Slow down and try again.</p>");
   const t = cookies().get("session")?.value || "";
   const form = await req.formData().catch(() => null);
   const id = String(form?.get("req") || "");

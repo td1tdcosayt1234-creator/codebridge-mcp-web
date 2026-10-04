@@ -81,7 +81,7 @@ export function csrfBlock(): Response {
 
 // ---- Password policy ----
 export function passwordError(pw: string): string | null {
-  if (!pw || pw.length < 8) return "Password must be at least 8 characters.";
+  if (!pw || pw.length < 12) return "Password must be at least 12 characters.";
   if (!/[a-zA-Z]/.test(pw) || !/[0-9]/.test(pw)) return "Password must include letters and numbers.";
   return null;
 }

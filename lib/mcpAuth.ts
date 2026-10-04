@@ -6,7 +6,10 @@ export type { PendingCall, ApprovalState } from "./db";
 // bound address like 0.0.0.0) so browser links are actually clickable.
 export function webOrigin(req: Request): string {
   const proto = (req.headers.get("x-forwarded-proto") || "").split(",")[0].trim() || "http";
-  const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").split(",")[0].trim();
+  const fwdHost = (req.headers.get("x-forwarded-host") || "").split(",")[0].trim();
+  const host =
+    ((process.env.TRUST_PROXY === "true" && fwdHost) ||
+      (req.headers.get("host") || "").split(",")[0].trim());
   if (host) return proto + "://" + host;
   return new URL(req.url).origin;
 }
@@ -69,8 +72,10 @@ export function agentFp(req: Request, clientIp: string): { ip: string; ua: strin
 
 function fpMatch(a: { ip: string; ua: string }, b: { ip: string; ua: string }): boolean {
   if (!a.ip || a.ip !== b.ip) return false;
-  if (a.ua || b.ua) return a.ua === b.ua;
-  return true;
+  // Empty UA must never match: otherwise all "local" (no CF header) agents
+  // with default/empty UA share one trusted identity.
+  if (!a.ua || !b.ua) return false;
+  return a.ua === b.ua;
 }
 
 // Single-flight guard for approval execution: synchronous claim (no await

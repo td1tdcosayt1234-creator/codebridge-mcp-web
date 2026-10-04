@@ -128,6 +128,11 @@ export async function writeDb(db:DbShape){
   // Bound growth: dashboard aggregations scan these arrays on every poll.
   if (db.events.length > 3000) db.events = db.events.slice(-3000);
   if (db.webhookIds.length > 500) db.webhookIds = db.webhookIds.slice(-500);
+  // Bound OAuth + trust stores: DCR auto-register + codes would otherwise bloat db.json (disk DoS).
+  if ((db.oauthClients?.length || 0) > 500) db.oauthClients = db.oauthClients.slice(-500);
+  if ((db.oauthCodes?.length || 0) > 500) db.oauthCodes = db.oauthCodes.slice(-500);
+  if ((db.trusted?.length || 0) > 500) db.trusted = db.trusted.slice(-500);
+  if ((db.approvals?.length || 0) > 500) db.approvals = db.approvals.slice(-500);
   // Rotating backups (latest 3) so a bad write/key never means total loss.
   try {
     await fs.access(file);

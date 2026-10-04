@@ -9,8 +9,10 @@ export async function POST(req: Request) {
   const t = cookies().get("session")?.value || "";
   const p = await verifyJwt(t);
   if (!p) return NextResponse.json({ error: "Login required" }, { status: 401 });
-  const { csrfCheck, csrfBlock } = await import("@/lib/security");
+  const { csrfCheck, csrfBlock, rateLimit, clientIp } = await import("@/lib/security");
   if (!csrfCheck(req)) return csrfBlock();
+  const rl = rateLimit("checkout:" + p.sub + ":" + clientIp(req), 10, 60 * 1000);
+  if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   if (!paddleConfigured()) return NextResponse.json({ error: "Payments not configured" }, { status: 503 });
   const { plan = "" } = await req.json().catch(() => ({}));
   if (plan !== "pro" && plan !== "team") return NextResponse.json({ error: "Unknown plan" }, { status: 400 });

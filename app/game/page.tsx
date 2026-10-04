@@ -368,7 +368,7 @@ export default function GameStudio(){
                     </div>
                   </div>
                 ) : html ? (
-                  <iframe ref={frameRef} title="preview" srcDoc={html} style={{width:"100%",height:"100%",border:0,background:"#020617"}} sandbox="allow-scripts allow-same-origin allow-pointer-lock" allow="fullscreen" />
+                  <iframe ref={frameRef} title="preview" srcDoc={html} style={{width:"100%",height:"100%",border:0,background:"#020617"}} sandbox="allow-scripts allow-pointer-lock" allow="fullscreen" />
                 ) : (
                   <div style={{textAlign:"center",padding:36,position:"relative"}}>
                     <div className="empty-art">🕹️</div>

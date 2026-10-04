@@ -8,8 +8,13 @@ import crypto from "crypto";
 async function admin() {
   const t = cookies().get("session")?.value || "";
   const p = await verifyJwt(t);
-  if (!p || p.role !== "admin") return null;
-  return p;
+  if (!p?.sub) return null;
+  // Never trust stale JWT role: re-read from DB (demoted admin keeps JWT 24h).
+  const { readDb } = await import("@/lib/db");
+  const db = await readDb();
+  const u = db.users.find((x) => x.id === p.sub);
+  if (!u || u.role !== "admin") return null;
+  return { ...p, email: u.email, role: "admin" as const };
 }
 
 // Manage builder repo + workflow + runner token. The runner token is shown only once at regenerate time.
@@ -36,8 +41,10 @@ export async function GET() {
 export async function POST(req: Request) {
   const p = await admin();
   if (!p) return NextResponse.json({ error: "admin only" }, { status: 403 });
-  const { csrfCheck, csrfBlock } = await import("@/lib/security");
+  const { csrfCheck, csrfBlock, rateLimit, clientIp } = await import("@/lib/security");
   if (!csrfCheck(req)) return csrfBlock();
+  const rl = rateLimit("admin_runner:" + clientIp(req), 30, 60 * 1000);
+  if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   const body = await req.json().catch(() => ({}));
   const db = await readDb();
   db.settings = db.settings || { builderRepo: "", builderWorkflow: "opencode-task.yml", runnerTokenEnc: "", updatedBy: "", updatedAt: "" };
@@ -51,11 +58,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, token, note: "Shown only once — put it into the builder repo secret RUNNER_TOKEN now." });
   }
   if (body.builderRepo !== undefined) {
-    const r = String(body.builderRepo).trim();
-    if (r && !r.includes("/")) return NextResponse.json({ error: "builderRepo must be in owner/repo format." }, { status: 400 });
+    const r = String(body.builderRepo).trim().slice(0, 200);
+    if (r && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(r))
+      return NextResponse.json({ error: "builderRepo must be owner/repo." }, { status: 400 });
     db.settings.builderRepo = r;
   }
-  if (body.builderWorkflow !== undefined) db.settings.builderWorkflow = String(body.builderWorkflow).trim() || "opencode-task.yml";
+  if (body.builderWorkflow !== undefined) {
+    const w = String(body.builderWorkflow).trim().slice(0, 100);
+    if (w && !/^[A-Za-z0-9_.-]+\.ya?ml$/.test(w))
+      return NextResponse.json({ error: "builderWorkflow must be a .yml file." }, { status: 400 });
+    db.settings.builderWorkflow = w || "opencode-task.yml";
+  }
   db.settings.updatedBy = p.email || p.sub;
   db.settings.updatedAt = new Date().toISOString();
   db.events.push({ id: uid("e"), userId: p.sub, action: "runner_settings", detail: db.settings.builderRepo + " " + db.settings.builderWorkflow, at: db.settings.updatedAt });

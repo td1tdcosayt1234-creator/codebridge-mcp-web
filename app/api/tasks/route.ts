@@ -15,6 +15,9 @@ async function me() {
 export async function GET() {
   const p = await me();
   if (!p) return NextResponse.json({ error: "auth" }, { status: 401 });
+  const { rateLimit } = await import("@/lib/security");
+  const rl = rateLimit("tasks_get:" + p.sub, 60, 60 * 1000);
+  if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   const db = await readDb();
   const mine = db.tasks.filter((x) => x.userId === p.sub).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 50);
   return NextResponse.json({ tasks: mine });

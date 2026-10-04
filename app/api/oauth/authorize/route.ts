@@ -102,6 +102,9 @@ function altCallback(uri: string): string | null {
 // Notion-style one-click connect: the agent opens this in a browser, the user
 // logs in (if needed) and clicks Connect — the agent gets its token.
 export async function GET(req: Request) {
+  const { rateLimit, clientIp } = await import("@/lib/security");
+  const rl = rateLimit("oauth_auth:" + clientIp(req), 60, 60 * 1000);
+  if (!rl.ok) return page("Connect", '<p class="eyebrow">CodeBridge MCP</p><h1>Too many requests</h1><p class="muted">Slow down and try again.</p>');
   const p = params(req.url);
   if (!p.clientId || !p.redirectUri)
     return page(
@@ -160,8 +163,10 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const { csrfCheck, csrfBlock } = await import("@/lib/security");
+  const { csrfCheck, csrfBlock, rateLimit, clientIp } = await import("@/lib/security");
   if (!csrfCheck(req)) return csrfBlock();
+  const rl = rateLimit("oauth_auth_post:" + clientIp(req), 30, 60 * 1000);
+  if (!rl.ok) return page("Connect", '<p class="eyebrow">CodeBridge MCP</p><h1>Too many requests</h1><p class="muted">Slow down and try again.</p>');
   const p = params(req.url);
   const t = cookies().get("session")?.value || "";
   const me = await verifyJwt(t);
@@ -197,11 +202,12 @@ export async function POST(req: Request) {
     );
   // Remote callbacks must prove PKCE S256: otherwise a stolen code alone
   // trades for the victim's MCP key at /api/oauth/token.
-  if (needsPkce(p.redirectUri) && !p.challenge)
+  // Enforced for ALL callbacks (incl. loopback): pkceOk() rejects missing verifier.
+  if (!p.challenge)
     return page(
       "Connect",
       '<p class="eyebrow">CodeBridge MCP</p><h1>PKCE required</h1>' +
-        '<p class="muted">This callback is not on this machine, so your agent must use PKCE (<code>code_challenge_method=S256</code>). Update the agent and try again.</p>'
+        '<p class="muted">Your agent must use PKCE (<code>code_challenge_method=S256</code>). Update the agent and try again.</p>'
     );
   const code = await issueCode(String(me.sub), p.clientId, p.redirectUri, p.challenge, p.method);
   const back =

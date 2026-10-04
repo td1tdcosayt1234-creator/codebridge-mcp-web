@@ -29,7 +29,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     const p = await verifyJwt(decodeURIComponent(m.slice(8)));
     if (!p?.sub) return Response.json({ error: "Login required." }, { status: 401 });
     userId = String(p.sub);
-    role = String(p.role || "");
+    role = db.users.find((u) => u.id === userId)?.role || ""; // Never trust stale JWT role.
   }
   const task = db.tasks.find((x) => x.id === params.id);
   if (!task || !task.exeSize) return Response.json({ error: "No EXE for this task." }, { status: 404 });
@@ -52,3 +52,4 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     },
   });
 }
+

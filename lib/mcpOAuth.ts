@@ -16,8 +16,11 @@ const CODE_TTL_MS = 10 * 60 * 1000;
 
 function base(req: Request): string {
   const proto = (req.headers.get("x-forwarded-proto") || "").split(",")[0].trim() || "http";
+  // x-forwarded-host is client-controlled — trust only behind sanitising proxy.
+  const fwdHost = (req.headers.get("x-forwarded-host") || "").split(",")[0].trim();
   const host =
-    (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").split(",")[0].trim();
+    ((process.env.TRUST_PROXY === "true" && fwdHost) ||
+      (req.headers.get("host") || "").split(",")[0].trim());
   if (host) return proto + "://" + host;
   return new URL(req.url).origin;
 }
@@ -160,7 +163,8 @@ export async function consumeCode(code: string) {
 }
 
 export function pkceOk(method: string, challenge: string, verifier: string): boolean {
-  if (!challenge) return true; // client did not use PKCE
+  // PKCE is mandatory: a code without challenge must never redeem.
+  if (!challenge || !verifier) return false;
   const m = (method || "plain").toUpperCase();
   if (m === "PLAIN") return false; // downgrade risk: only S256 is advertised
   if (m !== "S256") return false;
@@ -169,7 +173,6 @@ export function pkceOk(method: string, challenge: string, verifier: string): boo
 }
 
 export function newPersonalKey(): string {
-  return (
-    "cb_" + randomBytes(9).toString("hex").slice(0, 12) + randomBytes(3).toString("hex").slice(0, 4)
-  );
+  // 192-bit entropy, single-use display, long-lived — must resist offline guessing.
+  return "cb_" + randomBytes(24).toString("hex");
 }

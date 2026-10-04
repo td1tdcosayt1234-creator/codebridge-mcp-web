@@ -8,6 +8,9 @@ export const dynamic = "force-dynamic";
 // The access_token is the user's personal MCP key (cb_...), so /api/mcp
 // accepts it with zero extra plumbing. PKCE S256 verified when challenged.
 export async function POST(req: Request) {
+  const { rateLimit, clientIp } = await import("@/lib/security");
+  const rl = rateLimit("oauth_token:" + clientIp(req), 30, 60 * 1000);
+  if (!rl.ok) return NextResponse.json({ error: "too_many_requests" }, { status: 429 });
   const ct = req.headers.get("content-type") || "";
   let form: FormData | null = null;
   let json: Record<string, unknown> | null = null;

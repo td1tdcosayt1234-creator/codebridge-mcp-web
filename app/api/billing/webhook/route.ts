@@ -39,7 +39,9 @@ export async function POST(req: Request) {
     .map((it: any) => String(it?.price?.id || it?.price_id || ""))
     .filter(Boolean);
   const wantPrice = plan === "pro" ? process.env.PADDLE_PRO_PRICE_ID || "" : process.env.PADDLE_TEAM_PRICE_ID || "";
-  if (paidPriceIds.length > 0 && wantPrice && !paidPriceIds.includes(wantPrice))
+  // Fail closed: empty items must NOT mint coins. When wantPrice is configured
+  // the paid list must contain it; when unconfigured we still require items.
+  if (wantPrice ? !paidPriceIds.includes(wantPrice) : paidPriceIds.length === 0)
     return NextResponse.json({ ok: true, ignored: "price mismatch" });
   u.plan = plan as "pro" | "team";
   let usage = db.usage.find((x) => x.userId === userId);

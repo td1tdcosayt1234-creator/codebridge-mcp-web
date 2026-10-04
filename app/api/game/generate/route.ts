@@ -140,37 +140,54 @@ export async function POST(req: Request){
     const { prompt="", style="auto", model="" } = await req.json().catch(()=>({}));
     if(String(prompt||"").length>800) return NextResponse.json({error:"Prompt too long (max 800)"},{status:400});
     if(String(prompt||"").length<2) return NextResponse.json({error:"Prompt required"},{status:400});
+    const rawModel = String(model || "").trim();
+    // Enforce model allow-list: key owner pays for non-free models.
+    if (rawModel) {
+      const { OPENCODE_DEFAULT_MODEL } = await import("@/lib/opencode");
+      const cleaned = cleanModel(rawModel, OPENCODE_DEFAULT_MODEL);
+      if (!cleaned) return NextResponse.json({ error: "Unknown model." }, { status: 400 });
+    }
     // Pure AI generation — no templates. Kilo Code only.
     // Cloudflare Tunnel kills requests >100s (524), so run async: client polls GET ?job=id.
     const { uid } = await import("@/lib/db");
     const id = uid("job");
-    startJob(id, String(prompt || ""), String(style || "auto"), String(model || "").trim(), req);
+    startJob(id, String(user.sub), String(prompt || ""), String(style || "auto"), rawModel, req);
     return NextResponse.json({ ok: true, job: true, id });
   }catch(e){ return NextResponse.json({ error: String(e) }, {status:500})}
 }
 
 // In-memory game-generation jobs. Lost on restart (acceptable: client shows error and user retries).
-const jobs = new Map<string, { status: "running" | "done" | "error"; html?: string; provider?: string; error?: string; at: number }>();
-function startJob(id: string, prompt: string, style: string, model: string, req: Request) {
+const jobs = new Map<string, { owner: string; status: "running" | "done" | "error"; html?: string; provider?: string; error?: string; at: number }>();
+function startJob(id: string, owner: string, prompt: string, style: string, model: string, req: Request) {
   // Prune stale jobs so the map can't grow forever.
   jobs.forEach((v, k) => { if (Date.now() - v.at > 10 * 60 * 1000) jobs.delete(k); });
-  jobs.set(id, { status: "running", at: Date.now() });
+  jobs.set(id, { owner, status: "running", at: Date.now() });
   aiGameHTML(req, prompt, style, model)
     .then((ai) => {
       const j = jobs.get(id);
       if (!j) return;
-      if (ai) jobs.set(id, { status: "done", html: ai.html, provider: ai.provider, at: Date.now() });
-      else jobs.set(id, { status: "error", error: "AI generation failed. The free provider may be busy — wait a minute and try again.", at: Date.now() });
+      if (ai) jobs.set(id, { owner: j.owner, status: "done", html: ai.html, provider: ai.provider, at: Date.now() });
+      else jobs.set(id, { owner: j.owner, status: "error", error: "AI generation failed. The free provider may be busy — wait a minute and try again.", at: Date.now() });
     })
-    .catch((e) => jobs.set(id, { status: "error", error: String(e), at: Date.now() }));
+    .catch((e) => {
+      const j = jobs.get(id);
+      jobs.set(id, { owner: j?.owner || owner, status: "error", error: String(e), at: Date.now() });
+    });
 }
 export async function GET(req: Request){
+  const t = cookies().get("session")?.value || "";
+  const user = await verifyJwt(t);
+  if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
+  const { rateLimit } = await import("@/lib/security");
+  const rl = rateLimit("gamepoll:" + (user as any).sub, 60, 60 * 1000);
+  if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   const { KILO_FREE_MODELS, KILO_DEFAULT_MODEL } = await import("@/lib/kilo");
   const { OPENCODE_FREE_MODELS, OPENCODE_DEFAULT_MODEL, opencodeAuthOk } = await import("@/lib/opencode");
   const id = new URL(req.url).searchParams.get("job");
   if (id) {
     const j = jobs.get(id);
     if (!j) return NextResponse.json({ error: "Unknown job" }, { status: 404 });
+    if (j.owner !== (user as any).sub) return NextResponse.json({ error: "Not your job." }, { status: 403 });
     if (j.status === "running") return NextResponse.json({ ok: true, status: "running" });
     if (j.status === "error") return NextResponse.json({ ok: false, error: j.error }, { status: 503 });
     return NextResponse.json({ ok: true, status: "done", html: j.html, name: "index.html", size: (j.html || "").length, engine: "ai", provider: j.provider });

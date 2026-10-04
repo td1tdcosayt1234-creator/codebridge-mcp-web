@@ -28,7 +28,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     const p = await verifyJwt(decodeURIComponent(m.slice(8)));
     if (!p?.sub) return Response.json({ error: "Login required." }, { status: 401 });
     userId = String(p.sub);
-    role = String(p.role || "");
+    // Never trust stale JWT role: re-read from DB.
+    role = db.users.find((u) => u.id === userId)?.role || "";
   }
   const task = db.tasks.find((x) => x.id === params.id);
   if (!task || !task.apkSize) return Response.json({ error: "No APK for this task." }, { status: 404 });
