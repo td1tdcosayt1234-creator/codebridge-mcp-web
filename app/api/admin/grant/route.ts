@@ -18,7 +18,17 @@ export async function POST(req: Request) {
   const db0 = await readDb();
   if (db0.users.find((x) => x.id === p.sub)?.role !== "admin")
     return NextResponse.json({ error: "admin only" }, { status: 403 });
-  const { userId = "", plan = "" } = await req.json().catch(() => ({}));
+  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  // Tier-2: plan grants move coins — admins must pass 2FA step-up.
+  const { stepupInput, requireStepUp } = await import("@/lib/stepup");
+  const step = await requireStepUp(String(p.sub), stepupInput(req, body), { admin: true });
+  if (!step.ok)
+    return NextResponse.json(
+      { error: (step as { needEnroll?: boolean }).needEnroll ? "Enable 2FA in /dashboard/settings first." : "Fresh 2FA code required (x-2fa-code)." },
+      { status: 403 }
+    );
+  const userId = String(body.userId || "");
+  const plan = String(body.plan || "");
   if (!userId || (plan !== "free" && plan !== "pro" && plan !== "team")) {
     return NextResponse.json({ error: "userId + plan (free/pro/team) required" }, { status: 400 });
   }

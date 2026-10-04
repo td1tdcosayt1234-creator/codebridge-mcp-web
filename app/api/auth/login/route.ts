@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { readDb, writeDb, uid } from "@/lib/db";
 import { signJwt } from "@/lib/auth";
-import { rateLimit, clientIp, cookieSecure, csrfCheck, csrfBlock } from "@/lib/security";
+import { rateLimit, clientIp, cookieSecure, csrfCheck, csrfBlock, isBanned, banResponse, recordViolation } from "@/lib/security";
 
 const MAX_FAILS = 5;
 const LOCK_MS = 15 * 60 * 1000;
@@ -10,6 +10,7 @@ const LOCK_MS = 15 * 60 * 1000;
 export async function POST(req: Request) {
   if (!csrfCheck(req)) return csrfBlock();
   const ip = clientIp(req);
+  if (isBanned(ip)) return banResponse();
   const { email, password, remember, website } = await req.json().catch(() => ({}));
   const { honeypot } = await import("@/lib/antifraud");
   if (honeypot({ website })) return NextResponse.json({ error: "Bot detected." }, { status: 400 });
@@ -44,9 +45,18 @@ export async function POST(req: Request) {
     }
     if (u) db.events.push({ id: uid("e"), userId: u.id, action: "login_fail", detail: u.email, at: new Date().toISOString() });
     await writeDb(db);
+    recordViolation(ip, 1);
     return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
   }
   db.attempts = db.attempts.filter((a) => a.email !== mail);
+  // Tier-2: 2FA enrolled -> short-lived tmp token, code verified at /2fa/verify.
+  const { decToken } = await import("@/lib/crypto");
+  if (u.twoFaEnc && decToken(u.twoFaEnc)) {
+    db.events.push({ id: uid("e"), userId: u.id, action: "login_step1", detail: u.email, at: new Date().toISOString() });
+    await writeDb(db);
+    const tmp = await signJwt({ sub: u.id, purpose: "2fa", remember: !!remember }, "5m");
+    return NextResponse.json({ ok: true, need2fa: true, tmp });
+  }
   db.events.push({ id: uid("e"), userId: u.id, action: "login", detail: u.email, at: new Date().toISOString() });
   await writeDb(db);
   const token = await signJwt({ sub: u.id, email: u.email, role: u.role }, remember ? "30d" : "24h");

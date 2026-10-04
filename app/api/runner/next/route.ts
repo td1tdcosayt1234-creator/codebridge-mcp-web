@@ -11,11 +11,16 @@ const STUCK_MS = 45 * 60 * 1000;
 
 // Actions runner: take the next job. ?task_id= takes that task, otherwise the oldest queued one.
 export async function GET(req: Request) {
-  const { rateLimit, clientIp } = await import("@/lib/security");
-  const rl = rateLimit("runner:" + clientIp(req), 60, 60 * 1000);
+  const { rateLimit, clientIp, isBanned, banResponse, recordViolation } = await import("@/lib/security");
+  const ip = clientIp(req);
+  if (isBanned(ip)) return banResponse();
+  const rl = rateLimit("runner:" + ip, 60, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Rate limited. Retry in " + rl.retryAfterSec + "s." }, { status: 429 });
   const db = await readDb();
-  if (!verifyRunner(db, bearerToken(req))) return NextResponse.json({ error: "bad runner token" }, { status: 403 });
+  if (!verifyRunner(db, bearerToken(req))) {
+    recordViolation(ip, 2);
+    return NextResponse.json({ error: "bad runner token" }, { status: 403 });
+  }
   const now = new Date().toISOString();
   let swept = false;
   for (const t of db.tasks) {

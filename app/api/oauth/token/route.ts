@@ -8,8 +8,10 @@ export const dynamic = "force-dynamic";
 // The access_token is the user's personal MCP key (cb_...), so /api/mcp
 // accepts it with zero extra plumbing. PKCE S256 verified when challenged.
 export async function POST(req: Request) {
-  const { rateLimit, clientIp } = await import("@/lib/security");
-  const rl = rateLimit("oauth_token:" + clientIp(req), 30, 60 * 1000);
+  const { rateLimit, clientIp, isBanned, banResponse, recordViolation } = await import("@/lib/security");
+  const ip = clientIp(req);
+  if (isBanned(ip)) return NextResponse.json({ error: "too_many_requests" }, { status: 429 });
+  const rl = rateLimit("oauth_token:" + ip, 30, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "too_many_requests" }, { status: 429 });
   const ct = req.headers.get("content-type") || "";
   let form: FormData | null = null;
@@ -17,16 +19,25 @@ export async function POST(req: Request) {
   if (ct.includes("application/json")) json = await req.json().catch(() => null);
   else form = await req.formData().catch(() => null);
   const g = (k: string) => String((form ? form.get(k) : json?.[k]) || "");
-  if (g("grant_type") !== "authorization_code")
+  if (g("grant_type") !== "authorization_code") {
+    recordViolation(ip, 1);
     return NextResponse.json({ error: "unsupported_grant_type" }, { status: 400 });
+  }
   const c = await consumeCode(g("code"));
-  if (!c) return NextResponse.json({ error: "invalid_grant" }, { status: 400 });
+  if (!c) {
+    recordViolation(ip, 1);
+    return NextResponse.json({ error: "invalid_grant" }, { status: 400 });
+  }
   // redirect_uri must always match the one the code was issued for — a
   // stolen code alone is useless without the exact callback.
-  if (c.clientId !== g("client_id") || !g("redirect_uri") || c.redirectUri !== g("redirect_uri"))
+  if (c.clientId !== g("client_id") || !g("redirect_uri") || c.redirectUri !== g("redirect_uri")) {
+    recordViolation(ip, 2);
     return NextResponse.json({ error: "invalid_grant" }, { status: 400 });
-  if (!pkceOk(c.method, c.challenge, g("code_verifier")))
+  }
+  if (!pkceOk(c.method, c.challenge, g("code_verifier"))) {
+    recordViolation(ip, 2);
     return NextResponse.json({ error: "invalid_grant" }, { status: 400 });
+  }
 
   const db = await readDb();
   let rec = db.mcpKeys.find((k) => k.userId === c.userId);

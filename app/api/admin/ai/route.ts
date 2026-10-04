@@ -41,7 +41,16 @@ export async function POST(req: Request) {
   if (!csrfCheck(req)) return csrfBlock();
   const rl = rateLimit("admin_ai:" + clientIp(req), 20, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
-  const { key, baseUrl, model } = await req.json().catch(() => ({}));
+  const body = await req.json().catch(() => ({}));
+  const { key, baseUrl, model } = body as Record<string, unknown>;
+  // Tier-2: global AI key affects all Game Studio output — 2FA mandatory.
+  const { stepupInput, requireStepUp } = await import("@/lib/stepup");
+  const step = await requireStepUp(String((p as Record<string, unknown>).sub), stepupInput(req, body), { admin: true });
+  if (!step.ok)
+    return NextResponse.json(
+      { error: (step as { needEnroll?: boolean }).needEnroll ? "Enable 2FA in /dashboard/settings first." : "Fresh 2FA code required (x-2fa-code)." },
+      { status: 403 }
+    );
   const k = String(key || "").trim();
   if (k.length < 12) return NextResponse.json({ error: "Paste a valid API key (min 12 chars)." }, { status: 400 });
   const base = String(baseUrl || ZEN_DEFAULT_BASE).trim().replace(/\/+$/, "") || ZEN_DEFAULT_BASE;
@@ -77,6 +86,13 @@ export async function DELETE(req: Request) {
   if (!csrfCheck(req)) return csrfBlock();
   const rl = rateLimit("admin_ai:" + clientIp(req), 20, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
+  const { stepupInput, requireStepUp } = await import("@/lib/stepup");
+  const step = await requireStepUp(String((p as Record<string, unknown>).sub), stepupInput(req, null), { admin: true });
+  if (!step.ok)
+    return NextResponse.json(
+      { error: (step as { needEnroll?: boolean }).needEnroll ? "Enable 2FA in /dashboard/settings first." : "Fresh 2FA code required (x-2fa-code)." },
+      { status: 403 }
+    );
   const db = await readDb();
   db.globalAI = undefined;
   db.events.push({ id: uid("e"), userId: p.sub, action: "admin_ai_key_remove", detail: "global AI key removed, .env fallback active", at: new Date().toISOString() });

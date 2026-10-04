@@ -2,7 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
 import { encWith, decWith } from "./crypto";
-export type User = { id:string; email:string; passHash:string; role:"user"|"admin"; plan:"free"|"pro"|"team"; createdAt:string; googleId?:string; provider?: "local"|"google" };
+export type User = { id:string; email:string; passHash:string; role:"user"|"admin"; plan:"free"|"pro"|"team"; createdAt:string; googleId?:string; provider?: "local"|"google"; twoFaEnc?:string; twoFaPending?:string; twoFaBackup?:string[]; twoFaAt?:string };
 export type EventItem = { id:string; userId:string; action:string; detail:string; ip?:string; at:string };
 export type Build = { id:string; userId:string; repo:string; branch:string; status:string; log:string; at:string };
 export type Ticket = { id:string; userId:string; subject:string; body:string; status:string; at:string };
@@ -62,7 +62,7 @@ async function ensure(){
     await fs.mkdir(path.dirname(file),{recursive:true});
     const bcrypt = (await import("bcryptjs")).default;
     const { password, generated } = await seedAdminPassword();
-    const hash = await bcrypt.hash(password,10);
+    const hash = await bcrypt.hash(password, 12);
     const seed:DbShape={users:[{id:"u_admin",email:seedAdminEmail(),passHash:hash,role:"admin",plan:"pro",createdAt:new Date().toISOString()}],events:[],builds:[],tickets:[],githubTokens:[],mcpKeys:[{userId:"u_admin",key:"cb_"+crypto.randomBytes(18).toString("hex")}],usage:[{userId:"u_admin",mcpCalls:0,githubCalls:0,balance:10000,usedTotal:0}],tasks:[],attempts:[],earnNonces:[],approvals:[],trusted:[],oauthClients:[],oauthCodes:[],billing:[],webhookIds:[]};
     await writeDb(seed);
     if (generated) console.warn("[codebridge] generated admin password (shown once â save it and set ADMIN_PASSWORD): " + password);

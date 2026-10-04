@@ -78,7 +78,16 @@ export async function POST(req: Request) {
   if (!csrfCheck(req)) return csrfBlock();
   const rl = rateLimit("admin_oc:" + clientIp(req), 20, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
-  const { key } = await req.json().catch(() => ({}));
+  const body = await req.json().catch(() => ({}));
+  const { key } = body as Record<string, unknown>;
+  // Tier-2: CLI credential write — 2FA mandatory.
+  const { stepupInput, requireStepUp } = await import("@/lib/stepup");
+  const step = await requireStepUp(String((p as Record<string, unknown>).sub), stepupInput(req, body), { admin: true });
+  if (!step.ok)
+    return NextResponse.json(
+      { error: (step as { needEnroll?: boolean }).needEnroll ? "Enable 2FA in /dashboard/settings first." : "Fresh 2FA code required (x-2fa-code)." },
+      { status: 403 }
+    );
   const k = String(key || "").trim();
   if (k.length < 12) return NextResponse.json({ error: "Paste a valid API key (min 12 chars)." }, { status: 400 });
   // Live-verify before saving so a dead key never becomes the active one.
@@ -103,6 +112,14 @@ export async function DELETE(req: Request) {
   if (!csrfCheck(req)) return csrfBlock();
   const rl = rateLimit("admin_oc:" + clientIp(req), 20, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
+  // Tier-2: CLI credential delete — 2FA mandatory.
+  const { stepupInput, requireStepUp } = await import("@/lib/stepup");
+  const step = await requireStepUp(String((p as Record<string, unknown>).sub), stepupInput(req, null), { admin: true });
+  if (!step.ok)
+    return NextResponse.json(
+      { error: (step as { needEnroll?: boolean }).needEnroll ? "Enable 2FA in /dashboard/settings first." : "Fresh 2FA code required (x-2fa-code)." },
+      { status: 403 }
+    );
   try {
     await fs.rm(authPath(), { force: true });
   } catch {

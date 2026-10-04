@@ -14,7 +14,13 @@ export async function POST(req: Request) {
   const rl = rateLimit("checkout:" + p.sub + ":" + clientIp(req), 10, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   if (!paddleConfigured()) return NextResponse.json({ error: "Payments not configured" }, { status: 503 });
-  const { plan = "" } = await req.json().catch(() => ({}));
+  const body = await req.json().catch(() => ({}));
+  const { plan = "" } = body as Record<string, unknown>;
+  // Tier-2: money leaves here — 2FA-enrolled users must send a fresh code.
+  const { stepupInput, requireStepUp } = await import("@/lib/stepup");
+  const step = await requireStepUp(String(p.sub), stepupInput(req, body));
+  if (!step.ok)
+    return NextResponse.json({ error: "Fresh 2FA code required (x-2fa-code)." }, { status: 403 });
   if (plan !== "pro" && plan !== "team") return NextResponse.json({ error: "Unknown plan" }, { status: 400 });
   const db = await readDb();
   const u = db.users.find((x) => x.id === p.sub);

@@ -46,7 +46,7 @@ export async function GET(req: Request) {
     if (!user) {
       // New Google user: unusable password hash (password login impossible),
       // free plan + coins, personal MCP key — same as email signup.
-      const passHash = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
+      const passHash = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 12);
       const adminMail = (process.env.ADMIN_EMAIL || "admin@local.test").trim().toLowerCase();
       const isAdmin = prof.email === adminMail && !db.users.some((x) => x.role === "admin");
       user = {
@@ -64,6 +64,16 @@ export async function GET(req: Request) {
       db.events.push({ id: uid("e"), userId: user.id, action: "login_google", detail: user.email, at: new Date().toISOString() });
     }
     db.attempts = db.attempts.filter((a) => a.email !== user!.email);
+    // Tier-2: 2FA enrolled -> tmp cookie, code verified on /login?need2fa=1.
+    const { decToken } = await import("@/lib/crypto");
+    if (user!.twoFaEnc && decToken(user!.twoFaEnc)) {
+      db.events.push({ id: uid("e"), userId: user!.id, action: "login_step1", detail: user!.email + " (google)", at: new Date().toISOString() });
+      await writeDb(db);
+      const tmp = await signJwt({ sub: user!.id, purpose: "2fa", remember }, "5m");
+      const res = clear(NextResponse.redirect(new URL("/login?need2fa=1", req.url)));
+      res.cookies.set("g2fa", tmp, { httpOnly: true, path: "/", maxAge: 5 * 60, sameSite: "lax", secure: cookieSecure(req) });
+      return res;
+    }
     await writeDb(db);
     const token = await signJwt({ sub: user.id, email: user.email, role: user.role }, remember ? "30d" : "24h");
     const role = user.role;

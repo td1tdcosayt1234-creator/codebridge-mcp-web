@@ -29,10 +29,10 @@ export async function POST(req: Request) {
   // Existing accounts get {existing:true} with NO session — frontend redirects
   // to login with "already exists". Dummy hash keeps timing indistinguishable.
   if (db.users.find((u) => u.email.toLowerCase() === mail)) {
-    await bcrypt.hash(String(password), 10).catch(() => "");
+    await bcrypt.hash(String(password), 12).catch(() => "");
     return NextResponse.json({ ok: true, existing: true });
   }
-  const passHash = await bcrypt.hash(String(password), 10);
+  const passHash = await bcrypt.hash(String(password), 12);
   const u = { id: uid("u"), email: mail, passHash, role: "user" as const, plan: "free" as const, createdAt: new Date().toISOString() };
   db.users.push(u);
   const { newPersonalKey } = await import("@/lib/mcpOAuth");

@@ -33,6 +33,50 @@ export function clientIp(req: Request): string {
   return "local";
 }
 
+// ---- Tier-1 edge shield: violation score + auto-ban ----
+// Beyond per-route rate limits: repeated hostile signals (bad tokens,
+// bad signatures, CSRF fails, auth fails) from one IP accumulate.
+// 20 points in 10 min -> 15-min ban (403). Legit typos never reach it.
+const viol = new Map<string, { score: number; first: number; bannedUntil: number }>();
+const BAN_SCORE = 20;
+const BAN_WINDOW_MS = 10 * 60 * 1000;
+const BAN_MS = 15 * 60 * 1000;
+export function isBanned(ip: string): boolean {
+  if (!ip || ip === "local") return false;
+  const v = viol.get(ip);
+  if (!v) return false;
+  const now = Date.now();
+  if (v.bannedUntil > now) return true;
+  if (now - v.first > BAN_WINDOW_MS) viol.delete(ip);
+  return false;
+}
+export function banRemainingSec(ip: string): number {
+  const v = viol.get(ip);
+  if (!v) return 0;
+  return Math.max(0, Math.ceil((v.bannedUntil - Date.now()) / 1000));
+}
+export function recordViolation(ip: string, weight = 1): void {
+  if (!ip || ip === "local") return;
+  const now = Date.now();
+  if (viol.size > 5000) {
+    viol.forEach((v, k) => {
+      if (v.bannedUntil < now && now - v.first > BAN_WINDOW_MS) viol.delete(k);
+    });
+  }
+  const v = viol.get(ip) || { score: 0, first: now, bannedUntil: 0 };
+  if (now - v.first > BAN_WINDOW_MS) {
+    v.score = 0;
+    v.first = now;
+    v.bannedUntil = 0;
+  }
+  v.score += weight;
+  if (v.score >= BAN_SCORE) v.bannedUntil = now + BAN_MS;
+  viol.set(ip, v);
+}
+export function banResponse(): Response {
+  return Response.json({ error: "Blocked for abuse. Try again later." }, { status: 403 });
+}
+
 // ---- Timing-safe string compare (tokens/secrets) ----
 export function safeEqual(a: string, b: string): boolean {
   const ha = crypto.createHash("sha256").update(a || "").digest();

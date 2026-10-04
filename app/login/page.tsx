@@ -22,6 +22,9 @@ export default function Login() {
   const [shake, setShake] = useState(0);
   const [checking, setChecking] = useState(true);
   const [googleOn, setGoogleOn] = useState(false);
+  const [need2fa, setNeed2fa] = useState(false);
+  const [tmp, setTmp] = useState("");
+  const [code, setCode] = useState("");
 
   useEffect(() => {
     fetch("/api/auth/google/status", { cache: "no-store" })
@@ -34,6 +37,9 @@ export default function Login() {
         if (j?.user) window.location.href = dest(j.user.role);
         else {
           const q = new URLSearchParams(window.location.search);
+          if (q.get("need2fa") === "1") {
+            setNeed2fa(true);
+          }
           if (q.get("exists") === "1") {
             const em = q.get("email") || "";
             if (em) setEmail(em);
@@ -71,9 +77,40 @@ export default function Login() {
         setShake((s) => s + 1);
         return;
       }
+      if (j.need2fa) {
+        setNeed2fa(true);
+        setTmp(j.tmp || "");
+        setErr("");
+        return;
+      }
       // Full reload (not router.push): server layouts/middleware must
       // re-read the freshly-set session cookie, otherwise they bounce
       // straight back to /login with a stale cached payload.
+      window.location.href = dest(j.role);
+    } catch {
+      setErr("Server unreachable — address/server check kore abar try koro.");
+      setShake((s) => s + 1);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verify2fa(e: React.FormEvent) {
+    e.preventDefault();
+    setErr("");
+    setBusy(true);
+    try {
+      const res = await fetch("/api/auth/2fa/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tmp: tmp || undefined, code, remember }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErr(j.error || "Wrong code");
+        setShake((s) => s + 1);
+        return;
+      }
       window.location.href = dest(j.role);
     } catch {
       setErr("Server unreachable — address/server check kore abar try koro.");
@@ -103,6 +140,31 @@ export default function Login() {
         <h1>
           Login to <span className="grad-anim">CodeBridge</span>
         </h1>
+        {need2fa ? (
+          <form onSubmit={verify2fa}>
+            <p className="muted small" style={{ marginTop: 0 }}>
+              Tier-2 check — open your authenticator app and enter the 6-digit code (or a backup code).
+            </p>
+            <label>Authenticator code</label>
+            <input value={code} onChange={(e) => setCode(e.target.value)} autoComplete="one-time-code" inputMode="numeric" placeholder="123456" maxLength={8} />
+            {err && (
+              <p className="small" style={{ marginTop: 12 }}>
+                <span className="badge bad">{err}</span>
+              </p>
+            )}
+            <div style={{ marginTop: 20 }}>
+              <button className="btn btn-lg shine" style={{ width: "100%" }} type="submit" disabled={busy}>
+                {busy ? "Verifying…" : "Verify"}
+              </button>
+            </div>
+            <p className="muted small" style={{ margin: "14px 0 0", textAlign: "center" }}>
+              <button type="button" className="pw-toggle" style={{ position: "static", transform: "none" }} onClick={() => { setNeed2fa(false); setCode(""); setErr(""); }}>
+                ← Back to password
+              </button>
+            </p>
+          </form>
+        ) : (
+        <>
         <p className="muted small" style={{ marginTop: 0 }}>
           Local admin is set via <code>ADMIN_EMAIL</code> / <code>ADMIN_PASSWORD</code> in <code>.env</code>. Accounts
           lock for 15 minutes after 5 wrong tries.
@@ -147,7 +209,9 @@ export default function Login() {
             </button>
           </div>
         </form>
-        {googleOn && (
+        </>
+        )}
+        {googleOn && !need2fa && (
           <>
             <div className="or-div">or</div>
             <div style={{ marginTop: 12 }}>

@@ -13,12 +13,17 @@ const MAX_APK = 100 * 1024 * 1024; // 100MB debug APK cap
 //   success hole). Web stores it on disk, coding agent fetches it via
 //   /api/tasks/[id]/apk|jar|exe|deb (link in MCP tool output).
 export async function POST(req: Request) {
-  const { csrfCheck, csrfBlock, rateLimit, clientIp } = await import("@/lib/security");
+  const { csrfCheck, csrfBlock, rateLimit, clientIp, isBanned, banResponse, recordViolation } = await import("@/lib/security");
   if (!csrfCheck(req)) return csrfBlock();
-  const rl = rateLimit("runner_apk:" + clientIp(req), 30, 60 * 1000);
+  const ip = clientIp(req);
+  if (isBanned(ip)) return banResponse();
+  const rl = rateLimit("runner_apk:" + ip, 30, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   const db = await readDb();
-  if (!verifyRunner(db, bearerToken(req))) return NextResponse.json({ error: "bad runner token" }, { status: 403 });
+  if (!verifyRunner(db, bearerToken(req))) {
+    recordViolation(ip, 2);
+    return NextResponse.json({ error: "bad runner token" }, { status: 403 });
+  }
   const url = new URL(req.url);
   const id = url.searchParams.get("task_id") || "";
   const kind = url.searchParams.get("kind") || "apk";

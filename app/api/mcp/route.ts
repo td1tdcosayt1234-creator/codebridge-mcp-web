@@ -154,6 +154,8 @@ async function callTool(req: Request, name: string, args: Record<string, unknown
   if (name === "auth_check") return await checkApproval(req, args);
   const who = await resolveUser(req);
   if (who && "sentBadKey" in who) {
+    const { clientIp, recordViolation } = await import("@/lib/security");
+    recordViolation(clientIp(req), 1);
     const { invalidToken } = await import("@/lib/mcpOAuth");
     throw invalidToken("This personal key is wrong or was regenerated. Copy the fresh key from /dashboard/mcp.");
   }
@@ -316,7 +318,8 @@ async function handleOne(req: Request, m: RpcMsg): Promise<{ resp: object | null
 }
 
 export async function POST(req: Request) {
-  const { rateLimit, clientIp, csrfCheck, csrfBlock, hasBearer, sameOrigin } = await import("@/lib/security");
+  const { rateLimit, clientIp, csrfCheck, csrfBlock, hasBearer, sameOrigin, isBanned, banResponse } = await import("@/lib/security");
+  if (isBanned(clientIp(req))) return banResponse() as unknown as ReturnType<typeof err>;
   const rl = rateLimit("mcp:" + clientIp(req), 120, 60 * 1000);
   if (!rl.ok) return err(null, -32000, "Rate limited. Retry in " + rl.retryAfterSec + "s.");
   // Cookie-authed browser calls must be same-origin; Bearer machine clients bypass.

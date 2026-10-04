@@ -46,6 +46,14 @@ export async function POST(req: Request) {
   const rl = rateLimit("admin_runner:" + clientIp(req), 30, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   const body = await req.json().catch(() => ({}));
+  // Tier-2: runner token + builder repo control code execution — 2FA mandatory.
+  const { stepupInput, requireStepUp } = await import("@/lib/stepup");
+  const step = await requireStepUp(String((p as Record<string, unknown>).sub), stepupInput(req, body), { admin: true });
+  if (!step.ok)
+    return NextResponse.json(
+      { error: (step as { needEnroll?: boolean }).needEnroll ? "Enable 2FA in /dashboard/settings first." : "Fresh 2FA code required (x-2fa-code)." },
+      { status: 403 }
+    );
   const db = await readDb();
   db.settings = db.settings || { builderRepo: "", builderWorkflow: "opencode-task.yml", runnerTokenEnc: "", updatedBy: "", updatedAt: "" };
   if (body.regenerate) {
