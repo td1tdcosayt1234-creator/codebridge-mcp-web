@@ -21,8 +21,13 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
   const [shake, setShake] = useState(0);
   const [checking, setChecking] = useState(true);
+  const [googleOn, setGoogleOn] = useState(false);
 
   useEffect(() => {
+    fetch("/api/auth/google/status", { cache: "no-store" })
+      .then((x) => x.json())
+      .then((j) => { if (j?.google) setGoogleOn(true); })
+      .catch(() => {});
     fetch("/api/auth/me", { cache: "no-store" })
       .then((x) => x.json())
       .then((j) => {
@@ -133,6 +138,17 @@ export default function Login() {
             </button>
           </div>
         </form>
+        {googleOn && (
+          <div style={{ marginTop: 12 }}>
+            <a
+              className="btn btn-lg"
+              style={{ width: "100%", display: "block", textAlign: "center", background: "#fff", color: "#111", textDecoration: "none" }}
+              href={"/api/auth/google?next=" + encodeURIComponent(new URLSearchParams(window.location.search).get("next") || "/dashboard")}
+            >
+              Continue with Google
+            </a>
+          </div>
+        )}
         <p className="muted small" style={{ margin: "14px 0 0", textAlign: "center" }}>
           Tip: login works per address — localhost, tailnet IP and tunnel URL each need their own login. Pick one and
           bookmark it.

@@ -12,9 +12,14 @@ export default function Signup() {
   const [busy, setBusy] = useState(false);
   const [shake, setShake] = useState(0);
   const [checking, setChecking] = useState(true);
+  const [googleOn, setGoogleOn] = useState(false);
 
   // Already logged in -> straight to dashboard, no second form.
   useEffect(() => {
+    fetch("/api/auth/google/status", { cache: "no-store" })
+      .then((x) => x.json())
+      .then((j) => { if (j?.google) setGoogleOn(true); })
+      .catch(() => {});
     fetch("/api/auth/me", { cache: "no-store" })
       .then((x) => x.json())
       .then((j) => {
@@ -117,6 +122,17 @@ export default function Signup() {
             </button>
           </div>
         </form>
+        {googleOn && (
+          <div style={{ marginTop: 12 }}>
+            <a
+              className="btn btn-lg"
+              style={{ width: "100%", display: "block", textAlign: "center", background: "#fff", color: "#111", textDecoration: "none" }}
+              href="/api/auth/google?next=/dashboard"
+            >
+              Continue with Google
+            </a>
+          </div>
+        )}
         <p className="muted small" style={{ margin: "18px 0 0", textAlign: "center" }}>
           Already have an account?{" "}
           <Link href="/login" style={{ color: "var(--mint-2)" }}>
