@@ -11,7 +11,7 @@ export default function NotFound() {
         <span className="pulse-dot" />
         Signal lost
       </div>
-      <div className="grad-anim text-glow" style={{ fontSize: 118, fontWeight: 800, letterSpacing: "-0.06em", lineHeight: 1 }}>
+      <div className="big-glow">
         404
       </div>
       <h1 style={{ margin: "14px 0 10px", fontSize: 30 }}>This frame never rendered</h1>

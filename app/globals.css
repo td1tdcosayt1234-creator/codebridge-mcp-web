@@ -1052,3 +1052,94 @@ details.faq .a { padding: 0 18px 18px 56px; color: #c3cade; font-size: 14.3px; l
   .fade-up, .rv, .stagger > *, .word-mask > span, .page-transition { opacity: 1 !important; transform: none !important; filter: none !important; }
   .cursor-glow, .cine-shoot, .cine-scan { display: none; }
 }
+
+/* ============================================================
+   25 · COOL PACK v2 — global glow-ups (all pages)
+   ============================================================ */
+
+/* cool scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #05060d; }
+::-webkit-scrollbar-thumb { border-radius: 8px; background: linear-gradient(180deg, #8b5cf6, #2dd4bf); border: 2px solid #05060d; }
+::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #c4b5fd, #5eead4); }
+
+/* section titles get an animated gradient underline */
+.section h2, .page-hero h1, .dash-head h1 {
+  text-wrap: balance;
+}
+.section-head h2::after, .page-hero.center h1::after {
+  content: "";
+  display: block;
+  width: 72px; height: 3px;
+  margin: 14px auto 0;
+  border-radius: 3px;
+  background: var(--grad);
+  background-size: 220% auto;
+  animation: gradShift 5s linear infinite;
+  box-shadow: 0 0 18px rgba(139, 92, 246, 0.8);
+}
+
+/* Google button — official-ish G + glass hover */
+.btn-google {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 13px 24px;
+  border-radius: 13px;
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+  color: #0b0e19;
+  background: linear-gradient(120deg, #ffffff, #e6f5f2);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 14px 36px -18px rgba(255, 255, 255, 0.45), 0 0 0 0 rgba(45, 212, 191, 0);
+  transition: transform 0.3s var(--spring), box-shadow 0.3s ease;
+  overflow: hidden;
+}
+.btn-google:hover { transform: translateY(-2px) scale(1.01); box-shadow: 0 20px 46px -18px rgba(94, 234, 212, 0.55); }
+.btn-google:active { transform: translateY(0) scale(0.99); }
+.btn-google svg { width: 18px; height: 18px; flex-shrink: 0; }
+.or-div { display: flex; align-items: center; gap: 12px; margin: 20px 0 0; color: var(--muted-2); font-size: 11.5px; letter-spacing: 0.18em; text-transform: uppercase; }
+.or-div::before, .or-div::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--line-2), transparent); }
+
+/* auth cards: floating orbs + cooler inputs */
+.auth-card .orb { position: absolute; border-radius: 50%; filter: blur(46px); pointer-events: none; }
+.auth-card .orb--a { width: 220px; height: 220px; right: -70px; top: -70px; background: radial-gradient(circle, rgba(139,92,246,.4), transparent 70%); animation: floatY 8s ease-in-out infinite; }
+.auth-card .orb--b { width: 200px; height: 200px; left: -70px; bottom: -70px; background: radial-gradient(circle, rgba(45,212,191,.28), transparent 70%); animation: floatY 10s ease-in-out infinite reverse; }
+
+/* pricing: popular plan pops */
+.price-pop { position: relative; transform: scale(1.03); border-color: rgba(196,181,253,.55) !important; box-shadow: 0 34px 80px -40px rgba(139,92,246,.9), inset 0 1px 0 rgba(255,255,255,.1) !important; }
+.price-pop:hover { transform: scale(1.03) translateY(-6px) !important; }
+.price-flag { position: absolute; top: -13px; left: 50%; transform: translateX(-50%); padding: 4px 14px; border-radius: 999px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #06060d; background: var(--grad); background-size: 220% auto; animation: gradShift 5s linear infinite, floatY 5s ease-in-out infinite; box-shadow: 0 8px 26px -8px rgba(139,92,246,.9); white-space: nowrap; }
+
+/* dashboard: stat cards glow on hover */
+.dash-head { animation: pageIn 0.7s var(--ease) both; }
+.side a { overflow: hidden; }
+.side a::after { content: ""; position: absolute; inset: 0; opacity: 0; background: radial-gradient(120px circle at var(--mx, 50%) var(--my, 50%), rgba(139,92,246,.25), transparent 60%); transition: opacity .3s; pointer-events: none; }
+.side a:hover::after { opacity: 1; }
+
+/* game studio + dev frames */
+.game-frame { position: relative; border-radius: 18px; overflow: hidden; border: 1px solid var(--line-2); box-shadow: 0 40px 90px -50px rgba(45,212,191,.5); }
+.game-frame::before { content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; background: conic-gradient(from var(--holo-angle), transparent 0deg, rgba(94,234,212,.7) 70deg, rgba(139,92,246,.7) 150deg, transparent 230deg, transparent 360deg); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude; animation: holoSpin 10s linear infinite; pointer-events: none; }
+
+/* tables: sticky cool header */
+.table-wrap th { position: sticky; top: 0; background: rgba(7, 9, 17, 0.92); backdrop-filter: blur(8px); z-index: 1; }
+.table-wrap tbody tr:hover td:first-child { color: var(--mint-2); }
+
+/* footer glow */
+.footer-col a:hover { text-shadow: 0 0 14px rgba(94,234,212,.6); }
+
+/* 404 + empty states */
+.big-glow { font-size: clamp(72px, 14vw, 160px); font-weight: 800; letter-spacing: -0.05em; line-height: 1; background: var(--grad); background-size: 220% auto; -webkit-background-clip: text; background-clip: text; color: transparent; animation: gradShift 6s linear infinite; filter: drop-shadow(0 0 30px rgba(139,92,246,.45)); }
+
+/* chips + badges pulse on hot */
+.chip--hot { border-color: rgba(94,234,212,.5); color: var(--text); box-shadow: 0 0 24px -10px rgba(45,212,191,.8); animation: floatY 6s ease-in-out infinite; }
+
+/* terminal typing glow */
+.term { animation: pageIn 0.8s var(--ease) both; }
+
+/* faq open glow */
+details.faq[open] summary { color: var(--text); }

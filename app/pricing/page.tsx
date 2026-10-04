@@ -101,8 +101,8 @@ export default function Pricing() {
           return (
             <Reveal key={p.id} delay={i * 120} variant="scale">
               <Tilt strength={hero ? 7 : 5}>
-                <article className={"card" + (hero ? " card-glow holo" : "")} style={{ height: "100%" }}>
-                  {hero && <span className="ribbon">Most popular</span>}
+                <article className={"card" + (hero ? " card-glow holo price-pop" : "")} style={{ height: "100%" }}>
+                  {hero && <span className="price-flag">Most popular</span>}
                   <div className="feat">{ICONS[m.icon as keyof typeof ICONS]}</div>
                   <h3 style={{ marginTop: 0 }}>{p.name}</h3>
                   <div>
