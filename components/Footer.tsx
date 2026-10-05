@@ -37,6 +37,7 @@ export default function Footer() {
           <div className="footer-col">
             <h4>Product</h4>
             <Link href="/game">Game Studio</Link>
+            <Link href="/game/history">Game History</Link>
             <Link href="/pricing">Pricing</Link>
             <Link href="/mcp">Agent connect</Link>
             {me && <Link href="/dashboard">Dashboard</Link>}
@@ -45,6 +46,7 @@ export default function Footer() {
           <div className="footer-col">
             <h4>Resources</h4>
             <Link href="/docs">Docs</Link>
+            <Link href="/docs/game">Game Docs</Link>
             <Link href="/faq">FAQ</Link>
             <Link href="/support">Support</Link>
             <Link href="/about">About</Link>

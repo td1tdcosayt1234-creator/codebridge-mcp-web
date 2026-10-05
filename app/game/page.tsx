@@ -440,6 +440,14 @@ export default function GameStudio(){
                 {IDEAS.map(s=>(
                   <button key={s} className="tool" onClick={()=>{ setInput(s); taRef.current?.focus(); }}>{s}</button>
                 ))}
+                <button className="tool" onClick={()=>{
+                  const verbs=["neon","retro","cyber","candy","shadow","turbo","pixel","ghost"];
+                  const cores=["snake","flappy bird","pong","breakout","racing","maze runner","space shooter","tower defense"];
+                  const extras=["with glow","with combo scoring","with boss levels","with day-night cycle","with power-ups","with particles"];
+                  const pick=(a:string[])=>a[Math.floor(Math.random()*a.length)];
+                  setInput(`${pick(verbs)} ${pick(cores)} ${pick(extras)}`);
+                  taRef.current?.focus();
+                }}>🎲 Surprise me</button>
               </div>
             </div>
 

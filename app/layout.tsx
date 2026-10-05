@@ -10,7 +10,14 @@ import Nav from "../components/Nav";
 export const metadata: Metadata = {
   title: "CodeBridge — Request to Cloud Build",
   description:
-    "Send a compile request on the web, OpenCode builds it in the cloud, the output comes back to you.",
+    "Send a compile request on the web, OpenCode builds it in the cloud, the output comes back to you. Plus Game Studio: plan, build and play AI games.",
+  metadataBase: new URL(process.env.SITE_URL || "https://exact-pet-eric-www.trycloudflare.com"),
+  openGraph: {
+    title: "CodeBridge — Request to Cloud Build + Game Studio",
+    description: "Cloud builds with AI auto-fix. Chat to plan, build and play single-file HTML5 games.",
+    type: "website",
+  },
+  twitter: { card: "summary_large_image", title: "CodeBridge", description: "Request → cloud build → result. Plus AI Game Studio." },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

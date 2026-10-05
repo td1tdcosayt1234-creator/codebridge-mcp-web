@@ -50,6 +50,12 @@ APK flow: GitHub → web (`POST /api/runner/apk`) → agent (`--- apk ---` downl
 - Free balance: 10,000. Kom thakle `402` — request jabe na.
 - Modes: `compile` (only) / `fix-compile` (fail → AI auto fix, max 3 retry).
 
+## Game Studio (plan → build → history)
+- `/game`: describe → **📋 Plan first** → **✅ Confirm & Build** → live preview. Model picker defaults to custom `hl ★` (`localhost:20128/v1`).
+- Completion reply is AI-written (no hardcoded text), every build auto-saves.
+- `/game/history`: reload / preview / delete any build. API: `GET/POST/DELETE /api/game/history`, `POST /api/game/plan`.
+- Docs: `/docs/game`. `.env`: `OPENCODE_API_KEY`, `OPENCODE_BASE_URL=http://localhost:20128/v1`, `OPENCODE_MODEL=hl`.
+
 ## Quick start (localhost)
 ```bash
 npm install
@@ -86,7 +92,7 @@ TOKEN_ENC_KEY=32chars-min-key
 
 ## Routes
 - Public: `/`, `/pricing` (Free $0), `/about`, `/mcp`, `/docs`, `/faq`, `/support`, `/terms`, `/privacy`, `/login`, `/signup`
-- User (login must): `/game` (Game Studio), `/dashboard`, `/dashboard/tasks`, `/dashboard/github` (read-only, admin token status), `/dashboard/mcp`, `/dashboard/builds`, `/dashboard/tokens` (balance), `/dashboard/tracking`, `/dashboard/settings`
+- User (login must): `/game` (Game Studio), `/game/history`, `/dashboard`, `/dashboard/tasks`, `/dashboard/github` (read-only, admin token status), `/dashboard/mcp`, `/dashboard/builds`, `/dashboard/tokens` (balance), `/dashboard/tracking`, `/dashboard/settings`
 - Admin (login + admin, nahole 404): `/admin`, `/admin/runner`, `/admin/github`, `/admin/users`, `/admin/tokens`, `/admin/tracking`, `/admin/mcp-control`, `/admin/content`, `/admin/support`, `/admin/logs`
 
 ## Admin setup (must)
