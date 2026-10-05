@@ -140,11 +140,14 @@ export default function GameStudio(){
 
   useEffect(()=>{
     fetch("/api/game/generate",{cache:"no-store"}).then(r=>r.json()).then(j=>{
+      const custom = Array.isArray(j?.customModels) ? j.customModels : [];
       const oc = Array.isArray(j?.opencodeModels) ? j.opencodeModels : [];
       const kl = Array.isArray(j?.kiloModels) ? j.kiloModels : [];
-      if (oc.length || kl.length) setModels([...oc, ...kl]);
+      if (custom.length || oc.length || kl.length) setModels([...custom, ...oc, ...kl]);
       else if(Array.isArray(j?.freeModels)) setModels(j.freeModels);
       if(Array.isArray(j?.kiloModels)) setKiloModels(j.kiloModels);
+      // Default to custom hl model when available
+      if (custom.length) setModelSel(custom[0]);
     }).catch(()=>{});
     const sp=new URLSearchParams(location.search);
     const q=sp.get("prompt");
@@ -292,6 +295,13 @@ export default function GameStudio(){
               <div className="label"><span>MODEL — FREE</span><span style={{opacity:.6}}>{provider || "auto"}</span></div>
               <select className="field" value={modelSel} onChange={e=>setModelSel(e.target.value)} style={{padding:"11px 14px"}}>
                 <option value="auto">✦ Auto — best available</option>
+                {models.filter(m=>!m.startsWith("opencode/") && !m.startsWith("kilo/")).length>0 && (
+                  <optgroup label="Custom (localhost:20128)">
+                    {models.filter(m=>!m.startsWith("opencode/") && !m.startsWith("kilo/")).map(m=>(
+                      <option key={m} value={m}>{m} ★</option>
+                    ))}
+                  </optgroup>
+                )}
                 {models.length>0 && (
                   <optgroup label="opencode free (login once)">
                     {models.filter(m=>m.startsWith("opencode/")).map(m=>(

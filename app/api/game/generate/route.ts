@@ -24,10 +24,15 @@ const FREE_MODELS = [
   "space-bunny-free",
 ];
 // Only allow known models — the key owner pays for anything outside free tier.
+function customModelId(): string {
+  return (process.env.OPENCODE_MODEL || "hl").trim().slice(0, 120) || "hl";
+}
 function cleanModel(m: unknown, defaultModel: string): string {
   const s = String(m || "").slice(0, 120);
   if (!/^[A-Za-z0-9._:\/-]+$/.test(s)) return "";
   if (FREE_MODELS.includes(s) || s === defaultModel) return s;
+  // Custom OpenAI-compatible endpoint model (e.g. "hl" on localhost:20128).
+  if (s === customModelId() || s === "hl" || s === "custom/hl") return s;
   // Kilo CLI + opencode CLI free models pass through to their providers.
   // Each provider re-validates against its own allow-list (lib/kilo.ts, lib/opencode.ts).
   if (s.startsWith("kilo/") || s.startsWith("opencode/")) return s;
@@ -68,6 +73,52 @@ const GAME_SYSTEM = (style: string) =>
     "- Best score in localStorage. Fixed-timestep logic so speed is device-independent.",
   ].join("\n");
 
+async function directGameHTML(prompt: string, styleLabel: string, system: string, preferred = ""): Promise<{ html: string; provider: string } | null> {
+  try {
+    const { zenConfig, zenKeyOk } = await import("@/lib/ai");
+    const cfg = await zenConfig();
+    if (!zenKeyOk(cfg.key)) return null;
+    const model = preferred && (preferred === "hl" || preferred === "custom/hl" || preferred === cfg.model)
+      ? (preferred === "custom/hl" ? cfg.model : preferred)
+      : (cfg.model || "hl");
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 190000);
+    try {
+      const r = await fetch(cfg.base.replace(/\/+$/, "") + "/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.key },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: `Game idea: ${String(prompt || "").slice(0, 500)}\n\nOutput ONLY raw HTML — no markdown, no fences, no explanation.` },
+          ],
+          temperature: 0.8,
+          max_tokens: 16000,
+        }),
+        signal: ctrl.signal,
+      });
+      if (!r.ok) {
+        console.warn(`[game] direct ${model}: HTTP ${r.status}`);
+        return null;
+      }
+      const j = await r.json().catch(() => ({}));
+      const raw: string =
+        j?.choices?.[0]?.message?.content ||
+        j?.choices?.[0]?.text || "";
+      const html = extractHTML(raw);
+      if (looksLikeGame(html)) return { html, provider: "custom:" + model };
+      console.warn(`[game] direct ${model}: bad output (${String(raw).length} chars)`);
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (e) {
+    console.warn(`[game] direct failed: ${String(e).slice(0, 200)}`);
+    return null;
+  }
+}
+
 async function aiGameHTML(req: Request, prompt: string, style: string, preferred = ""): Promise<{ html: string; provider: string } | null> {
   const cleanPrompt = String(prompt || "").slice(0, 500);
   // Chat mode sends style:"auto" — no preset palettes, AI picks visuals to fit the idea.
@@ -78,10 +129,21 @@ async function aiGameHTML(req: Request, prompt: string, style: string, preferred
   // Client gave up (tab closed, navigated away)? Stop the upstream calls too.
   req.signal.addEventListener("abort", () => { try { ctrl.abort(); } catch {} });
   // Strict model routing: a user-selected model ALWAYS wins — no silent fallback
-  // to another provider's model. Auto ("") keeps opencode-first, kilo-fallback.
+  // to another provider's model. Auto ("") keeps direct-custom first, then opencode, kilo.
   const wantOC = preferred.startsWith("opencode/");
   const wantKilo = preferred.startsWith("kilo/");
+  const wantCustom = preferred === "hl" || preferred === "custom/hl" || (!wantOC && !wantKilo && preferred.length > 0);
   try {
+    // Provider 0: custom OpenAI-compatible endpoint (e.g. localhost:20128/v1 + hl).
+    if (!wantOC && !wantKilo) {
+      const direct = await directGameHTML(cleanPrompt, styleLabel, system, preferred);
+      if (direct) return direct;
+      // User explicitly picked the custom model — never silently build with another provider.
+      if (wantCustom) {
+        console.warn("[game] selected custom model failed — returning 503 (no cross-provider fallback)");
+        return null;
+      }
+    }
     // Provider 1: opencode CLI (free Zen models after one `opencode auth login`).
     if (!wantKilo) {
       try {
@@ -117,7 +179,7 @@ async function aiGameHTML(req: Request, prompt: string, style: string, preferred
         /* Kilo CLI unavailable or bad output */
       }
     }
-    console.warn("[game] all providers failed (opencode + kilo) — returning 503");
+    console.warn("[game] all providers failed (custom + opencode + kilo) — returning 503");
     return null;
   } catch {
     return null;
@@ -183,6 +245,10 @@ export async function GET(req: Request){
   if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   const { KILO_FREE_MODELS, KILO_DEFAULT_MODEL } = await import("@/lib/kilo");
   const { OPENCODE_FREE_MODELS, OPENCODE_DEFAULT_MODEL, opencodeAuthOk } = await import("@/lib/opencode");
+  const { zenConfig, zenKeyOk } = await import("@/lib/ai");
+  const zc = await zenConfig().catch(() => null);
+  const customId = (process.env.OPENCODE_MODEL || "hl").trim() || "hl";
+  const customModels = zc && zenKeyOk(zc.key) ? [customId] : [customId];
   const id = new URL(req.url).searchParams.get("job");
   if (id) {
     const j = jobs.get(id);
@@ -192,5 +258,5 @@ export async function GET(req: Request){
     if (j.status === "error") return NextResponse.json({ ok: false, error: j.error }, { status: 503 });
     return NextResponse.json({ ok: true, status: "done", html: j.html, name: "index.html", size: (j.html || "").length, engine: "ai", provider: j.provider });
   }
-  return NextResponse.json({ ok:true, service:"game-generate", ai: true, model: OPENCODE_DEFAULT_MODEL, source: "opencode+kilo", opencodeModels: OPENCODE_FREE_MODELS, opencodeDefault: OPENCODE_DEFAULT_MODEL, opencodeAuth: await opencodeAuthOk(), freeModels: KILO_FREE_MODELS, kiloModels: KILO_FREE_MODELS, kiloDefault: KILO_DEFAULT_MODEL });
+  return NextResponse.json({ ok:true, service:"game-generate", ai: true, model: customId, customModels, customDefault: customId, customBase: zc?.base || "", source: "custom+opencode+kilo", opencodeModels: OPENCODE_FREE_MODELS, opencodeDefault: OPENCODE_DEFAULT_MODEL, opencodeAuth: await opencodeAuthOk(), freeModels: KILO_FREE_MODELS, kiloModels: KILO_FREE_MODELS, kiloDefault: KILO_DEFAULT_MODEL });
 }
