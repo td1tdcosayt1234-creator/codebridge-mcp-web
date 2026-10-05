@@ -18,7 +18,8 @@ export type TrustedAgent = { id:string; userId:string; ip:string; ua:string; too
 export type OAuthClient = { id:string; redirectUris:string[]; createdAt:string };
 export type OAuthCode = { code:string; userId:string; clientId:string; redirectUri:string; challenge:string; method:string; expires:number };
 export type BillingSub = { userId:string; plan:"pro"|"team"; customerId:string; subscriptionId:string; status:string; updatedAt:string };
-export type DbShape = { users:User[]; events:EventItem[]; builds:Build[]; tickets:Ticket[]; githubTokens:{userId:string; enc:string}[]; mcpKeys:{userId:string; key:string}[]; usage:Usage[]; globalGithub?:{enc:string; updatedBy:string; updatedAt:string}; globalAI?:{enc:string; baseUrl:string; model:string; updatedBy:string; updatedAt:string}; tasks:Task[]; settings?:RunnerSettings; attempts:LoginAttempt[]; earnNonces:EarnNonce[]; approvals:PendingCall[]; trusted:TrustedAgent[]; oauthClients:OAuthClient[]; oauthCodes:OAuthCode[]; billing:BillingSub[]; webhookIds:string[] };
+export type GameHistoryEntry = { id:string; userId:string; prompt:string; plan:string; provider:string; model:string; htmlSize:number; html:string; summary:string; createdAt:string };
+export type DbShape = { users:User[]; events:EventItem[]; builds:Build[]; tickets:Ticket[]; githubTokens:{userId:string; enc:string}[]; mcpKeys:{userId:string; key:string}[]; usage:Usage[]; globalGithub?:{enc:string; updatedBy:string; updatedAt:string}; globalAI?:{enc:string; baseUrl:string; model:string; updatedBy:string; updatedAt:string}; tasks:Task[]; settings?:RunnerSettings; attempts:LoginAttempt[]; earnNonces:EarnNonce[]; approvals:PendingCall[]; trusted:TrustedAgent[]; oauthClients:OAuthClient[]; oauthCodes:OAuthCode[]; billing:BillingSub[]; webhookIds:string[]; gameHistory?:GameHistoryEntry[] };
 const file = process.env.DB_FILE || (process.env.VERCEL ? "/tmp/codebridge-db.json" : path.join(process.cwd(), "data", "db.json"));
 
 // ---- At-rest encryption (AES-256-GCM via lib/crypto) ----
@@ -115,6 +116,7 @@ export async function readDb():Promise<DbShape>{ await ensure();
   if(!parsed.trusted) parsed.trusted=[];
   if(!parsed.billing) { parsed.billing=[]; dirty=true; }
   if(!parsed.webhookIds) { parsed.webhookIds=[]; dirty=true; }
+  if(!parsed.gameHistory) { (parsed as any).gameHistory=[]; dirty=true; }
   // prune used/old earn nonces (>1h)
   const cutoff=Date.now()-3600000;
   const kept=(parsed.earnNonces as EarnNonce[]).filter(n=>!n.used&&n.at>cutoff);
@@ -139,6 +141,8 @@ async function writeDbInner(db:DbShape){
   if ((db.oauthCodes?.length || 0) > 500) db.oauthCodes = db.oauthCodes.slice(-500);
   if ((db.trusted?.length || 0) > 500) db.trusted = db.trusted.slice(-500);
   if ((db.approvals?.length || 0) > 500) db.approvals = db.approvals.slice(-500);
+  // Bound game history: cap 200/user, HTML can be large — prune oldest first.
+  if ((db.gameHistory?.length || 0) > 1000) db.gameHistory = (db.gameHistory || []).slice(-1000);
   // Rotating backups (latest 3) so a bad write/key never means total loss.
   try {
     await fs.access(file);

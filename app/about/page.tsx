@@ -91,6 +91,25 @@ export default function About() {
       </Reveal>
 
       <Reveal>
+        <h3>Game Studio</h3>
+        <p>
+          Chat in plain language → <strong>AI plans first</strong> (title, controls, features, steps) → you confirm →
+          a real single-file HTML5 game is built live. Every finished game auto-saves to{" "}
+          <Link href="/game/history">history</Link> — reload, preview or delete anytime.
+        </p>
+        <ul>
+          <li>
+            <strong>Plan:</strong> <code>/game</code> → describe → <strong>📋 Plan first</strong> →{" "}
+            <strong>✅ Confirm & Build</strong>. Details: <Link href="/docs/game">/docs/game</Link>.
+          </li>
+          <li>
+            <strong>History:</strong> toggle <strong>🕘 History</strong> inside the studio or open{" "}
+            <Link href="/game/history">/game/history</Link>.
+          </li>
+        </ul>
+      </Reveal>
+
+      <Reveal>
         <h3>Fair pricing by size</h3>
         <p>1 coin ≈ 4 characters. Bigger files cost more — held on request, finally charged on output size. 10,000 coins free to start.</p>
       </Reveal>
@@ -105,6 +124,9 @@ export default function About() {
             </Link>
             <Link className="btn-ghost btn-lg" href="/game">
               Game Studio
+            </Link>
+            <Link className="btn-ghost btn-lg" href="/docs/game">
+              Game Docs
             </Link>
             <Link className="btn-ghost btn-lg" href="/docs">
               Docs

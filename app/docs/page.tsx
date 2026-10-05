@@ -131,6 +131,15 @@ Mode: fix-compile + file attached`;
       </Reveal>
 
       <Reveal variant="left" delay={50}>
+        <h3>Game Studio — plan, build, history</h3>
+        <p>
+          <Link href="/game">/game</Link>: describe → <strong>📋 Plan first</strong> →{" "}
+          <strong>✅ Confirm & Build</strong> → live preview. Every build saves to{" "}
+          <Link href="/game/history">/game/history</Link>. Full guide: <Link href="/docs/game">/docs/game</Link>.
+        </p>
+      </Reveal>
+
+      <Reveal variant="left" delay={50}>
         <h3>Troubleshooting</h3>
         <ul>
           <li><strong>402 / &ldquo;low balance&rdquo;</strong> → split files smaller or earn coins in /dashboard/earn. History: /dashboard/tokens.</li>

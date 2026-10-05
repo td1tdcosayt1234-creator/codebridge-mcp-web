@@ -116,6 +116,13 @@ export default function GameStudio(){
   const [showCode,setShowCode]=useState(false);
   const [isFs,setIsFs]=useState(false);
   const [toast,setToast]=useState("");
+  // Plan-before-build + History
+  const [plan,setPlan]=useState("");
+  const [planLoading,setPlanLoading]=useState(false);
+  const [showHistory,setShowHistory]=useState(false);
+  type HistItem = { id:string; prompt:string; plan:string; provider:string; model:string; htmlSize:number; summary:string; createdAt:string };
+  const [history,setHistory]=useState<HistItem[]>([]);
+  const [histLoading,setHistLoading]=useState(false);
   const frameRef=useRef<HTMLIFrameElement>(null);
   const taRef=useRef<HTMLTextAreaElement>(null);
   const threadRef=useRef<HTMLDivElement>(null);
@@ -151,7 +158,22 @@ export default function GameStudio(){
     }).catch(()=>{});
     const sp=new URLSearchParams(location.search);
     const q=sp.get("prompt");
-    if(q && !autoRan.current){ autoRan.current=true; send(q); }
+    const hid=sp.get("history");
+    if(hid && !autoRan.current){
+      autoRan.current=true;
+      (async ()=>{
+        try{
+          const r = await fetch("/api/game/history?id="+encodeURIComponent(hid),{cache:"no-store"});
+          const j = await r.json().catch(()=>({}));
+          if(r.ok && j.entry){
+            setHtml(j.entry.html||""); setProvider(j.entry.provider||""); setPlan(j.entry.plan||"");
+            setContext(String(j.entry.prompt||"").slice(-700));
+            setMsgs(m=>[...m,{role:"ai",text:"📂 History থেকে load হলো: "+String(j.entry.prompt||"").slice(0,120)}]);
+          }
+        }catch{}
+      })();
+    }
+    else if(q && !autoRan.current){ autoRan.current=true; send(q); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
@@ -163,6 +185,70 @@ export default function GameStudio(){
   },[isFs]);
 
   const showToast=(m:string)=>{ setToast(m); setTimeout(()=>setToast(""),2200)};
+
+  // --- Plan before build: AI writes a short plan, user confirms, then builds ---
+  const makePlan = async ()=>{
+    const text = input.trim() || context.trim();
+    if(!text){ showToast("First describe your game"); return; }
+    setPlanLoading(true);
+    try{
+      const r = await fetch("/api/game/plan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:text.slice(-700), model: modelSel === "auto" ? "" : modelSel})});
+      const j = await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(j.error || ("Plan failed "+r.status));
+      setPlan(j.plan || "");
+      setMsgs(m=>[...m,{role:"ai",text:"📋 Plan ready — নিচে দেখো, ঠিক থাকলে Confirm & Build চাপো."}]);
+    }catch(e:any){ setMsgs(m=>[...m,{role:"ai",text:String(e?.message||"Plan failed"),err:true}]); }
+    setPlanLoading(false);
+  };
+
+  // --- History: server (login) + localStorage fallback ---
+  const loadHistory = async ()=>{
+    setHistLoading(true);
+    try{
+      const r = await fetch("/api/game/history",{cache:"no-store"});
+      const j = await r.json().catch(()=>({}));
+      if(r.ok && Array.isArray(j.history)){ setHistory(j.history); try{ localStorage.setItem("cb_game_hist", JSON.stringify(j.history.slice(0,20))); }catch{} }
+      else throw new Error("server");
+    }catch{
+      try{ const local = JSON.parse(localStorage.getItem("cb_game_hist")||"[]"); if(Array.isArray(local)) setHistory(local); }catch{}
+    }
+    setHistLoading(false);
+  };
+  const saveHistory = async (entry:{prompt:string;plan:string;provider:string;model:string;html:string;summary:string})=>{
+    const item: HistItem = { id:"local_"+Date.now(), prompt:entry.prompt, plan:entry.plan, provider:entry.provider, model:entry.model, htmlSize:entry.html.length, summary:entry.summary, createdAt:new Date().toISOString() };
+    try{
+      const local = [item, ...history].slice(0,20);
+      setHistory(local);
+      localStorage.setItem("cb_game_hist", JSON.stringify(local));
+    }catch{}
+    try{
+      const r = await fetch("/api/game/history",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(entry)});
+      if(r.ok) loadHistory();
+    }catch{}
+  };
+  const loadEntry = async (id:string)=>{
+    if(id.startsWith("local_")){ showToast("Preview-এ load করতে server history থেকে খুলো"); return; }
+    try{
+      const r = await fetch("/api/game/history?id="+encodeURIComponent(id),{cache:"no-store"});
+      const j = await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(j.error||"Load failed");
+      const h = j.entry;
+      setHtml(h.html||""); setProvider(h.provider||""); setPlan(h.plan||""); setContext(String(h.prompt||"").slice(-700));
+      setMsgs(m=>[...m,{role:"ai",text:"📂 History থেকে load হলো: "+String(h.prompt||"").slice(0,120)}]);
+      setShowHistory(false);
+    }catch(e:any){ showToast(String(e?.message||"Load failed")); }
+  };
+  const delEntry = async (id:string)=>{
+    if(id.startsWith("local_")){ const nl = history.filter(h=>h.id!==id); setHistory(nl); try{localStorage.setItem("cb_game_hist",JSON.stringify(nl));}catch{} return; }
+    await fetch("/api/game/history?id="+encodeURIComponent(id),{method:"DELETE"}).catch(()=>{});
+    loadHistory();
+  };
+  const clearHistory = async ()=>{
+    const locals = history.filter(h=>h.id.startsWith("local_"));
+    setHistory(locals); try{localStorage.setItem("cb_game_hist",JSON.stringify(locals));}catch{}
+    await fetch("/api/game/history?all=1",{method:"DELETE"}).catch(()=>{});
+    loadHistory();
+  };
 
   const send = async (raw?: string)=>{
     const text = (raw ?? input).trim();
@@ -212,6 +298,8 @@ export default function GameStudio(){
       // AI-written completion reply from the server; fallback to local text if empty.
       const aiText = String(j.summary || "").trim();
       setMsgs(m=>[...m,{role:"ai",text: aiText || `✅ Game ready in ${secs}s — live preview updated (${j.provider||"ai"}). Keep chatting to refine it.`}]);
+      // Save to history (server + local). Plan included when user made one.
+      saveHistory({prompt:ctx, plan, provider:j.provider||"ai", model:modelSel, html:j.html, summary:aiText});
     }catch(e:any){
       const raw = e?.message || "Failed";
       const friendly = /failed to fetch|networkerror|load failed|abort/i.test(raw)
@@ -281,8 +369,25 @@ export default function GameStudio(){
 
       <div className="dev-grid">
         <div className="panel">
-          <div className="panel-head"><span>✦ Chat</span><span style={{opacity:.5,fontWeight:600}}>/game</span></div>
+          <div className="panel-head"><span>✦ Chat</span><span style={{display:"flex",gap:6}}><button className="tool" onClick={()=>{ setShowHistory(v=>!v); if(!showHistory) loadHistory(); }}>{showHistory?"Hide History":"🕘 History"}</button><a className="tool" href="/game/history" style={{textDecoration:"none"}}>All →</a></span></div>
           <div className="panel-body" style={{display:"grid",gap:12}}>
+            {showHistory && (
+              <div className="msg msg-ai" style={{maxHeight:220,overflowY:"auto"}}>
+                <div style={{fontWeight:800,marginBottom:8}}>🕘 History {histLoading?"(loading…)":""}</div>
+                {history.length===0 && !histLoading && <div style={{opacity:.6}}>No history yet — build a game first.</div>}
+                {history.map(h=>(
+                  <div key={h.id} style={{border:"1px solid #ffffff14",borderRadius:10,padding:"8px 10px",marginBottom:6}}>
+                    <div style={{fontSize:12,fontWeight:700}}>{String(h.prompt||"").slice(0,80)}</div>
+                    <div style={{fontSize:11,opacity:.6}}>{new Date(h.createdAt).toLocaleString()} · {h.provider||h.model} · {Math.round((h.htmlSize||0)/1024)}KB</div>
+                    <div style={{display:"flex",gap:6,marginTop:6}}>
+                      {!h.id.startsWith("local_") && <button className="tool" onClick={()=>loadEntry(h.id)}>Load</button>}
+                      <button className="tool" onClick={()=>delEntry(h.id)}>Delete</button>
+                    </div>
+                  </div>
+                ))}
+                {history.length>0 && <button className="tool" onClick={clearHistory}>Clear all</button>}
+              </div>
+            )}
             <div ref={threadRef} className="chat-thread">
               {msgs.length===0 && !loading && (
                 <div className="hint" style={{marginTop:0}}>No messages yet — describe your game below. AI builds a real single-file HTML game, no templates involved.</div>
@@ -341,7 +446,20 @@ export default function GameStudio(){
             <button className="btn-primary" onClick={()=>send()} disabled={loading}>
               {loading?"Crafting…":(html?"Send & Update →":"Send & Build →")}
             </button>
-            <div className="hint">Each message rebuilds the full game from the whole chat — preview updates live on the right.</div>
+            <div style={{display:"flex",gap:8}}>
+              <button className="tool" style={{flex:1}} onClick={makePlan} disabled={planLoading||loading}>{planLoading?"Planning…":"📋 Plan first"}</button>
+              {plan && <button className="tool" onClick={()=>setPlan("")}>Clear plan</button>}
+            </div>
+            {plan && (
+              <div className="msg msg-ai" style={{whiteSpace:"pre-wrap"}}>
+                <div style={{fontWeight:800,marginBottom:6}}>📋 Build Plan</div>
+                {plan}
+                <div style={{display:"flex",gap:6,marginTop:8}}>
+                  <button className="tool" onClick={()=>send()} disabled={loading}>✅ Confirm & Build</button>
+                </div>
+              </div>
+            )}
+            <div className="hint">Each message rebuilds the full game from the whole chat — preview updates live on the right. Tip: Plan first, then Confirm & Build.</div>
           </div>
         </div>
 
