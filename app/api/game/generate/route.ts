@@ -218,17 +218,65 @@ export async function POST(req: Request){
   }catch(e){ return NextResponse.json({ error: String(e) }, {status:500})}
 }
 
+// AI-written completion summary for the chat thread (no more hardcoded text).
+async function aiSummary(prompt: string, provider: string, html: string): Promise<string> {
+  try {
+    const { zenConfig, zenKeyOk } = await import("@/lib/ai");
+    const cfg = await zenConfig();
+    if (!zenKeyOk(cfg.key)) return "";
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 60000);
+    try {
+      const hasCanvas = html.toLowerCase().includes("<canvas");
+      const sizeKb = Math.round(html.length / 1024);
+      const r = await fetch(cfg.base.replace(/\/+$/, "") + "/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.key },
+        body: JSON.stringify({
+          model: cfg.model || "hl",
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are Game Studio assistant. A browser game was just generated and is already live in the preview. Write a short chat reply (max 4 lines) in the user's language (Bengali mix if they wrote Bengali, else English). Mention: 1) what game was built, 2) controls (keyboard + touch), 3) one line inviting refinement (e.g. 'aro ki change chao?'). No markdown fences, no code, plain chat text with 1-2 emojis max.",
+            },
+            {
+              role: "user",
+              content: `Game idea: ${String(prompt || "").slice(0, 400)}\nProvider: ${provider}\nHTML size: ${sizeKb}KB, canvas: ${hasCanvas}\nWrite the completion reply.`,
+            },
+          ],
+          temperature: 0.7,
+          max_tokens: 400,
+        }),
+        signal: ctrl.signal,
+      });
+      if (!r.ok) return "";
+      const j = await r.json().catch(() => ({}));
+      const text: string = j?.choices?.[0]?.message?.content?.trim() || "";
+      if (text.length < 10 || text.length > 2000) return "";
+      return text;
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return "";
+  }
+}
+
 // In-memory game-generation jobs. Lost on restart (acceptable: client shows error and user retries).
-const jobs = new Map<string, { owner: string; status: "running" | "done" | "error"; html?: string; provider?: string; error?: string; at: number }>();
+const jobs = new Map<string, { owner: string; status: "running" | "done" | "error"; html?: string; provider?: string; summary?: string; error?: string; at: number }>();
 function startJob(id: string, owner: string, prompt: string, style: string, model: string, req: Request) {
   // Prune stale jobs so the map can't grow forever.
   jobs.forEach((v, k) => { if (Date.now() - v.at > 10 * 60 * 1000) jobs.delete(k); });
   jobs.set(id, { owner, status: "running", at: Date.now() });
   aiGameHTML(req, prompt, style, model)
-    .then((ai) => {
+    .then(async (ai) => {
       const j = jobs.get(id);
       if (!j) return;
-      if (ai) jobs.set(id, { owner: j.owner, status: "done", html: ai.html, provider: ai.provider, at: Date.now() });
+      if (ai) {
+        const summary = await aiSummary(prompt, ai.provider, ai.html);
+        jobs.set(id, { owner: j.owner, status: "done", html: ai.html, provider: ai.provider, summary, at: Date.now() });
+      }
       else jobs.set(id, { owner: j.owner, status: "error", error: "AI generation failed. The free provider may be busy — wait a minute and try again.", at: Date.now() });
     })
     .catch((e) => {
@@ -256,7 +304,7 @@ export async function GET(req: Request){
     if (j.owner !== (user as any).sub) return NextResponse.json({ error: "Not your job." }, { status: 403 });
     if (j.status === "running") return NextResponse.json({ ok: true, status: "running" });
     if (j.status === "error") return NextResponse.json({ ok: false, error: j.error }, { status: 503 });
-    return NextResponse.json({ ok: true, status: "done", html: j.html, name: "index.html", size: (j.html || "").length, engine: "ai", provider: j.provider });
+    return NextResponse.json({ ok: true, status: "done", html: j.html, summary: j.summary || "", name: "index.html", size: (j.html || "").length, engine: "ai", provider: j.provider });
   }
   return NextResponse.json({ ok:true, service:"game-generate", ai: true, model: customId, customModels, customDefault: customId, customBase: zc?.base || "", source: "custom+opencode+kilo", opencodeModels: OPENCODE_FREE_MODELS, opencodeDefault: OPENCODE_DEFAULT_MODEL, opencodeAuth: await opencodeAuthOk(), freeModels: KILO_FREE_MODELS, kiloModels: KILO_FREE_MODELS, kiloDefault: KILO_DEFAULT_MODEL });
 }

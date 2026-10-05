@@ -209,7 +209,9 @@ export default function GameStudio(){
       setShowCode(false);
       setProvider(j.provider || "ai");
       const secs = Math.round((Date.now()-t0)/1000);
-      setMsgs(m=>[...m,{role:"ai",text:`✅ Game ready in ${secs}s — live preview updated (${j.provider||"ai"}). Keep chatting to refine it.`}]);
+      // AI-written completion reply from the server; fallback to local text if empty.
+      const aiText = String(j.summary || "").trim();
+      setMsgs(m=>[...m,{role:"ai",text: aiText || `✅ Game ready in ${secs}s — live preview updated (${j.provider||"ai"}). Keep chatting to refine it.`}]);
     }catch(e:any){
       const raw = e?.message || "Failed";
       const friendly = /failed to fetch|networkerror|load failed|abort/i.test(raw)
