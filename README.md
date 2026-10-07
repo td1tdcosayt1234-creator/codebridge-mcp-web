@@ -82,16 +82,16 @@ AUTH_SECRET=32chars-min-secret
 TOKEN_ENC_KEY=32chars-min-key
 ```
 
-## Payments (Paddle Billing, live)
-`/pricing` Pro ($12/mo) / Team ($39/mo) pay via Paddle hosted checkout — coins auto-credit on `transaction.completed`.
-- `.env`: `PADDLE_API_KEY` (live key), `PADDLE_PRO_PRICE_ID`, `PADDLE_TEAM_PRICE_ID` (already created: Pro/Team monthly products).
-- Webhook (must for auto-credit): Paddle dashboard → Developer tools → Notifications → destination `https://<public-host>/api/billing/webhook`, event `transaction.completed` → paste notification secret as `PADDLE_WEBHOOK_SECRET`, restart. Without it payments succeed but plans stay free (503 in logs).
-- After-payment landing page: set Paddle checkout success URL to `https://<public-host>/dashboard/tokens`.
+## Payments (Paddle Billing — sandbox tested, live ready)
+`/pricing` Pro ($12/mo) / Team ($39/mo) pay via Paddle overlay checkout (`@paddle/paddle-js`) — coins auto-credit on `transaction.completed` webhook.
+- `.env`: `PADDLE_ENV` (`sandbox`/`live`), `PADDLE_API_KEY` (`pdl_sdbx_...`/`pdl_live_...`), `PADDLE_PRO_PRICE_ID`, `PADDLE_TEAM_PRICE_ID`, `PADDLE_WEBHOOK_SECRET`, plus frontend `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` (`test_...`/`live_...`) + `NEXT_PUBLIC_PADDLE_ENV`.
+- Paddle dashboard → Checkout → Checkout settings → **Default payment link** set koro (nahole `transaction_default_checkout_url_not_set` error) → Notifications → destination `https://<public-host>/api/billing/webhook`, event `transaction.completed` → secret `.env` e boshao, restart.
+- Webhook security: HMAC-SHA256 verify (`ts:body`), timestamp window, IP rate limit, `event_id` dedup, paid `price_id` must match plan — nahole coin mint hoy na.
 - Account must finish Paddle onboarding (dashboard verification) or checkout creation fails with "Checkouts aren't enabled" — `/pricing` shows that message until then.
-- Test without charging: use a Paddle sandbox key + sandbox price IDs in `.env` instead (same variable names).
+- Sandbox test cards: `4242 4242 4242 4242` (success), `4000 0038 0000 0446` (3DS), `4000 0000 0000 0002` (declined) — expiry future, CVC jekono.
 
 ## Routes
-- Public: `/`, `/pricing` (Free $0), `/about`, `/mcp`, `/docs`, `/faq`, `/support`, `/terms`, `/privacy`, `/login`, `/signup`
+- Public: `/`, `/pricing` (Free $0), `/about`, `/mcp`, `/docs`, `/faq`, `/support`, `/terms`, `/privacy`, `/refund`, `/login`, `/signup`
 - User (login must): `/game` (Game Studio), `/game/history`, `/dashboard`, `/dashboard/tasks`, `/dashboard/github` (read-only, admin token status), `/dashboard/mcp`, `/dashboard/builds`, `/dashboard/tokens` (balance), `/dashboard/tracking`, `/dashboard/settings`
 - Admin (login + admin, nahole 404): `/admin`, `/admin/runner`, `/admin/github`, `/admin/users`, `/admin/tokens`, `/admin/tracking`, `/admin/mcp-control`, `/admin/content`, `/admin/support`, `/admin/logs`
 
@@ -116,7 +116,7 @@ Signup/login on the web first, copy the personal key from `/dashboard/mcp` — a
 Restart opencode after config change. Tools: `compile`, `compile_fix`, `list_tasks`, `get_task_result`, `gh_issue_list`, `auth_check` — full log+result+APK link agent ei ase (compile call ~8 min wait, sesh na hole `get_task_result` e `task_id` pathao).
 
 ## Security
-bcrypt passwords, JWT httpOnly cookie, AES-256-GCM vault (tokens never shown full), RBAC user/admin, login-must dashboard, 404 on admin for non-admin, audit tracking.
+bcrypt passwords, JWT httpOnly cookie, AES-256-GCM vault (tokens never shown full), RBAC user/admin, login-must dashboard, 404 on admin for non-admin, audit tracking. Full policy: [`SECURITY.md`](./SECURITY.md).
 
 ## Production security checklist (must before public deploy)
 1. **Secrets**: set long random `AUTH_SECRET` + `TOKEN_ENC_KEY` (changing them logs everyone out and wipes saved encrypted tokens — set once, keep safe).
