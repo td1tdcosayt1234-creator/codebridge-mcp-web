@@ -1,6 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { initializePaddle, type Paddle } from "@paddle/paddle-js";
 import PageHero from "../../components/PageHero";
 import Reveal from "../../components/Reveal";
 import Tilt from "../../components/Tilt";
@@ -14,6 +16,7 @@ const META: Record<string, { icon: string; c: string; f: string[] }> = {
 };
 
 const ICONS = {
+
   seed: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21V9m0 0c0-3 2-5 5-5 0 3-2 5-5 5Zm0 4c0-3-2-5-5-5 0 3 2 5 5 5Z" /></svg>,
   bolt: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" /></svg>,
   team: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3" /><path d="M3 20a6 6 0 0 1 12 0M16 11a3 3 0 1 0 0-6m1 9a5 5 0 0 1 4 5" /></svg>,
@@ -21,12 +24,43 @@ const ICONS = {
   card: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" /><path d="M3 10h18M7 15h3" /></svg>,
 };
 
+function TransactionCheckout({ paddle }: { paddle: Paddle | null }) {
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (!paddle) return;
+    const txn = searchParams.get("_ptxn");
+    if (txn) paddle.Checkout.open({ transactionId: txn });
+  }, [paddle, searchParams]);
+  return null;
+}
+
 export default function Pricing() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [mine, setMine] = useState("free");
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
+  const [paddle, setPaddle] = useState<Paddle | null>(null);
+
+  // Paddle.js loads checkout when the app is opened via the transaction-link
+  // returned by the pricing page (`?_ptxn=...`).
+  useEffect(() => {
+    const token = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN;
+    const env = process.env.NEXT_PUBLIC_PADDLE_ENV as "sandbox" | "production" | undefined;
+    if (!token || !env) {
+      setErr("Payment widget not configured");
+      return;
+    }
+    const initPromise = (globalThis as any).__paddleInitPromise || initializePaddle({ token, environment: env });
+    (globalThis as any).__paddleInitPromise = initPromise;
+    initPromise.then((p: Paddle | undefined) => {
+      if (!p) {
+        setErr("Payment widget load failed");
+        return;
+      }
+      setPaddle(p);
+    }).catch((e: unknown) => setErr("Payment widget load failed: " + String((e as Error)?.message || e).slice(0, 120)));
+  }, []);
 
   useEffect(() => {
     fetch("/api/billing/status")
@@ -75,6 +109,9 @@ export default function Pricing() {
 
   return (
     <div>
+      <Suspense fallback={null}>
+        <TransactionCheckout paddle={paddle} />
+      </Suspense>
       <PageHero
         kicker="Simple pricing"
         title={<>Pricing — <span className="grad-anim text-glow">start free</span></>}

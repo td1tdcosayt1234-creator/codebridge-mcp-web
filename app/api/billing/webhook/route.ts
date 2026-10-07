@@ -10,9 +10,11 @@ export async function POST(req: Request) {
     console.warn("[billing] webhook hit but PADDLE_WEBHOOK_SECRET not set — ignoring");
     return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
   }
-  const { clientIp, isBanned, recordViolation } = await import("@/lib/security");
+  const { clientIp, isBanned, recordViolation, rateLimit } = await import("@/lib/security");
   const ip = clientIp(req);
   if (isBanned(ip)) return NextResponse.json({ error: "Blocked." }, { status: 403 });
+  const rl = rateLimit("webhook:" + ip, 60, 60 * 1000);
+  if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   const raw = await req.text();
   const sig = req.headers.get("paddle-signature");
   if (!verifyWebhookSignature(raw, sig, secret)) {

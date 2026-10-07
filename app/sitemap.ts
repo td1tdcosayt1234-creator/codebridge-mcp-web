@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const PAGES = ["", "/about", "/docs", "/docs/game", "/faq", "/game", "/game/history", "/mcp", "/pricing", "/privacy", "/support", "/terms", "/login", "/signup"];
+const PAGES = ["", "/about", "/docs", "/docs/game", "/faq", "/game", "/game/history", "/mcp", "/pricing", "/privacy", "/support", "/terms", "/refund", "/login", "/signup"];
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = (process.env.SITE_URL || "https://exact-pet-eric-www.trycloudflare.com").replace(/\/+$/, "");

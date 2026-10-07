@@ -22,9 +22,13 @@ export function priceIdFor(plan: PlanId): string {
   return plan === "pro" ? process.env.PADDLE_PRO_PRICE_ID || "" : process.env.PADDLE_TEAM_PRICE_ID || "";
 }
 
+function paddleApiBase() {
+  return process.env.PADDLE_ENV === "sandbox" ? "https://sandbox-api.paddle.com" : "https://api.paddle.com";
+}
+
 async function paddleFetch(path: string, init?: { method?: string; body?: unknown }) {
   const key = process.env.PADDLE_API_KEY || "";
-  const r = await fetch("https://api.paddle.com" + path, {
+  const r = await fetch(paddleApiBase() + path, {
     method: init?.method || "GET",
     headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
     body: init?.body === undefined ? undefined : JSON.stringify(init.body),
@@ -63,7 +67,7 @@ export async function createCheckout(opts: { email: string; userId: string; plan
 }
 
 // Verify Paddle Billing webhook signature.
-// Header: "Paddle-Signature: ts=<unix>;h1=<hex>". Signed payload: ts + ";" + rawBody.
+// Header: "Paddle-Signature: ts=<unix>;h1=<hex>". Signed payload: ts + ":" + rawBody.
 export function verifyWebhookSignature(rawBody: string, header: string | null, secret: string): boolean {
   if (!secret || !header) return false;
   const parts = Object.fromEntries(
@@ -75,7 +79,13 @@ export function verifyWebhookSignature(rawBody: string, header: string | null, s
   const ts = parts.ts || "";
   const h1 = parts.h1 || "";
   if (!ts || !h1) return false;
-  const signed = ts + ";" + rawBody;
+  // Fail closed on absurd timestamps (typos/forgery), but keep the window
+  // generous: Paddle retries deliveries for up to 3 days.
+  const tsNum = Number(ts);
+  if (!Number.isFinite(tsNum)) return false;
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (tsNum > nowSec + 600 || tsNum < nowSec - 4 * 24 * 3600) return false;
+  const signed = ts + ":" + rawBody;
   const want = crypto.createHmac("sha256", secret).update(signed).digest("hex");
   if (want.length !== h1.length) return false;
   return crypto.timingSafeEqual(Buffer.from(want), Buffer.from(h1));
