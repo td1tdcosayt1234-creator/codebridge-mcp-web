@@ -17,9 +17,10 @@ export type PendingCall = { id:string; tool:string; args:Record<string,unknown>;
 export type TrustedAgent = { id:string; userId:string; ip:string; ua:string; tool:string; createdAt:string; lastUsed:string; expiresAt:string };
 export type OAuthClient = { id:string; redirectUris:string[]; createdAt:string };
 export type OAuthCode = { code:string; userId:string; clientId:string; redirectUri:string; challenge:string; method:string; expires:number };
-export type BillingSub = { userId:string; plan:"pro"|"team"; customerId:string; subscriptionId:string; status:string; updatedAt:string };
+export type BillingSub = { userId:string; plan:"pro"|"team"; cycle?:string; customerId:string; subscriptionId:string; status:string; updatedAt:string };
+export type ElsePending = { chargeId:string; userId:string; plan:"pro"|"team"; cycle:"weekly"|"monthly"|"annual"; amount:number; status:"created"|"paid"; createdAt:string };
 export type GameHistoryEntry = { id:string; userId:string; prompt:string; plan:string; provider:string; model:string; htmlSize:number; html:string; summary:string; createdAt:string };
-export type DbShape = { users:User[]; events:EventItem[]; builds:Build[]; tickets:Ticket[]; githubTokens:{userId:string; enc:string}[]; mcpKeys:{userId:string; key:string}[]; usage:Usage[]; globalGithub?:{enc:string; updatedBy:string; updatedAt:string}; globalAI?:{enc:string; baseUrl:string; model:string; updatedBy:string; updatedAt:string}; tasks:Task[]; settings?:RunnerSettings; attempts:LoginAttempt[]; earnNonces:EarnNonce[]; approvals:PendingCall[]; trusted:TrustedAgent[]; oauthClients:OAuthClient[]; oauthCodes:OAuthCode[]; billing:BillingSub[]; webhookIds:string[]; gameHistory?:GameHistoryEntry[] };
+export type DbShape = { users:User[]; events:EventItem[]; builds:Build[]; tickets:Ticket[]; githubTokens:{userId:string; enc:string}[]; mcpKeys:{userId:string; key:string}[]; usage:Usage[]; globalGithub?:{enc:string; updatedBy:string; updatedAt:string}; globalAI?:{enc:string; baseUrl:string; model:string; updatedBy:string; updatedAt:string}; tasks:Task[]; settings?:RunnerSettings; attempts:LoginAttempt[]; earnNonces:EarnNonce[]; approvals:PendingCall[]; trusted:TrustedAgent[]; oauthClients:OAuthClient[]; oauthCodes:OAuthCode[]; billing:BillingSub[]; webhookIds:string[]; gameHistory?:GameHistoryEntry[]; elsepay?:ElsePending[] };
 const file = process.env.DB_FILE || (process.env.VERCEL ? "/tmp/codebridge-db.json" : path.join(process.cwd(), "data", "db.json"));
 
 // ---- At-rest encryption (AES-256-GCM via lib/crypto) ----
@@ -117,6 +118,8 @@ export async function readDb():Promise<DbShape>{ await ensure();
   if(!parsed.billing) { parsed.billing=[]; dirty=true; }
   if(!parsed.webhookIds) { parsed.webhookIds=[]; dirty=true; }
   if(!parsed.gameHistory) { (parsed as any).gameHistory=[]; dirty=true; }
+  if(!parsed.elsepay) { (parsed as any).elsepay=[]; dirty=true; }
+  for(const e of ((parsed as any).elsepay||[])){ if(!e.cycle){ e.cycle="monthly"; dirty=true; } }
   // prune used/old earn nonces (>1h)
   const cutoff=Date.now()-3600000;
   const kept=(parsed.earnNonces as EarnNonce[]).filter(n=>!n.used&&n.at>cutoff);

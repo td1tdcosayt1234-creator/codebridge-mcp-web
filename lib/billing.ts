@@ -1,14 +1,37 @@
 import crypto from "crypto";
 
 // Paddle Billing (live) — hosted checkout + webhook fulfillment.
-// Secrets come from env: PADDLE_API_KEY, PADDLE_PRO_PRICE_ID,
-// PADDLE_TEAM_PRICE_ID, PADDLE_WEBHOOK_SECRET. Never log the key.
+// Secrets come from env: PADDLE_API_KEY, PADDLE_*_PRICE_ID,
+// PADDLE_WEBHOOK_SECRET. Never log the key.
 
 export const PLANS = {
   pro: { name: "Pro", coins: 200000 },
   team: { name: "Team", coins: 1000000 },
 } as const;
 export type PlanId = keyof typeof PLANS;
+
+// Billing cycles. Weekly/annual are optional per gateway — monthly always works.
+export const CYCLES = ["weekly", "monthly", "annual"] as const;
+export type Cycle = (typeof CYCLES)[number];
+
+export function normalizeCycle(c: unknown): Cycle {
+  return c === "weekly" || c === "annual" ? c : "monthly";
+}
+
+// Price (USD) + coins per plan+cycle. Annual ≈ 10x monthly price for 12x
+// coins ("2 months free"). Weekly ≈ 1/3 monthly.
+export const PRICING: Record<PlanId, Record<Cycle, { price: number; coins: number; label: string }>> = {
+  pro: {
+    weekly: { price: 4, coins: 60000, label: "$4/wk" },
+    monthly: { price: 12, coins: 200000, label: "$12/mo" },
+    annual: { price: 120, coins: 2400000, label: "$120/yr" },
+  },
+  team: {
+    weekly: { price: 12, coins: 300000, label: "$12/wk" },
+    monthly: { price: 39, coins: 1000000, label: "$39/mo" },
+    annual: { price: 390, coins: 12000000, label: "$390/yr" },
+  },
+} as const;
 
 export function paddleConfigured(): boolean {
   return (
@@ -19,7 +42,23 @@ export function paddleConfigured(): boolean {
 }
 
 export function priceIdFor(plan: PlanId): string {
-  return plan === "pro" ? process.env.PADDLE_PRO_PRICE_ID || "" : process.env.PADDLE_TEAM_PRICE_ID || "";
+  return priceIdForCycle(plan, "monthly");
+}
+
+// Per-cycle Paddle price IDs. Monthly keeps the legacy env names;
+// weekly/annual need their own prices in the Paddle dashboard.
+export function priceIdForCycle(plan: PlanId, cycle: Cycle): string {
+  const P = plan === "pro" ? "PRO" : "TEAM";
+  if (cycle === "weekly") return process.env[`PADDLE_${P}_WEEKLY_PRICE_ID`] || "";
+  if (cycle === "annual") return process.env[`PADDLE_${P}_ANNUAL_PRICE_ID`] || "";
+  return process.env[`PADDLE_${P}_PRICE_ID`] || "";
+}
+
+export function paddleCycleConfigured(plan: PlanId, cycle: Cycle): boolean {
+  return (
+    (process.env.PADDLE_API_KEY || "").startsWith("pdl_") &&
+    !!priceIdForCycle(plan, cycle)
+  );
 }
 
 function paddleApiBase() {
@@ -49,15 +88,16 @@ export async function ensureCustomer(email: string): Promise<string> {
 }
 
 // Create a subscription transaction and return the hosted checkout URL.
-export async function createCheckout(opts: { email: string; userId: string; plan: PlanId }) {
+export async function createCheckout(opts: { email: string; userId: string; plan: PlanId; cycle?: Cycle }) {
+  const cycle = normalizeCycle(opts.cycle);
   const customerId = await ensureCustomer(opts.email);
   const tx = await paddleFetch("/transactions", {
     method: "POST",
     body: {
-      items: [{ price_id: priceIdFor(opts.plan), quantity: 1 }],
+      items: [{ price_id: priceIdForCycle(opts.plan, cycle), quantity: 1 }],
       customer_id: customerId,
       collection_mode: "automatic",
-      custom_data: { userId: opts.userId, plan: opts.plan },
+      custom_data: { userId: opts.userId, plan: opts.plan, cycle },
     },
   });
   const url = tx?.data?.checkout?.url as string | undefined;

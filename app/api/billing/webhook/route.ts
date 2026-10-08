@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { readDb, writeDb, uid } from "@/lib/db";
-import { PLANS, verifyWebhookSignature } from "@/lib/billing";
+import { PRICING, normalizeCycle, priceIdForCycle, verifyWebhookSignature } from "@/lib/billing";
 
 // Paddle Billing webhook. Destination: https://<public-host>/api/billing/webhook
 // Enable event: transaction.completed. Secret: PADDLE_WEBHOOK_SECRET.
@@ -30,6 +30,7 @@ export async function POST(req: Request) {
   const userId = String(cd.userId || "");
   const plan = String(cd.plan || "");
   if (!userId || (plan !== "pro" && plan !== "team")) return NextResponse.json({ ok: true, ignored: "no custom_data" });
+  const cycle = normalizeCycle(cd.cycle);
 
   const db = await readDb();
   // Idempotency: Paddle retries until 2xx — never credit twice for one event.
@@ -39,12 +40,12 @@ export async function POST(req: Request) {
   if (db.webhookIds.includes(eventId)) return NextResponse.json({ ok: true, duplicate: true });
   const u = db.users.find((x) => x.id === userId);
   if (!u) return NextResponse.json({ ok: true, ignored: "unknown user" });
-  // Verify the paid price matches the credited plan — a discounted/swapped
+  // Verify the paid price matches the credited plan+cycle — a discounted/swapped
   // checkout must not mint higher-tier coins.
   const paidPriceIds = (Array.isArray(d?.items) ? d.items : [])
     .map((it: any) => String(it?.price?.id || it?.price_id || ""))
     .filter(Boolean);
-  const wantPrice = plan === "pro" ? process.env.PADDLE_PRO_PRICE_ID || "" : process.env.PADDLE_TEAM_PRICE_ID || "";
+  const wantPrice = priceIdForCycle(plan as "pro" | "team", cycle);
   // Fail closed: empty items must NOT mint coins. When wantPrice is configured
   // the paid list must contain it; when unconfigured we still require items.
   if (wantPrice ? !paidPriceIds.includes(wantPrice) : paidPriceIds.length === 0)
@@ -52,14 +53,14 @@ export async function POST(req: Request) {
   u.plan = plan as "pro" | "team";
   let usage = db.usage.find((x) => x.userId === userId);
   if (!usage) { usage = { userId, mcpCalls: 0, githubCalls: 0, balance: 0, usedTotal: 0 }; db.usage.push(usage); }
-  usage.balance += PLANS[plan as "pro" | "team"].coins;
+  usage.balance += PRICING[plan as "pro" | "team"][cycle].coins;
   const subId = String(d?.subscription_id || "");
   const custId = String(d?.customer_id || "");
   const ex = db.billing.find((b) => b.userId === userId && b.plan === plan);
-  const rec = { userId, plan: plan as "pro" | "team", customerId: custId, subscriptionId: subId, status: String(d?.status || "active"), updatedAt: new Date().toISOString() };
+  const rec = { userId, plan: plan as "pro" | "team", cycle, customerId: custId, subscriptionId: subId, status: String(d?.status || "active"), updatedAt: new Date().toISOString() };
   if (ex) Object.assign(ex, rec); else db.billing.push(rec);
   db.webhookIds.push(eventId); if (db.webhookIds.length > 500) db.webhookIds = db.webhookIds.slice(-500);
-  db.events.push({ id: uid("e"), userId, action: "billing_paid", detail: plan + " " + (d?.id || ""), at: new Date().toISOString() });
+  db.events.push({ id: uid("e"), userId, action: "billing_paid", detail: plan + " " + cycle + " " + (d?.id || ""), at: new Date().toISOString() });
   await writeDb(db);
-  return NextResponse.json({ ok: true, plan });
+  return NextResponse.json({ ok: true, plan, cycle });
 }
