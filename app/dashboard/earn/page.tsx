@@ -55,7 +55,7 @@ export default function Earn(){
     <div className="grid g2" style={{marginTop:12}}>
       <div className="card" style={{textAlign:"center",minHeight:220,display:"flex",flexDirection:"column",justifyContent:"center"}}>
         {!nonce
-          ? (<div><div style={{fontSize:40}}>📺</div><p className="muted small">Sponsored slot (demo ad unit — replace with your ad network)</p>
+          ? (<div><div style={{fontSize:40}}>📺</div><p className="muted small">Sponsored — real ads on this page pay for your coins (keep adblock off)</p>
               <button className="btn" disabled={info.remainingToday<=0||adblock} onClick={start}>{info.remainingToday<=0?"Daily limit reached":"Watch ad (+"+info.reward+")"}</button></div>)
           : (<div><div style={{fontSize:40}}>▶️</div><p><b>Ad playing... {left}s</b></p>
               <div style={{background:"#ffffff14",borderRadius:8,height:10}}><div style={{width:((info.seconds>0?(info.seconds-left)/info.seconds*100:0))+"%",height:10,borderRadius:8,background:"linear-gradient(90deg,#6c8cff,#22d3ee)"}}/></div>

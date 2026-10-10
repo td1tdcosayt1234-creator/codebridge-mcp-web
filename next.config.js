@@ -5,12 +5,12 @@ const isDev = process.env.NODE_ENV !== "production";
 // 'unsafe-eval' and ws:. Everything else is locked down.
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://cdn.paddle.com`,
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://cdn.paddle.com https://quge5.com https://6opo.com https://5gvci.com https://n6wxm.com https://my.rtmark.net https://ldrws.com https://auqot.com https://ekhay.com https://b3mny.com https://jmosl.com https://094kk.com https://static.cloudflareinsights.com`,
   "style-src 'self' 'unsafe-inline' https://*.paddle.com",
-  "img-src 'self' data: blob: https://*.paddle.com",
+  "img-src 'self' data: blob: https://*.paddle.com https://quge5.com https://6opo.com https://5gvci.com https://n6wxm.com https://my.rtmark.net https://ldrws.com https://auqot.com https://ekhay.com https://b3mny.com https://jmosl.com https://094kk.com",
   "font-src 'self' data:",
-  "connect-src 'self' ws: wss: https://*.paddle.com https://api.paddle.com https://sandbox-api.paddle.com",
-  "frame-src https://*.paddle.com https://checkout.paddle.com https://sandbox-checkout-service.paddle.com",
+  "connect-src 'self' ws: wss: https://*.paddle.com https://api.paddle.com https://sandbox-api.paddle.com https://quge5.com https://6opo.com https://5gvci.com https://n6wxm.com https://my.rtmark.net https://ldrws.com https://auqot.com https://ekhay.com https://b3mny.com https://jmosl.com https://094kk.com",
+  "frame-src https://*.paddle.com https://checkout.paddle.com https://sandbox-checkout-service.paddle.com https://quge5.com https://6opo.com https://5gvci.com https://n6wxm.com https://my.rtmark.net https://ldrws.com https://auqot.com https://ekhay.com https://b3mny.com https://jmosl.com https://094kk.com",
   "frame-ancestors 'none'",
   "object-src 'none'",
   "base-uri 'self'",
@@ -40,3 +40,4 @@ const nextConfig = {
   },
 };
 module.exports = nextConfig;
+

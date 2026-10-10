@@ -2,7 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
 import { encWith, decWith } from "./crypto";
-export type User = { id:string; email:string; passHash:string; role:"user"|"admin"; plan:"free"|"pro"|"team"; createdAt:string; googleId?:string; provider?: "local"|"google"; twoFaEnc?:string; twoFaPending?:string; twoFaBackup?:string[]; twoFaAt?:string };
+export type User = { id:string; email:string; passHash:string; role:"user"|"admin"; plan:"free"|"pro"|"team"; createdAt:string; emailVerified?:boolean; googleId?:string; provider?: "local"|"google"; twoFaEnc?:string; twoFaPending?:string; twoFaBackup?:string[]; twoFaAt?:string };
 export type EventItem = { id:string; userId:string; action:string; detail:string; ip?:string; at:string };
 export type Build = { id:string; userId:string; repo:string; branch:string; status:string; log:string; at:string };
 export type Ticket = { id:string; userId:string; subject:string; body:string; status:string; at:string };
@@ -12,6 +12,7 @@ export type Task = { id:string; userId:string; title:string; prompt:string; kind
 export type RunnerSettings = { builderRepo:string; builderWorkflow:string; runnerTokenEnc:string; updatedBy:string; updatedAt:string; lastGuestRefill?:string };
 export type LoginAttempt = { email:string; fails:number; until:string };
 export type EarnNonce = { nonce:string; userId:string; at:number; used:boolean };
+export type ResetToken = { token:string; userId:string; expires:number; used:boolean };
 export type ApprovalState = "waiting" | "approved" | "denied";
 export type PendingCall = { id:string; tool:string; args:Record<string,unknown>; userId?:string; approverIp?:string; state:ApprovalState; createdAt:number; fp:{ip:string; ua:string} };
 export type TrustedAgent = { id:string; userId:string; ip:string; ua:string; tool:string; createdAt:string; lastUsed:string; expiresAt:string };
@@ -20,7 +21,7 @@ export type OAuthCode = { code:string; userId:string; clientId:string; redirectU
 export type BillingSub = { userId:string; plan:"pro"|"team"; cycle?:string; customerId:string; subscriptionId:string; status:string; updatedAt:string };
 export type ElsePending = { chargeId:string; userId:string; plan:"pro"|"team"; cycle:"weekly"|"monthly"|"annual"; amount:number; status:"created"|"paid"; createdAt:string };
 export type GameHistoryEntry = { id:string; userId:string; prompt:string; plan:string; provider:string; model:string; htmlSize:number; html:string; summary:string; createdAt:string };
-export type DbShape = { users:User[]; events:EventItem[]; builds:Build[]; tickets:Ticket[]; githubTokens:{userId:string; enc:string}[]; mcpKeys:{userId:string; key:string}[]; usage:Usage[]; globalGithub?:{enc:string; updatedBy:string; updatedAt:string}; globalAI?:{enc:string; baseUrl:string; model:string; updatedBy:string; updatedAt:string}; tasks:Task[]; settings?:RunnerSettings; attempts:LoginAttempt[]; earnNonces:EarnNonce[]; approvals:PendingCall[]; trusted:TrustedAgent[]; oauthClients:OAuthClient[]; oauthCodes:OAuthCode[]; billing:BillingSub[]; webhookIds:string[]; gameHistory?:GameHistoryEntry[]; elsepay?:ElsePending[] };
+export type DbShape = { users:User[]; events:EventItem[]; builds:Build[]; tickets:Ticket[]; githubTokens:{userId:string; enc:string}[]; mcpKeys:{userId:string; key:string}[]; usage:Usage[]; globalGithub?:{enc:string; updatedBy:string; updatedAt:string}; globalAI?:{enc:string; baseUrl:string; model:string; updatedBy:string; updatedAt:string}; tasks:Task[]; settings?:RunnerSettings; attempts:LoginAttempt[]; earnNonces:EarnNonce[]; resetTokens?:ResetToken[]; approvals:PendingCall[]; trusted:TrustedAgent[]; oauthClients:OAuthClient[]; oauthCodes:OAuthCode[]; billing:BillingSub[]; webhookIds:string[]; gameHistory?:GameHistoryEntry[]; elsepay?:ElsePending[] };
 const file = process.env.DB_FILE || (process.env.VERCEL ? "/tmp/codebridge-db.json" : path.join(process.cwd(), "data", "db.json"));
 
 // ---- At-rest encryption (AES-256-GCM via lib/crypto) ----
@@ -65,7 +66,7 @@ async function ensure(){
     const bcrypt = (await import("bcryptjs")).default;
     const { password, generated } = await seedAdminPassword();
     const hash = await bcrypt.hash(password, 12);
-    const seed:DbShape={users:[{id:"u_admin",email:seedAdminEmail(),passHash:hash,role:"admin",plan:"pro",createdAt:new Date().toISOString()}],events:[],builds:[],tickets:[],githubTokens:[],mcpKeys:[{userId:"u_admin",key:"cb_"+crypto.randomBytes(18).toString("hex")}],usage:[{userId:"u_admin",mcpCalls:0,githubCalls:0,balance:10000,usedTotal:0}],tasks:[],attempts:[],earnNonces:[],approvals:[],trusted:[],oauthClients:[],oauthCodes:[],billing:[],webhookIds:[]};
+    const seed:DbShape={users:[{id:"u_admin",email:seedAdminEmail(),passHash:hash,role:"admin",plan:"pro",createdAt:new Date().toISOString(),emailVerified:true}],events:[],builds:[],tickets:[],githubTokens:[],mcpKeys:[{userId:"u_admin",key:"cb_"+crypto.randomBytes(18).toString("hex")}],usage:[{userId:"u_admin",mcpCalls:0,githubCalls:0,balance:10000,usedTotal:0}],tasks:[],attempts:[],earnNonces:[],approvals:[],trusted:[],oauthClients:[],oauthCodes:[],billing:[],webhookIds:[]};
     await writeDb(seed);
     if (generated) console.warn("[codebridge] generated admin password (shown once â save it and set ADMIN_PASSWORD): " + password);
   }
@@ -113,6 +114,7 @@ export async function readDb():Promise<DbShape>{ await ensure();
   if(!parsed.oauthClients) parsed.oauthClients=[];
   if(!parsed.oauthCodes) parsed.oauthCodes=[];
   if(!parsed.earnNonces) parsed.earnNonces=[];
+  if(!parsed.resetTokens) { (parsed as any).resetTokens=[]; dirty=true; }
   if(!parsed.approvals) parsed.approvals=[];
   if(!parsed.trusted) parsed.trusted=[];
   if(!parsed.billing) { parsed.billing=[]; dirty=true; }
@@ -120,10 +122,12 @@ export async function readDb():Promise<DbShape>{ await ensure();
   if(!parsed.gameHistory) { (parsed as any).gameHistory=[]; dirty=true; }
   if(!parsed.elsepay) { (parsed as any).elsepay=[]; dirty=true; }
   for(const e of ((parsed as any).elsepay||[])){ if(!e.cycle){ e.cycle="monthly"; dirty=true; } }
-  // prune used/old earn nonces (>1h)
+  // prune used/old earn nonces (>1h) + reset tokens (used or expired)
   const cutoff=Date.now()-3600000;
   const kept=(parsed.earnNonces as EarnNonce[]).filter(n=>!n.used&&n.at>cutoff);
   if(kept.length!==(parsed.earnNonces as EarnNonce[]).length){ parsed.earnNonces=kept; dirty=true; }
+  const keptRt=((parsed as any).resetTokens as ResetToken[]||[]).filter(t=>!t.used&&t.expires>Date.now());
+  if(keptRt.length!==(((parsed as any).resetTokens as ResetToken[]||[]).length)){ (parsed as any).resetTokens=keptRt; dirty=true; }
   if(dirty){ try{ await writeDb(parsed); }catch{} }
   void warnIfDefaultAdminPassword();
   return parsed; }

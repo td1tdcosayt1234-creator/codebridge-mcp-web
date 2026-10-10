@@ -49,6 +49,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
   }
   db.attempts = db.attempts.filter((a) => a.email !== mail);
+  // Email gate: unverified accounts must finish the OTP first.
+  // (Missing flag on old rows means verified — grandfathered.)
+  if (u.emailVerified === false)
+    return NextResponse.json({ error: "Email not verified. Enter the code we sent.", verifyRequired: true }, { status: 403 });
   // Tier-2: 2FA enrolled -> short-lived tmp token, code verified at /2fa/verify.
   const { decToken } = await import("@/lib/crypto");
   if (u.twoFaEnc && decToken(u.twoFaEnc)) {

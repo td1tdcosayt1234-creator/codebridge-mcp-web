@@ -14,3 +14,6 @@ cloudflared.exe
 tunnel-url.txt
 tsconfig.tsbuildinfo
 .DS_Store
+
+.admin-credentials.txt
+

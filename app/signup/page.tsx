@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import VerifyEmail from "../../components/VerifyEmail";
 
 export default function Signup() {
   const [email, setEmail] = useState("");
@@ -13,6 +14,7 @@ export default function Signup() {
   const [shake, setShake] = useState(0);
   const [checking, setChecking] = useState(true);
   const [googleOn, setGoogleOn] = useState(false);
+  const [needVerify, setNeedVerify] = useState(false);
 
   // Already logged in -> straight to dashboard, no second form.
   useEffect(() => {
@@ -49,6 +51,11 @@ export default function Signup() {
         window.location.href = "/login?exists=1&email=" + encodeURIComponent(email);
         return;
       }
+      if (j.verifyRequired) {
+        // elsemail OTP sent — stay here, verify inline (no session yet).
+        setNeedVerify(true);
+        return;
+      }
       // Full reload so server gates read the fresh session cookie.
       window.location.href = "/dashboard";
     } catch {
@@ -82,6 +89,10 @@ export default function Signup() {
         <p className="muted small" style={{ marginTop: 0 }}>
           <strong className="grad-anim">10,000 coins</strong> included. Password: min 12 characters, letters + numbers.
         </p>
+        {needVerify ? (
+          <VerifyEmail email={email} remember={remember} onDone={(role) => { window.location.href = role === "admin" ? "/admin" : "/dashboard"; }} />
+        ) : (
+        <>
         <form onSubmit={go}>
           <label>Email</label>
           <input value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" type="email" placeholder="you@example.com" />
@@ -122,7 +133,7 @@ export default function Signup() {
             </button>
           </div>
         </form>
-        {googleOn && (
+        {googleOn && !needVerify && (
           <>
             <div className="or-div">or</div>
             <div style={{ marginTop: 12 }}>
@@ -133,6 +144,7 @@ export default function Signup() {
             </div>
           </>
         )}
+        </>)}
         <p className="muted small" style={{ margin: "18px 0 0", textAlign: "center" }}>
           Already have an account?{" "}
           <Link href="/login" style={{ color: "var(--mint-2)" }}>

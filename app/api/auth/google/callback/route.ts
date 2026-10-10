@@ -52,7 +52,7 @@ export async function GET(req: Request) {
       user = {
         id: uid("u"), email: prof.email, passHash,
         role: isAdmin ? "admin" : "user", plan: isAdmin ? "pro" : "free",
-        createdAt: new Date().toISOString(), googleId: prof.sub, provider: "google",
+        createdAt: new Date().toISOString(), emailVerified: true, googleId: prof.sub, provider: "google",
       };
       db.users.push(user);
       db.mcpKeys.push({ userId: user.id, key: newPersonalKey() });
@@ -60,7 +60,9 @@ export async function GET(req: Request) {
       db.events.push({ id: uid("e"), userId: user.id, action: "signup_google", detail: user.email, at: new Date().toISOString() });
     } else {
       // Link Google id on first Google login; never downgrade admin.
+      // Google already proved the mailbox — mark verified on link too.
       if (!user.googleId) { user.googleId = prof.sub; user.provider = user.provider || "google"; }
+      if (user.emailVerified === false) user.emailVerified = true;
       db.events.push({ id: uid("e"), userId: user.id, action: "login_google", detail: user.email, at: new Date().toISOString() });
     }
     db.attempts = db.attempts.filter((a) => a.email !== user!.email);

@@ -31,7 +31,6 @@
 | `roun.sryze.cc` | public site only (home, /pricing, /about, /mcp, /docs, /faq, /support, /login, /signup, /game, /docs/game…) | `http://localhost:3001` |
 | `dash.roun.sryze.cc` | dashboard: `/`→dashboard, `/tasks`, `/builds`, `/mcp` (key), `/earn`, `/settings`, `/tokens`, `/tracking`, `/uses`, `/github`, `/admin/*` | `http://localhost:3001` |
 | `api.roun.sryze.cc` | **শুধু MCP**: `/api/mcp`, `/api/mcp/*`, `/api/oauth/*`, `/.well-known/oauth-*`, `/api/auth/*`, `/login` — বাকি সব 404 | `http://localhost:3001` |
-| `codebridge.roun.sryze.cc` | same as public site | `http://localhost:3001` |
 | `codebridge.elsemail.indevs.in` | legacy full app (dashboard সহ) — purano setup | `http://localhost:3001` |
 | `elsemail.indevs.in` / `dash.elsemail.indevs.in` | elsemail-service (onno project) | `http://localhost:3000` |
 
@@ -53,7 +52,7 @@ Rules (middleware.ts এ):
 | Name | `roun-codebridge` |
 | config_src | `cloudflare` (remote-managed — ingress API দিয়ে set) |
 | Token | `.tunnel-tokens.ps1` → `TUNNEL_TOKEN_ROUN` (gitignored) |
-| Ingress (API v2) | `roun.sryze.cc`→`:3001`, `dash.roun.sryze.cc`→`:3001`, `api.roun.sryze.cc`→`:3001`, `codebridge.roun.sryze.cc`→`:3001`, catch-all `http_status:404` |
+| Ingress (API v2) | `roun.sryze.cc`→`:3001`, `dash.roun.sryze.cc`→`:3001`, `api.roun.sryze.cc`→`:3001`, catch-all `http_status:404` |
 
 > কেন dedicated: shared tunnel (`codebridge-web`) এর ingress config onno automation ba user ba baar baar overwrite korto (v8/v10) — DNS record o delete hoye jeto. Dedicated tunnel e conflict nai.
 
@@ -75,7 +74,6 @@ Rules (middleware.ts এ):
 | `roun.sryze.cc` | CNAME | `0546c535-91a6-4752-89c0-e4bed9a2cbd3.cfargotunnel.com` | yes |
 | `dash.roun.sryze.cc` | CNAME | `0546c535-91a6-4752-89c0-e4bed9a2cbd3.cfargotunnel.com` | yes |
 | `api.roun.sryze.cc` | CNAME | `0546c535-91a6-4752-89c0-e4bed9a2cbd3.cfargotunnel.com` | yes |
-| `codebridge.roun.sryze.cc` | CNAME | `0546c535-91a6-4752-89c0-e4bed9a2cbd3.cfargotunnel.com` | yes |
 
 SSL: tunnel CNAME + Cloudflare proxied = universal SSL automatic (extra cert lage na)।
 
@@ -134,12 +132,11 @@ curl -s -X PUT "https://api.cloudflare.com/client/v4/accounts/$ACCT/cfd_tunnel/$
     {"service":"http://localhost:3001","hostname":"roun.sryze.cc"},
     {"service":"http://localhost:3001","hostname":"dash.roun.sryze.cc"},
     {"service":"http://localhost:3001","hostname":"api.roun.sryze.cc"},
-    {"service":"http://localhost:3001","hostname":"codebridge.roun.sryze.cc"},
     {"service":"http_status:404"}
   ],"warp-routing":{"enabled":false}}}'
 
 # 5) DNS CNAME (protiti hostname er jonno alada call)
-for N in roun.sryze.cc dash.roun.sryze.cc api.roun.sryze.cc codebridge.roun.sryze.cc; do
+for N in roun.sryze.cc dash.roun.sryze.cc api.roun.sryze.cc; do
   curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records" \
     -H "Authorization: Bearer $CF" -H "Content-Type: application/json" \
     -d "{\"type\":\"CNAME\",\"name\":\"$N\",\"content\":\"$TUNNEL.cfargotunnel.com\",\"ttl\":1,\"proxied\":true}"

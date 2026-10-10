@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import VerifyEmail from "../../components/VerifyEmail";
 
 // Single-login: already-logged-in user never sees the form again,
 // and post-login uses a full reload so server gates read the fresh cookie.
@@ -23,6 +24,7 @@ export default function Login() {
   const [checking, setChecking] = useState(true);
   const [googleOn, setGoogleOn] = useState(false);
   const [need2fa, setNeed2fa] = useState(false);
+  const [needVerify, setNeedVerify] = useState(false);
   const [tmp, setTmp] = useState("");
   const [code, setCode] = useState("");
 
@@ -73,6 +75,13 @@ export default function Login() {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (j.verifyRequired) {
+          // Password right, mailbox not confirmed — OTP inline.
+          setNeedVerify(true);
+          setNeed2fa(false);
+          setErr("");
+          return;
+        }
         setErr(j.error || "Login failed");
         setShake((s) => s + 1);
         return;
@@ -140,7 +149,9 @@ export default function Login() {
         <h1>
           Login to <span className="grad-anim">CodeBridge</span>
         </h1>
-        {need2fa ? (
+        {needVerify ? (
+          <VerifyEmail email={email} remember={remember} onDone={(role) => { window.location.href = dest(role); }} />
+        ) : need2fa ? (
           <form onSubmit={verify2fa}>
             <p className="muted small" style={{ marginTop: 0 }}>
               Tier-2 check — open your authenticator app and enter the 6-digit code (or a backup code).
@@ -211,7 +222,7 @@ export default function Login() {
         </form>
         </>
         )}
-        {googleOn && !need2fa && (
+        {googleOn && !need2fa && !needVerify && (
           <>
             <div className="or-div">or</div>
             <div style={{ marginTop: 12 }}>
@@ -228,6 +239,11 @@ export default function Login() {
         <p className="muted small" style={{ margin: "14px 0 0", textAlign: "center" }}>
           Tip: login works per address — localhost, tailnet IP and tunnel URL each need their own login. Pick one and
           bookmark it.
+        </p>
+        <p className="muted small" style={{ margin: "10px 0 0", textAlign: "center" }}>
+          <Link href="/forgot-password" style={{ color: "var(--mint-2)" }}>
+            Forgot password?
+          </Link>
         </p>
         <p className="muted small" style={{ margin: "18px 0 0", textAlign: "center" }}>
           No account yet?{" "}
