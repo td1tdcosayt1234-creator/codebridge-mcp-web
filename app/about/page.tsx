@@ -80,8 +80,8 @@ export default function About() {
         <h3>Who uses what</h3>
         <ul>
           <li>
-            <strong>User:</strong> sign up → send requests in <Link href="/dashboard/tasks">/dashboard/tasks</Link> → watch
-            live status and output. Earn extra coins in <Link href="/dashboard/earn">/dashboard/earn</Link>.
+            <strong>User:</strong> sign up → send requests in <Link href="https://dash.roun.sryze.cc/tasks">dash.roun.sryze.cc/tasks</Link> → watch
+            live status and output. Earn extra coins in <Link href="https://dash.roun.sryze.cc/earn">dash.roun.sryze.cc/earn</Link>.
           </li>
           <li>
             <strong>Admin:</strong> manages the cloud backend, users, balances, requests and support from a protected

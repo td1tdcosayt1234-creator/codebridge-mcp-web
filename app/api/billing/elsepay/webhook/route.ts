@@ -4,7 +4,7 @@ import { PRICING, normalizeCycle } from "@/lib/billing";
 import { getElseCharge, expectedElseAmount, verifyElseWebhook } from "@/lib/elsepay";
 
 // Else Pay merchant webhook. Destination (set in Else console merchants):
-// https://<public-host>/api/billing/elsepay/webhook
+// https://roun.sryze.cc/api/billing/elsepay/webhook
 // Header: x-else-signature = merchant secretKey. Body: {charge_id, status, ...}
 export async function POST(req: Request) {
   if (!verifyElseWebhook(req))

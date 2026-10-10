@@ -9,7 +9,7 @@ export default function Docs() {
   "mcp": {
     "codebridge": {
       "type": "remote",
-      "url": "https://your-domain.com/api/mcp",
+      "url": "https://api.roun.sryze.cc/api/mcp",
       "headers": { "Authorization": "Bearer PASTE_KEY_FROM_DASHBOARD" }
     }
   }
@@ -35,7 +35,7 @@ Mode: fix-compile + file attached`;
         <h3>Step 1 — Account + coins</h3>
         <ul>
           <li><Link href="/signup">Sign up</Link> (free, no card) → <Link href="/login">log in</Link>. Free balance: <strong>10,000 coins</strong> (1 coin ≈ 4 chars).</li>
-          <li>Out of coins? Earn more in <Link href="/dashboard/earn">/dashboard/earn</Link> (+50 per ad, 10/day). Ad blocker and VPN must be off.</li>
+          <li>Out of coins? Earn more in <Link href="https://dash.roun.sryze.cc/earn">dash.roun.sryze.cc/earn</Link> (+50 per ad, 10/day). Ad blocker and VPN must be off.</li>
           <li>Nothing else to configure — no tokens, no keys, no setup.</li>
           <li>The dashboard requires login; admin pages show 404 without admin login.</li>
         </ul>
@@ -43,7 +43,7 @@ Mode: fix-compile + file attached`;
 
       <Reveal variant="left" delay={50}>
         <h3>Step 2 — Connect your agent (optional)</h3>
-        <p>Signup/login is required to use the agent tools. Copy your personal key from <Link href="/dashboard/mcp">/dashboard/mcp</Link>, add it to your project <code>opencode.json</code>, then restart the agent app:</p>
+        <p>Signup/login is required to use the agent tools. Copy your personal key from <Link href="https://dash.roun.sryze.cc/mcp">dash.roun.sryze.cc/mcp</Link>, add it to your project <code>opencode.json</code>, then restart the agent app:</p>
         <div className="codeblock">
           <div className="codeblock-bar">
             <span>opencode.json</span>
@@ -56,7 +56,7 @@ Mode: fix-compile + file attached`;
 
       <Reveal variant="left" delay={50}>
         <h3>Step 3 — Send a request</h3>
-        <p>In <Link href="/dashboard/tasks">/dashboard/tasks</Link>, set a title, instructions and files (optional, max 200KB), then pick a mode:</p>
+        <p>In <Link href="https://dash.roun.sryze.cc/tasks">dash.roun.sryze.cc/tasks</Link>, set a title, instructions and files (optional, max 200KB), then pick a mode:</p>
         <ul className="check">
           <li><strong>Compile only</strong> — builds every type: Python, Node, Go, Rust, Android and more.</li>
           <li><strong>Fix with compile</strong> — on failure the AI repairs the source itself and retries up to 3 times.</li>
@@ -142,7 +142,7 @@ Mode: fix-compile + file attached`;
       <Reveal variant="left" delay={50}>
         <h3>Troubleshooting</h3>
         <ul>
-          <li><strong>402 / &ldquo;low balance&rdquo;</strong> → split files smaller or earn coins in /dashboard/earn. History: /dashboard/tokens.</li>
+          <li><strong>402 / &ldquo;low balance&rdquo;</strong> → split files smaller or earn coins in dash.roun.sryze.cc/earn. History: dash.roun.sryze.cc/tokens.</li>
           <li><strong>&ldquo;Bot detected&rdquo;</strong> → you tripped the bot trap; fill the form normally in a real browser.</li>
           <li><strong>&ldquo;VPN/Proxy not allowed&rdquo;</strong> → disable VPN/proxy and retry.</li>
           <li><strong>Agent shows no tools</strong> → restart the agent after the config change; check the server URL and website login.</li>

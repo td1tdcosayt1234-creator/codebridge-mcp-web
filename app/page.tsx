@@ -109,7 +109,7 @@ const AFTER = [
 ];
 
 const AGENT_STEPS = [
-  { n: "1", t: "Copy your key", d: <>Open <Link href="/dashboard/mcp">/dashboard/mcp</Link> and copy the personal key. It is shown once and never in full again.</> },
+  { n: "1", t: "Copy your key", d: <>Open <Link href="https://dash.roun.sryze.cc/mcp">dash.roun.sryze.cc/mcp</Link> and copy the personal key. It is shown once and never in full again.</> },
   { n: "2", t: "Paste one block", d: <>Drop it into your agent config. OpenCode, Claude and Cursor all read the same shape.</> },
   { n: "3", t: "Ask for a build", d: <>Say <em>&ldquo;compile my files&rdquo;</em> and the result comes back inside the conversation.</> },
 ];
@@ -128,7 +128,7 @@ const CONFIG = `{
   "mcp": {
     "codebridge": {
       "type": "remote",
-      "url": "http://localhost:3001/api/mcp",
+      "url": "https://api.roun.sryze.cc/api/mcp",
       "headers": { "Authorization": "Bearer YOUR_KEY" }
     }
   }

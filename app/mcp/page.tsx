@@ -13,23 +13,25 @@ const TOOLS = [
 ];
 
 export default function Mcp() {
-  // NOTE: your-domain.com = wherever this site is deployed.
+  // Live MCP endpoint (Cloudflare host layout):
+  //   api.roun.sryze.cc          -> MCP + OAuth only (this URL)
+  //   dash.roun.sryze.cc/mcp     -> key management (dashboard)
   // Local dev server? Use http://localhost:3001 instead.
-  const originNote = "https://your-domain.com";
+  const MCP_URL = "https://api.roun.sryze.cc/api/mcp";
   const opencode = `{
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "codebridge": { "type": "remote", "url": "${originNote}/api/mcp", "enabled": true }
+    "codebridge": { "type": "remote", "url": "${MCP_URL}", "enabled": true }
   }
 }`;
-  const cursor = `{"mcpServers":{"codebridge":{"url":"${originNote}/api/mcp"}}}`;
-  const claude = `{"mcpServers":{"codebridge":{"url":"${originNote}/api/mcp"}}}`;
+  const cursor = `{"mcpServers":{"codebridge":{"url":"${MCP_URL}"}}}`;
+  const claude = `{"mcpServers":{"codebridge":{"url":"${MCP_URL}"}}}`;
   const manual = `{
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
     "codebridge": {
       "type": "remote",
-      "url": "https://your-domain.com/api/mcp",
+      "url": "https://api.roun.sryze.cc/api/mcp",
       "headers": { "Authorization": "Bearer PASTE_YOUR_KEY_HERE" }
     }
   }
@@ -46,7 +48,7 @@ export default function Mcp() {
           <>
             This site is an MCP server (<code>/api/mcp</code>). <strong>Easiest path:</strong> add only the URL below —
             your client opens a browser login, you click <strong>Connect</strong>, done. Prefer keys? Copy one from{" "}
-            <Link href="/dashboard/mcp">/dashboard/mcp</Link>.
+            <Link href="https://dash.roun.sryze.cc/mcp">dash.roun.sryze.cc/mcp</Link>.
           </>
         }
       />
@@ -80,7 +82,7 @@ export default function Mcp() {
               <strong>Use any tool once</strong>
               <p className="muted small" style={{ margin: "8px 0 0" }}>
                 The client opens <code>/api/oauth/authorize</code> in your browser. Signup/login, click{" "}
-                <strong>Connect</strong>, return to the client. Connected until you revoke it in /dashboard/mcp.
+                <strong>Connect</strong>, return to the client. Connected until you revoke it in dash.roun.sryze.cc/mcp.
               </p>
             </div>
           </div>
@@ -93,7 +95,7 @@ export default function Mcp() {
             <h3>Manual key <span className="muted small">(headless agents)</span></h3>
             <p className="muted small">
               <Link href="/signup">Signup</Link> / <Link href="/login">login</Link>, then open{" "}
-              <Link href="/dashboard/mcp">/dashboard/mcp</Link> — your personal key is shown there (never share it). Put
+              <Link href="https://dash.roun.sryze.cc/mcp">dash.roun.sryze.cc/mcp</Link> — your personal key is shown there (never share it). Put
               it in your project <code>opencode.json</code>:
             </p>
             <div className="codeblock">
@@ -105,7 +107,7 @@ export default function Mcp() {
             </div>
             <p className="muted small">
               <strong>Restart the agent afterwards</strong> — otherwise no tools appear. Wrong key? You get a clear{" "}
-              <code>invalid_token</code> error. Key leaked? Regenerate it in /dashboard/mcp.
+              <code>invalid_token</code> error. Key leaked? Regenerate it in dash.roun.sryze.cc/mcp.
             </p>
           </div>
         </Reveal>

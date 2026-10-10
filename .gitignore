@@ -8,6 +8,7 @@ data/*.tmp.*
 data/apks/
 .env
 .env.local
+.tunnel-tokens.ps1
 *.log
 cloudflared.exe
 tunnel-url.txt

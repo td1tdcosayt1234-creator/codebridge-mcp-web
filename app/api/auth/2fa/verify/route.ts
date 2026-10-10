@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 // Step 2 of login: exchange short-lived tmp token + TOTP/backup code
 // for a real session cookie. tmp comes from body or g2fa cookie (Google flow).
 export async function POST(req: Request) {
-  const { rateLimit, clientIp, cookieSecure, recordViolation, isBanned, banResponse } = await import("@/lib/security");
+  const { rateLimit, clientIp, cookieSecure, cookieDomain, recordViolation, isBanned, banResponse } = await import("@/lib/security");
   const ip = clientIp(req);
   if (isBanned(ip)) return banResponse();
   const rl = rateLimit("2fa_verify:" + ip, 10, 60 * 1000);
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
   const wantRem = (p as Record<string, unknown>).remember !== false && remember;
   const token = await signJwt({ sub: u.id, email: u.email, role: u.role }, wantRem ? "30d" : "24h");
   const res = NextResponse.json({ ok: true, role: u.role });
-  res.cookies.set("session", token, { httpOnly: true, path: "/", maxAge: wantRem ? 30 * 24 * 3600 : 24 * 3600, sameSite: "lax", secure: cookieSecure(req) });
+  res.cookies.set("session", token, { httpOnly: true, path: "/", domain: cookieDomain(req), maxAge: wantRem ? 30 * 24 * 3600 : 24 * 3600, sameSite: "lax", secure: cookieSecure(req) });
   res.cookies.set("g2fa", "", { httpOnly: true, path: "/", maxAge: 0 });
   return res;
 }

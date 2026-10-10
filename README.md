@@ -3,9 +3,18 @@
 User repo chhoy na. Web e request dao → GitHub Actions e chalano OpenCode compile/fix kore → output web e fire ase → user result dekhe.
 MCP diye coding agent thekei full output paoa jay — dashboard e jete hoy na.
 
+## Live URLs (Cloudflare)
+| Host | Ki ase |
+|---|---|
+| **https://roun.sryze.cc** | Public site — home, /pricing, /about, /mcp, /docs, /faq, /support, /login, /signup, /game |
+| **https://dash.roun.sryze.cc** | Dashboard — `/` = dashboard, `/tasks`, `/builds`, `/mcp` (key), `/earn`, `/settings`, `/tokens`, `/tracking`, `/uses`, `/github`; admin: `/admin/*` |
+| **https://api.roun.sryze.cc/api/mcp** | MCP endpoint (agent connect — shudhu MCP + OAuth ai host e) |
+
+Middleware host-protocol: main host e `/dashboard/*` → dash host, `/api/mcp*` → api host (307). Pura host layout `middleware.ts` e.
+
 ## Flow
 ```
-web request (/dashboard/tasks, title+prompt+files) ba MCP (compile/compile_fix)
+web request (dash.roun.sryze.cc/tasks, title+prompt+files) ba MCP (compile/compile_fix)
   → task queue → workflow_dispatch (builder repo)
   → Actions: task files task-work/ dir e likhe AI review (Ollama, free, no key)
     + project type onujayi REAL build (Android/Node/Python/Go/Rust)
@@ -85,15 +94,16 @@ TOKEN_ENC_KEY=32chars-min-key
 ## Payments (Paddle Billing — sandbox tested, live ready)
 `/pricing` Pro ($12/mo) / Team ($39/mo) pay via Paddle overlay checkout (`@paddle/paddle-js`) — coins auto-credit on `transaction.completed` webhook.
 - `.env`: `PADDLE_ENV` (`sandbox`/`live`), `PADDLE_API_KEY` (`pdl_sdbx_...`/`pdl_live_...`), `PADDLE_PRO_PRICE_ID`, `PADDLE_TEAM_PRICE_ID`, `PADDLE_WEBHOOK_SECRET`, plus frontend `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` (`test_...`/`live_...`) + `NEXT_PUBLIC_PADDLE_ENV`.
-- Paddle dashboard → Checkout → Checkout settings → **Default payment link** set koro (nahole `transaction_default_checkout_url_not_set` error) → Notifications → destination `https://<public-host>/api/billing/webhook`, event `transaction.completed` → secret `.env` e boshao, restart.
+- Paddle dashboard → Checkout → Checkout settings → **Default payment link** set koro (nahole `transaction_default_checkout_url_not_set` error) → Notifications → destination `https://roun.sryze.cc/api/billing/webhook`, event `transaction.completed` → secret `.env` e boshao, restart.
 - Webhook security: HMAC-SHA256 verify (`ts:body`), timestamp window, IP rate limit, `event_id` dedup, paid `price_id` must match plan — nahole coin mint hoy na.
 - Account must finish Paddle onboarding (dashboard verification) or checkout creation fails with "Checkouts aren't enabled" — `/pricing` shows that message until then.
 - Sandbox test cards: `4242 4242 4242 4242` (success), `4000 0038 0000 0446` (3DS), `4000 0000 0000 0002` (declined) — expiry future, CVC jekono.
 
-## Routes
-- Public: `/`, `/pricing` (Free $0), `/about`, `/mcp`, `/docs`, `/faq`, `/support`, `/terms`, `/privacy`, `/refund`, `/login`, `/signup`
-- User (login must): `/game` (Game Studio), `/game/history`, `/dashboard`, `/dashboard/tasks`, `/dashboard/github` (read-only, admin token status), `/dashboard/mcp`, `/dashboard/builds`, `/dashboard/tokens` (balance), `/dashboard/tracking`, `/dashboard/settings`
-- Admin (login + admin, nahole 404): `/admin`, `/admin/runner`, `/admin/github`, `/admin/users`, `/admin/tokens`, `/admin/tracking`, `/admin/mcp-control`, `/admin/content`, `/admin/support`, `/admin/logs`
+## Routes (live host layout)
+- Public (`roun.sryze.cc`): `/`, `/pricing` (Free $0), `/about`, `/mcp`, `/docs`, `/faq`, `/support`, `/terms`, `/privacy`, `/refund`, `/login`, `/signup`, `/game`, `/game/history`
+- Dashboard (`dash.roun.sryze.cc`, login must): `/` (dashboard home), `/tasks`, `/github` (read-only, admin token status), `/mcp` (MCP key + agents), `/builds`, `/tokens` (balance), `/tracking`, `/settings`, `/earn`, `/uses`
+- Admin (`dash.roun.sryze.cc/admin/*`, login + admin, nahole 404): `/admin`, `/admin/runner`, `/admin/github`, `/admin/users`, `/admin/tokens`, `/admin/tracking`, `/admin/mcp-control`, `/admin/content`, `/admin/support`, `/admin/logs`, `/admin/ai`
+- MCP (`api.roun.sryze.cc`, shudhu MCP): `/api/mcp`, `/api/mcp/*`, `/api/oauth/*`, `/.well-known/oauth-*` — onno kichu ai host e 404
 
 ## Admin setup (must)
 1. `/admin/github` — Global GitHub Classic Token (scope `repo` + `workflow`).
@@ -106,13 +116,13 @@ TOKEN_ENC_KEY=32chars-min-key
   "mcp": {
     "codebridge": {
       "type": "remote",
-      "url": "https://your-domain.com/api/mcp",
+      "url": "https://api.roun.sryze.cc/api/mcp",
       "headers": { "Authorization": "Bearer PASTE_MCP_KEY_FROM_DASHBOARD" }
     }
   }
 }
 ```
-Signup/login on the web first, copy the personal key from `/dashboard/mcp` — anonymous calls are rejected.
+Signup/login on the web first, copy the personal key from `dash.roun.sryze.cc/mcp` — anonymous calls are rejected.
 Restart opencode after config change. Tools: `compile`, `compile_fix`, `list_tasks`, `get_task_result`, `gh_issue_list`, `auth_check` — full log+result+APK link agent ei ase (compile call ~8 min wait, sesh na hole `get_task_result` e `task_id` pathao).
 
 ## Security

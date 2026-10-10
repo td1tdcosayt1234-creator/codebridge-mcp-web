@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { readDb, writeDb, uid } from "@/lib/db";
 import { PRICING, normalizeCycle, priceIdForCycle, verifyWebhookSignature } from "@/lib/billing";
 
-// Paddle Billing webhook. Destination: https://<public-host>/api/billing/webhook
+// Paddle Billing webhook. Destination: https://roun.sryze.cc/api/billing/webhook
 // Enable event: transaction.completed. Secret: PADDLE_WEBHOOK_SECRET.
 export async function POST(req: Request) {
   const secret = process.env.PADDLE_WEBHOOK_SECRET || "";

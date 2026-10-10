@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { readDb, writeDb, uid } from "@/lib/db";
 import { signJwt } from "@/lib/auth";
-import { rateLimit, clientIp, passwordError, cookieSecure, clampText, csrfCheck, csrfBlock } from "@/lib/security";
+import { rateLimit, clientIp, passwordError, cookieSecure, cookieDomain, clampText, csrfCheck, csrfBlock } from "@/lib/security";
 import { honeypot, isVpn } from "@/lib/antifraud";
 
 export async function POST(req: Request) {
@@ -43,6 +43,6 @@ export async function POST(req: Request) {
   const token = await signJwt({ sub: u.id, email: u.email, role: u.role }, remember ? "30d" : "24h");
   const res = NextResponse.json({ ok: true });
   // Cookie lifetime matches the JWT lifetime — a stale cookie can never outlive its token.
-  res.cookies.set("session", token, { httpOnly: true, path: "/", maxAge: remember ? 30 * 24 * 3600 : 24 * 3600, sameSite: "lax", secure: cookieSecure(req) });
+  res.cookies.set("session", token, { httpOnly: true, path: "/", domain: cookieDomain(req), maxAge: remember ? 30 * 24 * 3600 : 24 * 3600, sameSite: "lax", secure: cookieSecure(req) });
   return res;
 }

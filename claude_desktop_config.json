@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "codebridge": {
-      "url": "http://localhost:3001/api/mcp",
+      "url": "https://api.roun.sryze.cc/api/mcp",
       "transport": "streamableHttp"
     }
   }

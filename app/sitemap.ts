@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 const PAGES = ["", "/about", "/docs", "/docs/game", "/faq", "/game", "/game/history", "/mcp", "/pricing", "/privacy", "/support", "/terms", "/refund", "/login", "/signup"];
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = (process.env.SITE_URL || "https://exact-pet-eric-www.trycloudflare.com").replace(/\/+$/, "");
+  const base = (process.env.SITE_URL || "https://roun.sryze.cc").replace(/\/+$/, "");
   const now = new Date();
   return PAGES.map((p) => ({
     url: base + (p || "/"),

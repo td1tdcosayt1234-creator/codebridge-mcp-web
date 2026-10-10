@@ -165,3 +165,15 @@ export function cookieSecure(req: Request): boolean {
   if (isLocalHost(host) || isPrivateHost(host)) return false;
   return isProd();
 }
+
+// The site is split across subdomains (roun.sryze.cc public, dash./admin, api./MCP),
+// so the session cookie must be shared by the whole parent domain. Browsers
+// reject Domain= for localhost/LAN, so dev keeps host-only cookies.
+export function cookieDomain(req: Request): string | undefined {
+  const h = ((req.headers.get("x-forwarded-host") || req.headers.get("host") || "")
+    .split(",")[0].trim().toLowerCase().split(":")[0]);
+  if (h === "roun.sryze.cc" || h.endsWith(".roun.sryze.cc") || h === "www.roun.sryze.cc") {
+    return ".roun.sryze.cc";
+  }
+  return undefined;
+}
