@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { googleConfigured, googleRedirectUri, googleExchangeCode, googleFetchProfile, safeNext } from "@/lib/google";
 import { readDb, writeDb, uid } from "@/lib/db";
 import { signJwt } from "@/lib/auth";
-import { rateLimit, clientIp, cookieSecure } from "@/lib/security";
+import { rateLimit, clientIp, cookieSecure, cookieDomain } from "@/lib/security";
 import { newPersonalKey } from "@/lib/mcpOAuth";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -28,31 +28,41 @@ export async function GET(req: Request) {
   const wantNext = safeNext(get("g_next"), "/dashboard");
   const remember = get("g_rem") !== "0";
   const clear = (r: NextResponse) => {
-    r.cookies.set("g_state", "", { httpOnly: true, path: "/", maxAge: 0 });
-    r.cookies.set("g_next", "", { httpOnly: true, path: "/", maxAge: 0 });
-    r.cookies.set("g_rem", "", { httpOnly: true, path: "/", maxAge: 0 });
+    const dom = cookieDomain(req);
+    const sec = cookieSecure(req);
+    r.cookies.set("g_state", "", { httpOnly: true, path: "/", domain: dom, maxAge: 0, sameSite: "lax", secure: sec });
+    r.cookies.set("g_next", "", { httpOnly: true, path: "/", domain: dom, maxAge: 0, sameSite: "lax", secure: sec });
+    r.cookies.set("g_rem", "", { httpOnly: true, path: "/", domain: dom, maxAge: 0, sameSite: "lax", secure: sec });
     return r;
   };
   if (!code || !state || !wantState || state !== wantState) {
     return clear(NextResponse.redirect(new URL("/login?err=google_state", req.url)));
   }
+  let stage = "exchange";
   try {
     const redirectUri = googleRedirectUri(req);
     const { accessToken } = await googleExchangeCode(code, redirectUri);
+    stage = "profile";
     const prof = await googleFetchProfile(accessToken);
+    stage = "db";
     if (!prof.verified) return clear(NextResponse.redirect(new URL("/login?err=google_unverified", req.url)));
     const db = await readDb();
     let user = db.users.find((x) => x.email.toLowerCase() === prof.email);
+    let isNew = false;
     if (!user) {
+      isNew = true;
       // New Google user: unusable password hash (password login impossible),
       // free plan + coins, personal MCP key — same as email signup.
       const passHash = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 12);
       const adminMail = (process.env.ADMIN_EMAIL || "admin@local.test").trim().toLowerCase();
       const isAdmin = prof.email === adminMail && !db.users.some((x) => x.role === "admin");
+      const nameParts = String(prof.name || "").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
       user = {
         id: uid("u"), email: prof.email, passHash,
         role: isAdmin ? "admin" : "user", plan: isAdmin ? "pro" : "free",
         createdAt: new Date().toISOString(), emailVerified: true, googleId: prof.sub, provider: "google",
+        firstName: (nameParts[0] || "").slice(0, 60) || undefined,
+        lastName: nameParts.slice(1).join(" ").slice(0, 60) || undefined,
       };
       db.users.push(user);
       db.mcpKeys.push({ userId: user.id, key: newPersonalKey() });
@@ -73,17 +83,22 @@ export async function GET(req: Request) {
       await writeDb(db);
       const tmp = await signJwt({ sub: user!.id, purpose: "2fa", remember }, "5m");
       const res = clear(NextResponse.redirect(new URL("/login?need2fa=1", req.url)));
-      res.cookies.set("g2fa", tmp, { httpOnly: true, path: "/", maxAge: 5 * 60, sameSite: "lax", secure: cookieSecure(req) });
+      res.cookies.set("g2fa", tmp, { httpOnly: true, path: "/", domain: cookieDomain(req), maxAge: 5 * 60, sameSite: "lax", secure: cookieSecure(req) });
       return res;
     }
     await writeDb(db);
     const token = await signJwt({ sub: user.id, email: user.email, role: user.role }, remember ? "30d" : "24h");
     const role = user.role;
-    const dest = wantNext !== "/dashboard" ? wantNext : role === "admin" ? "/admin" : "/dashboard";
-    const res = clear(NextResponse.redirect(new URL(dest, req.url)));
-    res.cookies.set("session", token, { httpOnly: true, path: "/", maxAge: remember ? 30 * 24 * 3600 : 24 * 3600, sameSite: "lax", secure: cookieSecure(req) });
+    // First-time Google users go through the onboarding survey; the
+    // MCP-only api host can't render /dashboard or /welcome (404 there).
+    const cbHost = new URL(req.url).hostname.toLowerCase();
+    const origin = cbHost === "api.roun.sryze.cc" ? "https://roun.sryze.cc" : new URL(req.url).origin;
+    const dest = wantNext !== "/dashboard" ? wantNext : isNew ? "/welcome" : role === "admin" ? "/admin" : "/dashboard";
+    const res = clear(NextResponse.redirect(origin + dest));
+    res.cookies.set("session", token, { httpOnly: true, path: "/", domain: cookieDomain(req), maxAge: remember ? 30 * 24 * 3600 : 24 * 3600, sameSite: "lax", secure: cookieSecure(req) });
     return res;
-  } catch {
+  } catch (e) {
+    console.error("[google-cb] stage=" + stage + " err=" + ((e as Error)?.message || e));
     return clear(NextResponse.redirect(new URL("/login?err=google_failed", req.url)));
   }
 }

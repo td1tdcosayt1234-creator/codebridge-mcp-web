@@ -2,8 +2,19 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import VerifyEmail from "../../components/VerifyEmail";
+import ProfileSurvey from "../../components/ProfileSurvey";
+import { COUNTRIES } from "../../lib/profile";
+
+const PENDING_KEY = "cb_pending_verify";
+
+function destFor(role: string): string {
+  return role === "admin" ? "/admin" : "/dashboard";
+}
 
 export default function Signup() {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [country, setCountry] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
@@ -15,8 +26,12 @@ export default function Signup() {
   const [checking, setChecking] = useState(true);
   const [googleOn, setGoogleOn] = useState(false);
   const [needVerify, setNeedVerify] = useState(false);
+  const [needSurvey, setNeedSurvey] = useState(false);
+  const [mailSlow, setMailSlow] = useState(false);
+  const [role, setRole] = useState("user");
 
-  // Already logged in -> straight to dashboard, no second form.
+  // Logged-in users skip the form; unfinished surveys resume instead of
+  // jumping to the dashboard. Refresh mid-OTP restores from localStorage.
   useEffect(() => {
     fetch("/api/auth/google/status", { cache: "no-store" })
       .then((x) => x.json())
@@ -25,21 +40,42 @@ export default function Signup() {
     fetch("/api/auth/me", { cache: "no-store" })
       .then((x) => x.json())
       .then((j) => {
-        if (j?.user) window.location.href = j.user.role === "admin" ? "/admin" : "/dashboard";
-        else setChecking(false);
+        if (j?.user) {
+          setRole(j.user.role || "user");
+          fetch("/api/auth/profile", { cache: "no-store" })
+            .then((x) => x.json())
+            .then((p) => {
+              if (p?.profile && !p.profile.surveyDone) setNeedSurvey(true);
+              else window.location.href = destFor(j.user.role);
+            })
+            .catch(() => { window.location.href = destFor(j.user.role); });
+        } else {
+          try {
+            const saved = JSON.parse(localStorage.getItem(PENDING_KEY) || "null");
+            if (saved?.email) {
+              setEmail(saved.email);
+              setFirstName(saved.firstName || "");
+              setLastName(saved.lastName || "");
+              setCountry(saved.country || "");
+              setNeedVerify(true);
+            }
+          } catch {}
+          setChecking(false);
+        }
       })
       .catch(() => setChecking(false));
   }, []);
 
   async function go(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
     setErr("");
     setBusy(true);
     try {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, remember, website: hp }),
+        body: JSON.stringify({ email, password, remember, website: hp, firstName, lastName, country }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -48,11 +84,14 @@ export default function Signup() {
         return;
       }
       if (j.existing) {
+        try { localStorage.removeItem(PENDING_KEY); } catch {}
         window.location.href = "/login?exists=1&email=" + encodeURIComponent(email);
         return;
       }
       if (j.verifyRequired) {
         // elsemail OTP sent — stay here, verify inline (no session yet).
+        try { localStorage.setItem(PENDING_KEY, JSON.stringify({ email, firstName, lastName, country })); } catch {}
+        setMailSlow(!!j.mailSlow);
         setNeedVerify(true);
         return;
       }
@@ -64,6 +103,13 @@ export default function Signup() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function verified(r: string) {
+    try { localStorage.removeItem(PENDING_KEY); } catch {}
+    setRole(r || "user");
+    setNeedVerify(false);
+    setNeedSurvey(true);
   }
 
   if (checking) {
@@ -89,16 +135,36 @@ export default function Signup() {
         <p className="muted small" style={{ marginTop: 0 }}>
           <strong className="grad-anim">10,000 coins</strong> included. Password: min 12 characters, letters + numbers.
         </p>
-        {needVerify ? (
-          <VerifyEmail email={email} remember={remember} onDone={(role) => { window.location.href = role === "admin" ? "/admin" : "/dashboard"; }} />
+        {needSurvey ? (
+          <ProfileSurvey onDone={() => { window.location.href = destFor(role); }} />
+        ) : needVerify ? (
+          <VerifyEmail email={email} remember={remember} mailSlow={mailSlow} onDone={verified} />
         ) : (
         <>
         <form onSubmit={go}>
-          <label>Email</label>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" type="email" placeholder="you@example.com" />
-          <label>Password</label>
+          <div className="grid-2col">
+            <div>
+              <label htmlFor="su-first">First name</label>
+              <input id="su-first" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoComplete="given-name" placeholder="Rahim" maxLength={60} />
+            </div>
+            <div>
+              <label htmlFor="su-last">Last name</label>
+              <input id="su-last" value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" placeholder="Uddin" maxLength={60} />
+            </div>
+          </div>
+          <label htmlFor="su-country">Country</label>
+          <select id="su-country" value={country} onChange={(e) => setCountry(e.target.value)} style={{ width: "100%" }}>
+            <option value="">Select your country…</option>
+            {COUNTRIES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          <label htmlFor="su-email">Email</label>
+          <input id="su-email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" type="email" placeholder="you@example.com" />
+          <label htmlFor="su-pass">Password</label>
           <div className="pw-wrap">
             <input
+              id="su-pass"
               type={show ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -123,17 +189,17 @@ export default function Signup() {
             Remember me — 30 days, all tabs
           </label>
           {err && (
-            <p className="small" style={{ marginTop: 12 }}>
+            <p className="small" style={{ marginTop: 12 }} role="alert">
               <span className="badge bad">{err}</span>
             </p>
           )}
           <div style={{ marginTop: 20 }}>
-            <button className="btn btn-lg shine" style={{ width: "100%" }} type="submit" disabled={busy}>
+            <button className={"btn btn-lg shine" + (busy ? " is-loading" : "")} style={{ width: "100%" }} type="submit" disabled={busy}>
               {busy ? "Creating…" : "Create account"}
             </button>
           </div>
         </form>
-        {googleOn && !needVerify && (
+        {googleOn && !needVerify && !needSurvey && (
           <>
             <div className="or-div">or</div>
             <div style={{ marginTop: 12 }}>

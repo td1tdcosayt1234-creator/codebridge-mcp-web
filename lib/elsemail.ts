@@ -52,3 +52,42 @@ export function checkSignupOtp(email: string, code: string) {
 export function sendBrandedMail(to: string, subject: string, html: string) {
   return call("/api/mail/send", { to, subject, html }, 45000);
 }
+
+export type InboxMail = {
+  id?: string; messageId?: string; time?: string; from?: string; to?: string;
+  subject?: string; text?: string; html?: string; status?: string; dkim?: boolean;
+};
+
+// Admin inbox: latest mails from the elsemail console API (server-side key).
+export async function fetchInbox(): Promise<{ ok: boolean; mails?: InboxMail[]; error?: string }> {
+  if (!elsemailConfigured()) return { ok: false, error: "Email service not configured (ELSEMAIL_API_KEY)." };
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 20000);
+  try {
+    const r = await fetch(BASE + "/api/console/mails", {
+      headers: { "x-api-key": KEY },
+      signal: ctrl.signal,
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !Array.isArray(j)) return { ok: false, error: "Email service error (" + r.status + ")" };
+    return {
+      ok: true,
+      mails: (j as InboxMail[]).slice(0, 50).map((m) => ({
+        id: String(m.id || m.messageId || ""),
+        messageId: String(m.messageId || ""),
+        time: String(m.time || ""),
+        from: String(m.from || "").slice(0, 120),
+        to: String(m.to || "").slice(0, 120),
+        subject: String(m.subject || "").slice(0, 200),
+        text: String(m.text || "").slice(0, 20000),
+        html: String(m.html || "").slice(0, 100000),
+        status: String(m.status || "").slice(0, 40),
+        dkim: !!m.dkim,
+      })),
+    };
+  } catch {
+    return { ok: false, error: "Email service unreachable." };
+  } finally {
+    clearTimeout(t);
+  }
+}

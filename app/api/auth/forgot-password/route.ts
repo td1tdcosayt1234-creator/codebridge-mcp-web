@@ -7,8 +7,8 @@ import { sendBrandedMail } from "@/lib/elsemail";
 function siteBase(req: Request): string {
   const env = (process.env.SITE_URL || "").replace(/\/+$/, "");
   if (env) return env;
-  const h = req.headers.get("x-forwarded-host") || req.headers.get("host") || "roun.sryze.cc";
-  return "https://" + h.split(",")[0].trim().split(":")[0];
+  // Fallback never trusts the request host (poisoned Host = stolen reset links).
+  return "https://roun.sryze.cc";
 }
 
 // POST {email} — always {ok:true} (never reveal whether the address exists).

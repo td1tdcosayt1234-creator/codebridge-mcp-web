@@ -46,15 +46,16 @@ export async function POST(req: Request) {
   if (!u) return NextResponse.json({ error: "Account not found. Sign up first." }, { status: 404 });
   if (u.emailVerified !== false) {
     // Already verified (OTP valid but account active) — just log in.
-    const token0 = await signJwt({ sub: u.id, email: u.email, role: u.role }, "24h");
+    const token0 = await signJwt({ sub: u.id, email: u.email, role: u.role }, remember ? "30d" : "24h");
     const res0 = NextResponse.json({ ok: true, role: u.role });
-    res0.cookies.set("session", token0, { httpOnly: true, path: "/", domain: cookieDomain(req), maxAge: 24 * 3600, sameSite: "lax", secure: cookieSecure(req) });
+    res0.cookies.set("session", token0, { httpOnly: true, path: "/", domain: cookieDomain(req), maxAge: (remember ? 30 * 24 * 3600 : 24 * 3600), sameSite: "lax", secure: cookieSecure(req) });
     return res0;
   }
   u.emailVerified = true;
   // Coins + key are granted HERE so fake mailboxes can never farm 10k.
-  db.mcpKeys.push({ userId: u.id, key: newPersonalKey() });
-  db.usage.push({ userId: u.id, mcpCalls: 0, githubCalls: 0, balance: 10000, usedTotal: 0 });
+  // Guard against double-credit on concurrent/double submits.
+  if (!db.mcpKeys.some((k) => k.userId === u.id)) db.mcpKeys.push({ userId: u.id, key: newPersonalKey() });
+  if (!db.usage.some((x) => x.userId === u.id)) db.usage.push({ userId: u.id, mcpCalls: 0, githubCalls: 0, balance: 10000, usedTotal: 0 });
   db.events.push({ id: uid("e"), userId: u.id, action: "email_verified", detail: u.email, at: new Date().toISOString() });
   await writeDb(db);
   const token = await signJwt({ sub: u.id, email: u.email, role: u.role }, remember ? "30d" : "24h");

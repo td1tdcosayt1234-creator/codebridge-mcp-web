@@ -2,7 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
 import { encWith, decWith } from "./crypto";
-export type User = { id:string; email:string; passHash:string; role:"user"|"admin"; plan:"free"|"pro"|"team"; createdAt:string; emailVerified?:boolean; googleId?:string; provider?: "local"|"google"; twoFaEnc?:string; twoFaPending?:string; twoFaBackup?:string[]; twoFaAt?:string };
+export type User = { id:string; email:string; passHash:string; role:"user"|"admin"; plan:"free"|"pro"|"team"; createdAt:string; emailVerified?:boolean; googleId?:string; provider?: "local"|"google"; twoFaEnc?:string; twoFaPending?:string; twoFaBackup?:string[]; twoFaAt?:string; firstName?:string; lastName?:string; country?:string; gender?:string; hearAbout?:string; goal?:string; surveyAt?:string };
 export type EventItem = { id:string; userId:string; action:string; detail:string; ip?:string; at:string };
 export type Build = { id:string; userId:string; repo:string; branch:string; status:string; log:string; at:string };
 export type Ticket = { id:string; userId:string; subject:string; body:string; status:string; at:string };

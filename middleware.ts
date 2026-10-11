@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { verifyJwt } from "@/lib/auth";
+import { verifyJwt, validSession } from "@/lib/auth";
 
 // ---- Host layout (every Cloudflare host lands on this same server) ----
 //   roun.sryze.cc        public site only (home, docs, pricing, login, game…)
@@ -48,7 +48,7 @@ function isMcpApi(p: string): boolean {
 // Public-only pages: never rewritten onto the dashboard on the dash host.
 const PUBLIC_PAGES = [
   "/about", "/docs", "/faq", "/pricing", "/privacy", "/refund",
-  "/terms", "/support", "/login", "/signup", "/game", "/dev",
+  "/terms", "/support", "/login", "/signup", "/welcome", "/game", "/dev",
   "/forgot-password", "/reset-password",
 ];
 function isPublicPage(p: string): boolean {
@@ -63,7 +63,7 @@ function redirectTo(host: string, p: string, search: string): NextResponse {
 async function gameGate(req: NextRequest, p: string): Promise<NextResponse | null> {
   if (p !== "/game" && !p.startsWith("/game/")) return null;
   const t = req.cookies.get("session")?.value || "";
-  const user = await verifyJwt(t);
+  const user = validSession(await verifyJwt(t));
   if (!user) {
     const next = p + req.nextUrl.search;
     return NextResponse.redirect(new URL("/login?next=" + encodeURIComponent(next), req.url));
@@ -75,6 +75,13 @@ export async function middleware(req: NextRequest) {
   const p = req.nextUrl.pathname;
   const search = req.nextUrl.search;
   const host = hostOf(req);
+
+  // 0.0.0.0 is a listen-address, never a browsable host (and this origin
+  // is plain HTTP, so https://0.0.0.0:... always fails). Send it to the
+  // real domain instead of letting OAuth/state break there.
+  if (host === "0.0.0.0" || host === "[") {
+    return NextResponse.redirect(new URL(p + search, "https://roun.sryze.cc"));
+  }
 
   // OAuth discovery: dot-folder routes are flaky under Next dev bundling, so
   // they are served from normal /api routes via rewrite (all hosts).

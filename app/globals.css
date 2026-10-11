@@ -821,6 +821,39 @@ textarea { line-height: 1.65; resize: vertical; }
 input:focus, select:focus, textarea:focus { border-color: rgba(196, 181, 253, 0.7); background: rgba(139, 92, 246, 0.07); box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.14), 0 0 30px -12px rgba(139, 92, 246, 0.8); transform: translateY(-1px); }
 input::placeholder, textarea::placeholder { color: var(--muted-2); }
 select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' stroke='%2399a1b8' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 13px center; padding-right: 36px; }
+/* Native dropdown popup (Windows/Chrome): UA paints options on white while
+   inheriting our light text colour -> invisible names. Force dark popup. */
+select option { background-color: #151a2a; color: var(--text); }
+select option:checked { background-color: #232c4e; color: #fff; }
+
+/* Responsive 2-col grids (signup names, survey gender): stack on phones. */
+.grid-2col, .opt-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.opt-grid-2 { gap: 10px; }
+.survey-nav { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+@media (max-width: 480px) {
+  .grid-2col, .opt-grid-2 { grid-template-columns: 1fr; }
+}
+
+/* Survey progress shimmer (reuses payShimmer). */
+.progress-shimmer { position: relative; overflow: hidden; }
+.progress-shimmer::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 25%, rgba(255,255,255,.45) 50%, transparent 75%); animation: payShimmer 1.6s linear infinite; pointer-events: none; }
+
+/* OTP input glows mint when a full 6-digit code is typed. */
+.otp-ready { border-color: rgba(52, 211, 153, 0.65) !important; box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.14), 0 0 26px -8px rgba(52, 211, 153, 0.8) !important; }
+
+/* Status dot pulse (was missing keyframes). */
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* Long errors must wrap, never clip inside cards. */
+.badge { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; }
+
+/* Checkbox + disabled ghost buttons. */
+input[type="checkbox"] { accent-color: var(--mint); width: 16px; height: 16px; flex-shrink: 0; }
+.pw-toggle:disabled { opacity: 0.45; cursor: not-allowed; background: none; }
+
+@media (forced-colors: active) {
+  .grad, .grad-anim, .stat-num, .big-glow { background: none; color: CanvasText; }
+}
 label { display: block; margin: 18px 0 8px; color: var(--muted); font-size: 12.5px; font-weight: 500; letter-spacing: 0.02em; }
 input[type="checkbox"] { width: auto; min-width: 0; padding: 0; border: 0; background: none; appearance: auto; }
 
@@ -1051,6 +1084,7 @@ details.faq .a { padding: 0 18px 18px 56px; color: #c3cade; font-size: 14.3px; l
   }
   .fade-up, .rv, .stagger > *, .word-mask > span, .page-transition { opacity: 1 !important; transform: none !important; filter: none !important; }
   .cursor-glow, .cine-shoot, .cine-scan { display: none; }
+  .marquee-track, .btn.is-loading::after, .grad-anim, .auth-card::before, .progress-shimmer::after { animation: none !important; }
 }
 
 /* ============================================================

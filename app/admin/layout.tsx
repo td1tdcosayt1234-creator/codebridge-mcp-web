@@ -1,16 +1,17 @@
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
-import { verifyJwt } from "@/lib/auth";
+import { verifyJwt, validSession } from "@/lib/auth";
 import SideNav from "../../components/SideNav";
 
 // Server-side admin gate (replaces edge middleware): non-admin -> 404.
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const t = cookies().get("session")?.value || "";
-  const p = await verifyJwt(t);
+  const p = validSession(await verifyJwt(t));
   if (!p || p.role !== "admin") notFound();
 
   const items: [string, string, string][] = [
     ["/admin", "Overview", "◈"],
+    ["/admin/inbox", "Inbox", "✉"],
     ["/admin/runner", "Runner (Actions)", "▲"],
     ["/admin/github", "GitHub Token", "⚿"],
     ["/admin/ai", "AI Key", "✧"],

@@ -1,18 +1,32 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // Shared email-OTP step (elsemail 6-digit code, 5 min valid).
-// Props: email (locked), remember flag, onDone(role).
-export default function VerifyEmail({ email, remember, onDone }: { email: string; remember: boolean; onDone: (role: string) => void }) {
+// Props: email (locked), remember flag, mailSlow hint, onDone(role).
+export default function VerifyEmail({ email, remember, mailSlow, onDone }: { email: string; remember: boolean; mailSlow?: boolean; onDone: (role: string) => void }) {
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resending, setResending] = useState(false);
   const [resent, setResent] = useState("");
   const [shake, setShake] = useState(0);
   const [cool, setCool] = useState(0);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => () => { if (timer.current) clearInterval(timer.current); }, []);
+
+  function startCool() {
+    if (timer.current) clearInterval(timer.current);
+    setCool(60);
+    timer.current = setInterval(() => setCool((v) => {
+      if (v <= 1) { if (timer.current) clearInterval(timer.current); timer.current = null; return 0; }
+      return v - 1;
+    }), 1000);
+  }
 
   async function verify(e: React.FormEvent) {
     e.preventDefault();
+    if (busy || resending) return;
     setErr("");
     setBusy(true);
     try {
@@ -37,9 +51,10 @@ export default function VerifyEmail({ email, remember, onDone }: { email: string
   }
 
   async function resend() {
-    if (cool > 0 || busy) return;
+    if (cool > 0 || busy || resending) return;
     setErr("");
     setResent("");
+    setResending(true);
     try {
       const res = await fetch("/api/auth/verify-email", {
         method: "POST",
@@ -50,11 +65,12 @@ export default function VerifyEmail({ email, remember, onDone }: { email: string
       if (!res.ok) setErr(j.error || "Could not resend");
       else {
         setResent("New code sent — use the LATEST mail only (old codes stop working).");
-        setCool(60);
-        const t = setInterval(() => setCool((v) => { if (v <= 1) { clearInterval(t); return 0; } return v - 1; }), 1000);
+        startCool();
       }
     } catch {
       setErr("Server unreachable — try again.");
+    } finally {
+      setResending(false);
     }
   }
 
@@ -63,25 +79,30 @@ export default function VerifyEmail({ email, remember, onDone }: { email: string
       <p className="muted small" style={{ marginTop: 0 }}>
         We sent a <b>6-digit code</b> to <b>{email}</b> (valid 5 min). Enter it to activate your account + 10,000 coins.
       </p>
+      {mailSlow && (
+        <p className="small" style={{ marginTop: 10 }}>
+          <span className="badge warn">Mail is slow right now — your code may still arrive. Wait a minute before Resend.</span>
+        </p>
+      )}
       <form onSubmit={verify}>
-        <label>Verification code</label>
-        <input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} autoComplete="one-time-code" inputMode="numeric" placeholder="123456" maxLength={6} />
+        <label htmlFor="otp-code">Verification code</label>
+        <input id="otp-code" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} autoComplete="one-time-code" inputMode="numeric" placeholder="123456" maxLength={6} className={code.length === 6 ? "otp-ready" : ""} />
         {err && (
-          <p className="small" style={{ marginTop: 12 }}>
+          <p className="small" style={{ marginTop: 12 }} role="alert">
             <span className="badge bad">{err}</span>
           </p>
         )}
-        {resent && <p className="small" style={{ marginTop: 12 }}><span className="badge ok">{resent}</span></p>}
+        {resent && <p className="small" style={{ marginTop: 12 }} aria-live="polite"><span className="badge ok">{resent}</span></p>}
         <div style={{ marginTop: 20 }}>
-          <button className="btn btn-lg shine" style={{ width: "100%" }} type="submit" disabled={busy || code.length !== 6}>
+          <button className={"btn btn-lg shine" + (busy ? " is-loading" : "")} style={{ width: "100%" }} type="submit" disabled={busy || resending || code.length !== 6}>
             {busy ? "Verifying…" : "Verify & activate"}
           </button>
         </div>
       </form>
       <p className="muted small" style={{ margin: "14px 0 0", textAlign: "center" }}>
         No mail? Check spam, then{" "}
-        <button type="button" className="pw-toggle" style={{ position: "static", transform: "none" }} onClick={resend} disabled={cool > 0}>
-          {cool > 0 ? `Resend code (${cool}s)` : "Resend code"}
+        <button type="button" className="pw-toggle" style={{ position: "static", transform: "none" }} onClick={resend} disabled={cool > 0 || busy || resending}>
+          {resending ? "Sending…" : cool > 0 ? `Resend code (${cool}s)` : "Resend code"}
         </button>
       </p>
     </div>

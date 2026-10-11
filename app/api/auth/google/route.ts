@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { googleConfigured, googleRedirectUri, googleAuthUrl, newState, safeNext } from "@/lib/google";
-import { rateLimit, clientIp } from "@/lib/security";
+import { rateLimit, clientIp, cookieDomain } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +18,9 @@ export async function GET(req: Request) {
   const redirectUri = googleRedirectUri(req);
   const res = NextResponse.redirect(googleAuthUrl(state, redirectUri));
   const secure = redirectUri.startsWith("https://");
-  res.cookies.set("g_state", state, { httpOnly: true, path: "/", maxAge: 5 * 60, sameSite: "lax", secure });
-  res.cookies.set("g_next", next, { httpOnly: true, path: "/", maxAge: 5 * 60, sameSite: "lax", secure });
-  res.cookies.set("g_rem", remember, { httpOnly: true, path: "/", maxAge: 5 * 60, sameSite: "lax", secure });
+  const domain = cookieDomain(req);
+  res.cookies.set("g_state", state, { httpOnly: true, path: "/", domain, maxAge: 5 * 60, sameSite: "lax", secure });
+  res.cookies.set("g_next", next, { httpOnly: true, path: "/", domain, maxAge: 5 * 60, sameSite: "lax", secure });
+  res.cookies.set("g_rem", remember, { httpOnly: true, path: "/", domain, maxAge: 5 * 60, sameSite: "lax", secure });
   return res;
 }

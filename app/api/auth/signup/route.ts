@@ -4,6 +4,7 @@ import { readDb, writeDb, uid } from "@/lib/db";
 import { rateLimit, clientIp, passwordError, clampText, csrfCheck, csrfBlock } from "@/lib/security";
 import { honeypot, isVpn } from "@/lib/antifraud";
 import { sendSignupOtp } from "@/lib/elsemail";
+import { cleanName, nameError, countryError } from "@/lib/profile";
 
 export async function POST(req: Request) {
   if (!csrfCheck(req)) return csrfBlock();
@@ -18,9 +19,18 @@ export async function POST(req: Request) {
     await writeDb(db0);
     return NextResponse.json({ error: "VPN/Proxy connections are not allowed. Disable it and try again." }, { status: 403 });
   }
-  const { email, password } = body;
+  const { email, password, firstName, lastName, country } = body;
   const mail = clampText(email, 120).trim().toLowerCase();
   if (!mail || !/^\S+@\S+\.\S+$/.test(mail)) return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
+  const first = cleanName(firstName);
+  const last = cleanName(lastName);
+  const ctry = String(country || "").trim().slice(0, 60);
+  const fErr = nameError(first, "First name");
+  if (fErr) return NextResponse.json({ error: fErr }, { status: 400 });
+  const lErr = nameError(last, "Last name");
+  if (lErr) return NextResponse.json({ error: lErr }, { status: 400 });
+  const cErr = countryError(ctry);
+  if (cErr) return NextResponse.json({ error: cErr }, { status: 400 });
   const pwErr = passwordError(String(password || ""));
   if (pwErr) return NextResponse.json({ error: pwErr }, { status: 400 });
   if (String(password).length > 128) return NextResponse.json({ error: "Password too long (max 128 characters)." }, { status: 400 });
@@ -31,6 +41,7 @@ export async function POST(req: Request) {
   const dupe = db.users.find((u) => u.email.toLowerCase() === mail);
   if (dupe) {
     await bcrypt.hash(String(password), 12).catch(() => "");
+    // Never mutate an existing row from an unauthenticated dupe signup.
     if (dupe.emailVerified === false) {
       const mailRes = await sendSignupOtp(mail);
       if (!mailRes.ok) return NextResponse.json({ error: mailRes.error || "Could not send code." }, { status: 502 });
@@ -43,7 +54,7 @@ export async function POST(req: Request) {
   const passHash = await bcrypt.hash(String(password), 12);
   // Unverified: NO session, NO coins, NO keys until the OTP is confirmed.
   // (Missing emailVerified on old rows means verified — grandfathered.)
-  const u = { id: uid("u"), email: mail, passHash, role: "user" as const, plan: "free" as const, createdAt: new Date().toISOString(), emailVerified: false as const };
+  const u = { id: uid("u"), email: mail, passHash, role: "user" as const, plan: "free" as const, createdAt: new Date().toISOString(), emailVerified: false as const, firstName: first, lastName: last, country: ctry };
   db.users.push(u);
   db.events.push({ id: uid("e"), userId: u.id, action: "signup", detail: u.email, at: new Date().toISOString() });
   await writeDb(db);

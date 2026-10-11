@@ -32,7 +32,11 @@ export async function POST(req: Request) {
   // take the same time, so the response timing reveals nothing.
   const ok = await bcrypt.compare(String(password), u?.passHash || "$2b$10$invalidinvalidinvalidinvalidinvalidinvalidinval");
   if (!u || !ok) {
-    if (!att) db.attempts.push({ email: mail, fails: 1, until: "" });
+    if (!att) {
+      db.attempts.push({ email: mail, fails: 1, until: "" });
+      // Bound growth: rotating-email attackers must not bloat db.json.
+      if (db.attempts.length > 500) db.attempts = db.attempts.slice(-500);
+    }
     else {
       att.fails += 1;
       // Re-arm the lockout every time the threshold is crossed again, so a

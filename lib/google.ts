@@ -56,7 +56,7 @@ export async function googleExchangeCode(code: string, redirectUri: string): Pro
     }).toString(),
   });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.access_token) throw new Error("Google code exchange failed.");
+  if (!r.ok || !j.access_token) throw new Error("Google code exchange failed: " + String(j.error_description || j.error || ("http_" + r.status)));
   return { accessToken: String(j.access_token) };
 }
 

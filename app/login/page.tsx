@@ -8,8 +8,23 @@ import VerifyEmail from "../../components/VerifyEmail";
 function dest(fallbackRole: string): string {
   if (typeof window === "undefined") return "/";
   const nx = new URLSearchParams(window.location.search).get("next") || "";
-  if (nx.startsWith("/") && !nx.startsWith("//")) return nx;
+  // Only in-app pages — never APIs, internals or protocol tricks.
+  if (/^\/(dashboard|admin|game|pricing|mcp|docs|faq|about|support)(\/|$)/.test(nx)) return nx;
   return fallbackRole === "admin" ? "/admin" : "/dashboard";
+}
+
+// After any successful login: unfinished surveys go to /welcome first
+// (/welcome sends surveyDone users straight on — no loop).
+async function postLogin(role: string) {
+  try {
+    const r = await fetch("/api/auth/profile", { cache: "no-store" });
+    const p = await r.json().catch(() => ({}));
+    if (r.ok && p?.profile && !p.profile.surveyDone) {
+      window.location.href = "/welcome";
+      return;
+    }
+  } catch {}
+  window.location.href = dest(role);
 }
 
 export default function Login() {
@@ -65,6 +80,7 @@ export default function Login() {
 
   async function go(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
     setErr("");
     setBusy(true);
     try {
@@ -95,7 +111,7 @@ export default function Login() {
       // Full reload (not router.push): server layouts/middleware must
       // re-read the freshly-set session cookie, otherwise they bounce
       // straight back to /login with a stale cached payload.
-      window.location.href = dest(j.role);
+      postLogin(j.role);
     } catch {
       setErr("Server unreachable — address/server check kore abar try koro.");
       setShake((s) => s + 1);
@@ -106,6 +122,7 @@ export default function Login() {
 
   async function verify2fa(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
     setErr("");
     setBusy(true);
     try {
@@ -120,7 +137,7 @@ export default function Login() {
         setShake((s) => s + 1);
         return;
       }
-      window.location.href = dest(j.role);
+      postLogin(j.role);
     } catch {
       setErr("Server unreachable — address/server check kore abar try koro.");
       setShake((s) => s + 1);
@@ -150,16 +167,19 @@ export default function Login() {
           Login to <span className="grad-anim">CodeBridge</span>
         </h1>
         {needVerify ? (
-          <VerifyEmail email={email} remember={remember} onDone={(role) => { window.location.href = dest(role); }} />
+          <VerifyEmail email={email} remember={remember} onDone={(role) => { postLogin(role); }} />
         ) : need2fa ? (
           <form onSubmit={verify2fa}>
             <p className="muted small" style={{ marginTop: 0 }}>
               Tier-2 check — open your authenticator app and enter the 6-digit code (or a backup code).
             </p>
-            <label>Authenticator code</label>
-            <input value={code} onChange={(e) => setCode(e.target.value)} autoComplete="one-time-code" inputMode="numeric" placeholder="123456" maxLength={8} />
+            <p className="muted small" style={{ marginTop: 6 }}>
+              Lost this screen or reloaded? Go back and log in again for a fresh code.
+            </p>
+            <label htmlFor="li-code">Authenticator code</label>
+            <input id="li-code" value={code} onChange={(e) => setCode(e.target.value)} autoComplete="one-time-code" inputMode="numeric" placeholder="123456" maxLength={8} />
             {err && (
-              <p className="small" style={{ marginTop: 12 }}>
+              <p className="small" style={{ marginTop: 12 }} role="alert">
                 <span className="badge bad">{err}</span>
               </p>
             )}
@@ -181,11 +201,12 @@ export default function Login() {
           lock for 15 minutes after 5 wrong tries.
         </p>
         <form onSubmit={go}>
-          <label>Email</label>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" type="email" />
-          <label>Password</label>
+          <label htmlFor="li-email">Email</label>
+          <input id="li-email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" type="email" />
+          <label htmlFor="li-pass">Password</label>
           <div className="pw-wrap">
             <input
+              id="li-pass"
               type={show ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -201,7 +222,7 @@ export default function Login() {
             Remember me — 30 days, all tabs
           </label>
           {err && (
-            <p className="small" style={{ marginTop: 12 }}>
+            <p className="small" style={{ marginTop: 12 }} role="alert">
               <span className="badge bad">{err}</span>
             </p>
           )}
@@ -215,7 +236,7 @@ export default function Login() {
             style={{ position: "absolute", left: "-9999px", opacity: 0, height: 0 }}
           />
           <div style={{ marginTop: 20 }}>
-            <button className="btn btn-lg shine" style={{ width: "100%" }} type="submit" disabled={busy}>
+            <button className={"btn btn-lg shine" + (busy ? " is-loading" : "")} style={{ width: "100%" }} type="submit" disabled={busy}>
               {busy ? "Logging in…" : "Login"}
             </button>
           </div>
