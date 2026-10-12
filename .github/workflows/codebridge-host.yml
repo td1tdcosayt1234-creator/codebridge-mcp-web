@@ -8,17 +8,16 @@
 #   - workflow_dispatch (manual / keeper / self-chain)
 #   - schedule every 6h (fallback if self-chain secret missing)
 #
-# Required repo secret (Settings -> Secrets and variables -> Actions):
+# Required repo secrets (Settings -> Secrets and variables -> Actions):
 #   TUNNEL_TOKEN_ROUN - tunnel token for roun-codebridge (JWT eyJh...).
-#     Get it: Cloudflare dashboard -> Zero Trust -> Networks -> Tunnels ->
-#     roun-codebridge -> Configure -> token, OR API:
-#     GET /accounts/<ACCT>/cfd_tunnel/<TUNNEL>/token (cfat_... token)
+#   AUTH_SECRET, TOKEN_ENC_KEY, ADMIN_PASSWORD - FIXED values shared by every
+#     run (random per-run values would break sessions + encrypted tokens in
+#     the shared Firebase DB). All already set.
 #
-# Optional secrets (safe defaults generated at runtime if missing):
-#   AUTH_SECRET, TOKEN_ENC_KEY (32B hex generated if empty)
-#   ADMIN_EMAIL (default admin@local.test), ADMIN_PASSWORD (auto-generated, shown in build log)
-#   GOOGLE_SITE_VERIFICATION (Search Console meta, empty = skip)
+# Optional secrets (empty = safe default):
+#   ADMIN_EMAIL (default admin@local.test)
 #   DB_MASTER_KEY (empty = plaintext DB like local dev)
+#   GOOGLE_SITE_VERIFICATION (Search Console meta, empty = skip)
 #   FIREBASE_DATABASE_URL + FIREBASE_SERVICE_ACCOUNT (shared DB — without them
 #     each runner uses its own empty local file; see .env.example)
 #   GH_PAT - classic PAT (repo + workflow) for zero-downtime self-chain.
@@ -49,13 +48,16 @@ jobs:
       - name: Install deps
         run: npm ci --no-audit --no-fund
 
-      - name: Write .env (defaults + secrets)
+      - name: Write .env (fixed secrets — no random fallback)
         run: |
-          AUTH=${AUTH_SECRET:-$(openssl rand -hex 32)}
-          ENC=${TOKEN_ENC_KEY:-$(openssl rand -hex 32)}
+          # Fixed secrets REQUIRED: random per-run values would invalidate
+          # sessions (AUTH_SECRET) and encrypted tokens (TOKEN_ENC_KEY) stored
+          # in the shared Firebase DB. Set them once in repo secrets.
+          if [ -z "${AUTH_SECRET}" ]; then echo "AUTH_SECRET secret missing!"; exit 1; fi
+          if [ -z "${TOKEN_ENC_KEY}" ]; then echo "TOKEN_ENC_KEY secret missing!"; exit 1; fi
           {
-            echo "AUTH_SECRET=$AUTH"
-            echo "TOKEN_ENC_KEY=$ENC"
+            echo "AUTH_SECRET=$AUTH_SECRET"
+            echo "TOKEN_ENC_KEY=$TOKEN_ENC_KEY"
             echo "SITE_URL=https://roun.sryze.cc"
             echo "NEXT_PUBLIC_SITE_URL=https://roun.sryze.cc"
             echo "ADMIN_EMAIL=${ADMIN_EMAIL:-admin@local.test}"
