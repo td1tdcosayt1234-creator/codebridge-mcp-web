@@ -35,16 +35,18 @@ function dbPath(): string {
 }
 
 async function dbRef() {
-  const adminMod = await import("firebase-admin");
-  const admin: any = (adminMod as any).default || adminMod;
-  if (!admin.apps?.length) {
+  // firebase-admin v12+ modular API (no admin.apps / admin.database namespaces).
+  const appMod: any = await import("firebase-admin");
+  const admin: any = appMod.default || appMod;
+  const getApps: () => any[] = admin.getApps?.bind(admin) || (() => []);
+  if (!getApps().length) {
     const url = (process.env.FIREBASE_DATABASE_URL || "").trim();
     let cred: any;
     const full = (process.env.FIREBASE_SERVICE_ACCOUNT || "").trim();
     if (full) {
-      cred = admin.credential.cert(JSON.parse(full));
+      cred = admin.cert(JSON.parse(full));
     } else {
-      cred = admin.credential.cert({
+      cred = admin.cert({
         projectId: (process.env.FIREBASE_PROJECT_ID || "").trim(),
         clientEmail: (process.env.FIREBASE_CLIENT_EMAIL || "").trim(),
         privateKey: (process.env.FIREBASE_PRIVATE_KEY || "")
@@ -54,7 +56,9 @@ async function dbRef() {
     }
     admin.initializeApp({ credential: cred, databaseURL: url });
   }
-  return admin.database().ref(dbPath());
+  const app = admin.getApp();
+  const dbMod: any = await import("firebase-admin/database");
+  return dbMod.getDatabase(app).ref(dbPath());
 }
 
 // Returns the stored string (encrypted envelope or plaintext JSON), or null
