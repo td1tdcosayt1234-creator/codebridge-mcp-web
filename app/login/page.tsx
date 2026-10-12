@@ -164,7 +164,7 @@ export default function Login() {
           Welcome back
         </div>
         <h1>
-          Login to <span className="grad-anim">CodeBridge</span>
+          Login to <span className="grad-anim">Roun</span>
         </h1>
         {needVerify ? (
           <VerifyEmail email={email} remember={remember} onDone={(role) => { postLogin(role); }} />

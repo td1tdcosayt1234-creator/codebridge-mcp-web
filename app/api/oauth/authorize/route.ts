@@ -45,7 +45,7 @@ function page(title: string, inner: string): Response {
   const html =
     '<!doctype html><html lang="en"><head><meta charset="utf-8"/>' +
     '<meta name="viewport" content="width=device-width,initial-scale=1"/>' +
-    "<title>" + title + " — CodeBridge</title><style>" + CSS + "</style></head><body>" +
+    "<title>" + title + " — Roun</title><style>" + CSS + "</style></head><body>" +
     '<div class="card"><div class="mark">◈</div>' + inner + "</div></body></html>";
   return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
 }
@@ -104,12 +104,12 @@ function altCallback(uri: string): string | null {
 export async function GET(req: Request) {
   const { rateLimit, clientIp } = await import("@/lib/security");
   const rl = rateLimit("oauth_auth:" + clientIp(req), 60, 60 * 1000);
-  if (!rl.ok) return page("Connect", '<p class="eyebrow">CodeBridge MCP</p><h1>Too many requests</h1><p class="muted">Slow down and try again.</p>');
+  if (!rl.ok) return page("Connect", '<p class="eyebrow">Roun MCP</p><h1>Too many requests</h1><p class="muted">Slow down and try again.</p>');
   const p = params(req.url);
   if (!p.clientId || !p.redirectUri)
     return page(
       "Connect",
-      '<p class="eyebrow">CodeBridge MCP</p><h1>Connect your agent</h1>' +
+      '<p class="eyebrow">Roun MCP</p><h1>Connect your agent</h1>' +
         '<p class="muted">Open this page from your AI client (opencode / Cursor / Claude) so it can pass its connection details. Or connect manually: add <code>/api/mcp</code> as a remote MCP server.</p>' +
         '<p class="foot">No client details found in this URL.</p>'
     );
@@ -121,7 +121,7 @@ export async function GET(req: Request) {
   if (!redirectUriOk(p.redirectUri))
     return page(
       "Connect",
-      '<p class="eyebrow">CodeBridge MCP</p><h1>Callback not allowed</h1>' +
+      '<p class="eyebrow">Roun MCP</p><h1>Callback not allowed</h1>' +
         '<p class="muted">Callbacks must be <code>http://localhost</code> (your agent on this machine) or <code>https://</code>. Plain-http remote URLs can leak your login.</p>'
     );
   const known = await getClient(p.clientId);
@@ -129,8 +129,8 @@ export async function GET(req: Request) {
   else if (!known.redirectUris.includes(p.redirectUri))
     return page(
       "Connect",
-      '<p class="eyebrow">CodeBridge MCP</p><h1>Redirect mismatch</h1>' +
-        '<p class="muted">This agent is registered with a different callback URL. Remove + re-add the CodeBridge MCP server in your agent so it registers fresh, then try again.</p>'
+      '<p class="eyebrow">Roun MCP</p><h1>Redirect mismatch</h1>' +
+        '<p class="muted">This agent is registered with a different callback URL. Remove + re-add the Roun MCP server in your agent so it registers fresh, then try again.</p>'
     );
   if (p.responseType && p.responseType !== "code") {
     const sep = p.redirectUri.includes("?") ? "&" : "?";
@@ -148,7 +148,7 @@ export async function GET(req: Request) {
   const email = esc(String(me.email || me.sub || "your account"));
   return page(
     "Connect agent",
-    '<p class="eyebrow">CodeBridge MCP</p><h1>Connect this agent?</h1>' +
+    '<p class="eyebrow">Roun MCP</p><h1>Connect this agent?</h1>' +
       '<p class="muted">Your AI coding agent wants to work as <b>' + email + "</b>.</p>" +
       '<div class="agent"><div class="avatar">🤖</div><div><b>AI coding agent</b><span>' +
       esc(shortId(p.clientId)) + " • " + esc(callbackHost(p.redirectUri)) + "</span></div></div>" +
@@ -166,7 +166,7 @@ export async function POST(req: Request) {
   const { csrfCheck, csrfBlock, rateLimit, clientIp } = await import("@/lib/security");
   if (!csrfCheck(req)) return csrfBlock();
   const rl = rateLimit("oauth_auth_post:" + clientIp(req), 30, 60 * 1000);
-  if (!rl.ok) return page("Connect", '<p class="eyebrow">CodeBridge MCP</p><h1>Too many requests</h1><p class="muted">Slow down and try again.</p>');
+  if (!rl.ok) return page("Connect", '<p class="eyebrow">Roun MCP</p><h1>Too many requests</h1><p class="muted">Slow down and try again.</p>');
   const p = params(req.url);
   const t = cookies().get("session")?.value || "";
   const me = await verifyJwt(t);
@@ -179,7 +179,7 @@ export async function POST(req: Request) {
   if (!p.clientId || !p.redirectUri)
     return page(
       "Connect",
-      '<p class="eyebrow">CodeBridge MCP</p><h1>Missing connection details</h1>' +
+      '<p class="eyebrow">Roun MCP</p><h1>Missing connection details</h1>' +
         '<p class="muted">Open this page from your AI client (opencode / Cursor / Claude) so it can pass its connection details, then click Connect again.</p>'
     );
   const sep = p.redirectUri.includes("?") ? "&" : "?";
@@ -191,13 +191,13 @@ export async function POST(req: Request) {
   else if (!reg.redirectUris.includes(p.redirectUri))
     return page(
       "Connect",
-      '<p class="eyebrow">CodeBridge MCP</p><h1>Redirect mismatch</h1>' +
-        '<p class="muted">This agent is registered with a different callback URL. Remove + re-add the CodeBridge MCP server in your agent so it registers fresh, then try again.</p>'
+      '<p class="eyebrow">Roun MCP</p><h1>Redirect mismatch</h1>' +
+        '<p class="muted">This agent is registered with a different callback URL. Remove + re-add the Roun MCP server in your agent so it registers fresh, then try again.</p>'
     );
   if (!redirectUriOk(p.redirectUri))
     return page(
       "Connect",
-      '<p class="eyebrow">CodeBridge MCP</p><h1>Callback not allowed</h1>' +
+      '<p class="eyebrow">Roun MCP</p><h1>Callback not allowed</h1>' +
         '<p class="muted">Callbacks must be <code>http://localhost</code> (your agent on this machine) or <code>https://</code>. Plain-http remote URLs can leak your login.</p>'
     );
   // Remote callbacks must prove PKCE S256: otherwise a stolen code alone
@@ -206,7 +206,7 @@ export async function POST(req: Request) {
   if (!p.challenge)
     return page(
       "Connect",
-      '<p class="eyebrow">CodeBridge MCP</p><h1>PKCE required</h1>' +
+      '<p class="eyebrow">Roun MCP</p><h1>PKCE required</h1>' +
         '<p class="muted">Your agent must use PKCE (<code>code_challenge_method=S256</code>). Update the agent and try again.</p>'
     );
   const code = await issueCode(String(me.sub), p.clientId, p.redirectUri, p.challenge, p.method).catch(() =>
@@ -215,7 +215,7 @@ export async function POST(req: Request) {
   if (!code)
     return page(
       "Connect",
-      '<p class="eyebrow">CodeBridge MCP</p><h1>Too many pending logins</h1>' +
+      '<p class="eyebrow">Roun MCP</p><h1>Too many pending logins</h1>' +
         '<p class="muted">This agent has too many open login attempts. Complete or wait 10 minutes, then try again.</p>'
     );
   const back =
@@ -249,7 +249,7 @@ export async function POST(req: Request) {
   const jsAlt = JSON.stringify(alt);
   return page(
     "Connecting",
-    '<p class="eyebrow">CodeBridge MCP</p>' +
+    '<p class="eyebrow">Roun MCP</p>' +
       '<div id="spin"><div class="spin"></div><h1>Connecting your agent…</h1>' +
       '<p class="muted">Handing the login to your agent. Keep it running.</p></div>' +
       '<div id="done" hidden><div class="okmark">✓</div><h1>Connected!</h1>' +
@@ -262,7 +262,7 @@ export async function POST(req: Request) {
       '<div class="row"><button class="btn go" type="button" onclick="copyKey()">Copy my key</button>' +
       '<a class="btn stop" id="retry" href="' + esc(back) + '">Try redirect now</a></div>' +
       '<p class="muted" id="copymsg" style="margin:8px 0 0"></p>' +
-      "<p class=\"muted\">If the agent was restarted, remove + re-add the CodeBridge MCP server there so it opens a fresh login, then Connect within a minute.</p></div>" +
+      "<p class=\"muted\">If the agent was restarted, remove + re-add the Roun MCP server there so it opens a fresh login, then Connect within a minute.</p></div>" +
       '<p class="foot">Talking to: <code>' + esc(callbackHost(p.redirectUri)) + "</code></p></div>" +
       "<script>" +
       "var cb=" + jsBack + ";var alt=" + jsAlt + ";var key=" + JSON.stringify(rec.key) + ";" +

@@ -36,13 +36,13 @@ export async function POST(req: Request) {
   const link = siteBase(req) + "/reset-password?token=" + token;
   const html = `<!doctype html><html><body style="margin:0;background:#f4f4f5;font-family:Arial,sans-serif;">
 <div style="max-width:560px;margin:24px auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e4e4e7;">
-<div style="background:#070a14;color:#fff;padding:20px 24px;"><div style="font-size:18px;font-weight:bold;">CodeBridge</div><div style="opacity:.7;font-size:13px;">Reset your password</div></div>
+<div style="background:#070a14;color:#fff;padding:20px 24px;"><div style="font-size:18px;font-weight:bold;">Roun</div><div style="opacity:.7;font-size:13px;">Reset your password</div></div>
 <div style="padding:24px;color:#18181b;"><p>Click below to set a new password (link valid 1 hour, one-time use):</p>
 <p><a href="${link}" style="display:inline-block;background:#111827;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:bold;">Set new password</a></p>
 <p style="color:#52525b;font-size:13px;word-break:break-all;">Or copy: ${link}</p>
 <p style="color:#52525b;font-size:13px;">Didn't ask for this? Ignore — your password stays unchanged.</p></div>
 </div></body></html>`;
-  const sent = await sendBrandedMail(mail, "CodeBridge — reset your password", html);
+  const sent = await sendBrandedMail(mail, "Roun — reset your password", html);
   if (!sent.ok) {
     // Token without mail is useless — remove it, keep the ok-shape.
     const db2 = await readDb();

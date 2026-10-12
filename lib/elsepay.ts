@@ -1,6 +1,6 @@
 import { PRICING, normalizeCycle, type PlanId, type Cycle } from "./billing";
 
-// Else Pay (port 3000 gateway) — merchant integration for CodeBridge.
+// Else Pay (port 3000 gateway) — merchant integration for Roun.
 // Merchant created in Else console (/app/console/merchants). Secrets come
 // from env, never logged. See .env.example.
 
@@ -65,7 +65,7 @@ async function ensureProduct(plan: PlanId, cycle: Cycle): Promise<string> {
   }
   const c = normalizeCycle(cycle);
   const cName = c === "weekly" ? "Weekly" : c === "annual" ? "Annual" : "Monthly";
-  const name = `CodeBridge ${plan === "pro" ? "Pro" : "Team"} ${cName}`;
+  const name = `Roun ${plan === "pro" ? "Pro" : "Team"} ${cName}`;
   const r = await fetch(base() + "/api/v1/products", {
     method: "POST",
     headers: headers(),

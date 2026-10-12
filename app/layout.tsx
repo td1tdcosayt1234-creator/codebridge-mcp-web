@@ -37,25 +37,25 @@ export async function generateMetadata(): Promise<Metadata> {
   const indexable = PUBLIC_HOSTS.includes(host) || host === "" || host === "localhost";
   return {
     title: {
-      default: "CodeBridge — Request to Cloud Build",
-      template: "%s | CodeBridge",
+      default: "Roun — Request to Cloud Build",
+      template: "%s | Roun",
     },
     description:
       "Send a compile request on the web, OpenCode builds it in the cloud, the output comes back to you. Plus Game Studio: plan, build and play AI games.",
-    keywords: ["CodeBridge", "cloud build", "OpenCode", "compile online", "AI fix", "APK build", "Game Studio", "roun.sryze.cc"],
+    keywords: ["Roun", "cloud build", "OpenCode", "compile online", "AI fix", "APK build", "Game Studio", "roun.sryze.cc"],
     metadataBase: new URL(process.env.SITE_URL || "https://roun.sryze.cc"),
     robots: indexable ? { index: true, follow: true } : { index: false, follow: false },
     verification: process.env.GOOGLE_SITE_VERIFICATION
       ? { google: process.env.GOOGLE_SITE_VERIFICATION }
       : undefined,
     openGraph: {
-      title: "CodeBridge — Request to Cloud Build + Game Studio",
+      title: "Roun — Request to Cloud Build + Game Studio",
       description: "Cloud builds with AI auto-fix. Chat to plan, build and play single-file HTML5 games.",
       type: "website",
       url: "/",
-      siteName: "CodeBridge",
+      siteName: "Roun",
     },
-    twitter: { card: "summary_large_image", title: "CodeBridge", description: "Request → cloud build → result. Plus AI Game Studio." },
+    twitter: { card: "summary_large_image", title: "Roun", description: "Request → cloud build → result. Plus AI Game Studio." },
   };
 }
 
@@ -75,7 +75,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "WebSite",
-              name: "CodeBridge",
+              name: "Roun",
               url: "https://roun.sryze.cc",
               description:
                 "Send a compile request on the web, OpenCode builds it in the cloud. Plus AI Game Studio.",
@@ -89,10 +89,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <header className="nav">
           <div className="nav-beam" aria-hidden="true" />
           <div className="container nav-inner">
-            <Link href="/" className="logo" aria-label="CodeBridge home">
+            <Link href="/" className="logo" aria-label="Roun home">
               <span className="logo-mark" aria-hidden="true" />
               <span className="logo-word">
-                Code<em>Bridge</em>
+                Roun
               </span>
             </Link>
             <Nav />

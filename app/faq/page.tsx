@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "FAQ",
-  description: "Frequently asked questions about CodeBridge: free coins, builds, MCP and billing.",
+  description: "Frequently asked questions about Roun: free coins, builds, MCP and billing.",
 };
 import PageHero from "../../components/PageHero";
 import Reveal from "../../components/Reveal";

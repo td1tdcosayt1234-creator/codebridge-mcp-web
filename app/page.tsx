@@ -179,7 +179,7 @@ export default function Home() {
             </h1>
 
             <p className="fade-up d5">
-              Send one request from your agent or the web. CodeBridge runs a real build on an isolated cloud runner,
+              Send one request from your agent or the web. Roun runs a real build on an isolated cloud runner,
               repairs the failures itself, and hands the artifact back — full logs, zero infrastructure on your side.
             </p>
 
@@ -309,7 +309,7 @@ export default function Home() {
 
           <Reveal variant="right" delay={160}>
             <div className="ba-card ba-card--after holo">
-              <span className="ba-tag">With CodeBridge</span>
+              <span className="ba-tag">With Roun</span>
               <h3>Request, result, done</h3>
               <p className="muted small">What it costs now.</p>
               <ul className="ba-list">
@@ -342,7 +342,7 @@ export default function Home() {
           <Reveal variant="left">
             <div>
               <p className="muted" style={{ fontSize: 16, lineHeight: 1.75, maxWidth: 460 }}>
-                CodeBridge speaks MCP, so your coding agent gets build tools without learning a new API. Three steps,
+                Roun speaks MCP, so your coding agent gets build tools without learning a new API. Three steps,
                 once, and every future build is a single sentence.
               </p>
               <ul className="agent-list">
@@ -426,7 +426,7 @@ export default function Home() {
             <h2>
               Everything the <span className="grad">middle layer</span> needs
             </h2>
-            <p className="sub">From request to artifact, CodeBridge owns the boring half of shipping software.</p>
+            <p className="sub">From request to artifact, Roun owns the boring half of shipping software.</p>
           </div>
         </Reveal>
 

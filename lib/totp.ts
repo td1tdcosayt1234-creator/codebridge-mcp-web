@@ -84,7 +84,7 @@ export function totpVerify(secretB32: string, code: string, atMs = Date.now()): 
   return ok;
 }
 
-export function otpauthUrl(secretB32: string, email: string, issuer = "CodeBridge"): string {
+export function otpauthUrl(secretB32: string, email: string, issuer = "Roun"): string {
   return (
     "otpauth://totp/" +
     encodeURIComponent(issuer + ":" + email) +

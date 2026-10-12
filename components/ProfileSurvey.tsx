@@ -6,7 +6,7 @@ import { GENDERS, HEAR_ABOUT, GOALS } from "../lib/profile";
 // Props: onDone() -> next step. Skip allowed — account is active.
 const STEPS = [
   { key: "gender", title: "You are…", sub: "Step 1 of 3 — helps us personalise your space." },
-  { key: "hearAbout", title: "How did you find us?", sub: "Step 2 of 3 — tell us where you heard about CodeBridge." },
+  { key: "hearAbout", title: "How did you find us?", sub: "Step 2 of 3 — tell us where you heard about Roun." },
   { key: "goal", title: "What brings you here?", sub: "Step 3 of 3 — we will highlight the right tools." },
 ] as const;
 

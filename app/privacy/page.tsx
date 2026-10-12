@@ -3,7 +3,7 @@ import PageHero from "../../components/PageHero";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
-  description: "CodeBridge privacy policy: sessions, quota counting and abuse prevention.",
+  description: "Roun privacy policy: sessions, quota counting and abuse prevention.",
 };
 import Reveal from "../../components/Reveal";
 

@@ -68,7 +68,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="footer-bottom">
-          <span>© {new Date().getFullYear()} CodeBridge — request → cloud build → result</span>
+          <span>© {new Date().getFullYear()} Roun — request → cloud build → result</span>
           <span className="status">
             <i />
             All systems normal

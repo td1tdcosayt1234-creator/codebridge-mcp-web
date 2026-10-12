@@ -13,7 +13,7 @@ const ICON_DENY = "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#f87171\" s
 const ICON_CLOCK = "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#fbbf24\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3 2\"/></svg>";
 
 function shell(inner: string): Response {
-  const html = "<!doctype html><html><head><meta charset=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"/><title>CodeBridge — approve agent</title>"
+  const html = "<!doctype html><html><head><meta charset=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"/><title>Roun — approve agent</title>"
     + "<style>:root{--bg:#060a14;--card:rgba(17,25,46,.8);--line:rgba(148,184,255,.16);--txt:#eef2ff;--mut:#93a1c0;--acc1:#6c8cff;--acc2:#22d3ee}"
     + "*{box-sizing:border-box}"
     + "body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;color:var(--txt);font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:radial-gradient(900px 480px at 15% -5%,#1b2a5e66,transparent 60%),radial-gradient(800px 460px at 90% 110%,#0e5f6e55,transparent 60%),var(--bg)}"

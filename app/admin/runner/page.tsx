@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       task_id:
-        description: 'CodeBridge task id'
+        description: 'Roun task id'
         required: true
 jobs:
   agent:
@@ -366,7 +366,7 @@ jobs:
             if [ -z "$PKGNAME" ]; then PKGNAME=app; fi
             rm -rf debpkg && mkdir -p debpkg/DEBIAN debpkg/usr/local/bin
             cp "$NATIVE_BIN" "debpkg/usr/local/bin/$PKGNAME"
-            printf "Package: %s\nVersion: 1.0.0\nArchitecture: amd64\nMaintainer: codebridge <noreply@local>\nDescription: Auto-built by CodeBridge\n" "$PKGNAME" > debpkg/DEBIAN/control
+            printf "Package: %s\nVersion: 1.0.0\nArchitecture: amd64\nMaintainer: codebridge <noreply@local>\nDescription: Auto-built by Roun\n" "$PKGNAME" > debpkg/DEBIAN/control
             dpkg-deb --build debpkg "./$PKGNAME.deb" > deb-build.log 2>&1; RC=$?
             tail -n 5 deb-build.log | tee -a agent.log
             if [ "$RC" != "0" ]; then mark_fail "deb-build"; else echo "deb-ready=$PKGNAME.deb" | tee -a agent.log; fi

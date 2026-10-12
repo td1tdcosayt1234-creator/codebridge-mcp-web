@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
   title: "Pricing",
-  description: "CodeBridge Free, Pro and Team plans: cloud builds, tokens and billing.",
+  description: "Roun Free, Pro and Team plans: cloud builds, tokens and billing.",
 };
 
 export default function PricingLayout({ children }: { children: ReactNode }) {

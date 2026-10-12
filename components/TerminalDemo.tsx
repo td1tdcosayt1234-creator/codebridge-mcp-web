@@ -33,7 +33,7 @@ export default function TerminalDemo() {
     <div
       className="term float-slow"
       role="img"
-      aria-label="CodeBridge build log: a compile request is queued, fails, is repaired by AI and passes"
+      aria-label="Roun build log: a compile request is queued, fails, is repaired by AI and passes"
     >
       <div className="term-bar">
         <i />

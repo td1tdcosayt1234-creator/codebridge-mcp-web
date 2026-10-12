@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "About",
-  description: "What CodeBridge is: web requests become cloud builds with AI auto-fix, plus Game Studio.",
+  description: "What Roun is: web requests become cloud builds with AI auto-fix, plus Game Studio.",
 };
 import Counter from "../../components/Counter";
 import PageHero from "../../components/PageHero";
@@ -15,7 +15,7 @@ export default function About() {
     <div className="prose">
       <PageHero
         kicker="Our story"
-        title={<>About <span className="grad-anim text-glow">CodeBridge</span></>}
+        title={<>About <span className="grad-anim text-glow">Roun</span></>}
         sub="Send a compile request on the web → AI compiles it in the cloud and fixes errors itself → the output comes back here → you read the result. No setup, no infrastructure on your side."
       />
 

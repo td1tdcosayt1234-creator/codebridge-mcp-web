@@ -3,14 +3,14 @@ import PageHero from "../../components/PageHero";
 
 export const metadata: Metadata = {
   title: "Refund Policy",
-  description: "CodeBridge refund policy for Pro and Team purchases.",
+  description: "Roun refund policy for Pro and Team purchases.",
 };
 import Reveal from "../../components/Reveal";
 
 export default function RefundPolicy() {
   return (
     <div className="prose">
-      <PageHero kicker="Legal" title={<>Refund <span className="grad-anim">Policy</span></>} sub="How refunds work for CodeBridge subscriptions and credits." />
+      <PageHero kicker="Legal" title={<>Refund <span className="grad-anim">Policy</span></>} sub="How refunds work for Roun subscriptions and credits." />
 
       <Reveal variant="left">
         <h3>1. Digital services</h3>

@@ -3,7 +3,7 @@ import PageHero from "../../components/PageHero";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
-  description: "CodeBridge terms of service: accounts, tokens and fair use.",
+  description: "Roun terms of service: accounts, tokens and fair use.",
 };
 import Reveal from "../../components/Reveal";
 
@@ -14,7 +14,7 @@ export default function Terms() {
 
       <Reveal variant="left">
         <h3>1. Service</h3>
-        <p>CodeBridge compiles your web requests with AI in the cloud (compile only, all types). Fair-use limits of the cloud backend apply.</p>
+        <p>Roun compiles your web requests with AI in the cloud (compile only, all types). Fair-use limits of the cloud backend apply.</p>
       </Reveal>
       <Reveal variant="left" delay={60}>
         <h3>2. Account + tokens</h3>
