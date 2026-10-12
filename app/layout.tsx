@@ -29,7 +29,6 @@ export const metadata: Metadata = {
     "Send a compile request on the web, OpenCode builds it in the cloud, the output comes back to you. Plus Game Studio: plan, build and play AI games.",
   keywords: ["CodeBridge", "cloud build", "OpenCode", "compile online", "AI fix", "APK build", "Game Studio", "roun.sryze.cc"],
   metadataBase: new URL(process.env.SITE_URL || "https://roun.sryze.cc"),
-  alternates: { canonical: "/" },
   robots: { index: true, follow: true },
   verification: process.env.GOOGLE_SITE_VERIFICATION
     ? { google: process.env.GOOGLE_SITE_VERIFICATION }
