@@ -20,39 +20,47 @@ const VIG_SRC = "https://n6wxm.com/vignette.min.js";
 const VIG_ZONE = "11997991";
 const PUBLIC_HOSTS = ["roun.sryze.cc", "www.roun.sryze.cc"];
 
-export const metadata: Metadata = {
-  title: {
-    default: "CodeBridge — Request to Cloud Build",
-    template: "%s | CodeBridge",
-  },
-  description:
-    "Send a compile request on the web, OpenCode builds it in the cloud, the output comes back to you. Plus Game Studio: plan, build and play AI games.",
-  keywords: ["CodeBridge", "cloud build", "OpenCode", "compile online", "AI fix", "APK build", "Game Studio", "roun.sryze.cc"],
-  metadataBase: new URL(process.env.SITE_URL || "https://roun.sryze.cc"),
-  robots: { index: true, follow: true },
-  verification: process.env.GOOGLE_SITE_VERIFICATION
-    ? { google: process.env.GOOGLE_SITE_VERIFICATION }
-    : undefined,
-  openGraph: {
-    title: "CodeBridge — Request to Cloud Build + Game Studio",
-    description: "Cloud builds with AI auto-fix. Chat to plan, build and play single-file HTML5 games.",
-    type: "website",
-    url: "/",
-    siteName: "CodeBridge",
-  },
-  twitter: { card: "summary_large_image", title: "CodeBridge", description: "Request → cloud build → result. Plus AI Game Studio." },
-};
-
-export default function RootLayout({ children }: { children: ReactNode }) {
-  let vigHead = false;
+function reqHost(): string {
   try {
     const h = headers();
-    const host = ((h.get("x-forwarded-host") || h.get("host") || "").split(",")[0] || "")
+    return ((h.get("x-forwarded-host") || h.get("host") || "").split(",")[0] || "")
       .trim().toLowerCase().split(":")[0];
-    vigHead = PUBLIC_HOSTS.includes(host);
   } catch {
-    vigHead = false;
+    return "";
   }
+}
+
+// Host-aware metadata: ONLY the public site is indexable. dash/api hosts
+// serve app UI / MCP — indexing them creates duplicate + login-walled pages.
+export async function generateMetadata(): Promise<Metadata> {
+  const host = reqHost();
+  const indexable = PUBLIC_HOSTS.includes(host) || host === "" || host === "localhost";
+  return {
+    title: {
+      default: "CodeBridge — Request to Cloud Build",
+      template: "%s | CodeBridge",
+    },
+    description:
+      "Send a compile request on the web, OpenCode builds it in the cloud, the output comes back to you. Plus Game Studio: plan, build and play AI games.",
+    keywords: ["CodeBridge", "cloud build", "OpenCode", "compile online", "AI fix", "APK build", "Game Studio", "roun.sryze.cc"],
+    metadataBase: new URL(process.env.SITE_URL || "https://roun.sryze.cc"),
+    robots: indexable ? { index: true, follow: true } : { index: false, follow: false },
+    verification: process.env.GOOGLE_SITE_VERIFICATION
+      ? { google: process.env.GOOGLE_SITE_VERIFICATION }
+      : undefined,
+    openGraph: {
+      title: "CodeBridge — Request to Cloud Build + Game Studio",
+      description: "Cloud builds with AI auto-fix. Chat to plan, build and play single-file HTML5 games.",
+      type: "website",
+      url: "/",
+      siteName: "CodeBridge",
+    },
+    twitter: { card: "summary_large_image", title: "CodeBridge", description: "Request → cloud build → result. Plus AI Game Studio." },
+  };
+}
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  const vigHead = PUBLIC_HOSTS.includes(reqHost());
   return (
     <html lang="en">
       <head>
