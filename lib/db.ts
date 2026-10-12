@@ -87,7 +87,42 @@ export async function warnIfDefaultAdminPassword(){
 function readCorruptCandidates(): string[] {
   return [file + ".bak.1", file + ".bak.2", file + ".bak.3"];
 }
-export async function readDb():Promise<DbShape>{ await ensure();
+export async function readDb():Promise<DbShape>{
+  // Shared Firebase doc when configured — every origin (local PC, Actions
+  // 6h host, new VPS) sees the SAME data. Falls back to local file.
+  try {
+    const { remoteEnabled, remoteGet, remoteSet } = await import("./remotedb");
+    if (remoteEnabled()) {
+      try {
+        const remote = await remoteGet();
+        if (remote) {
+          const parsed = normalizeParsed(JSON.parse(decryptDb(remote)));
+          if (parsed.dirty) { try { await writeDb(parsed.doc); } catch {} }
+          else { try { await writeLocalCopy(parsed.doc); } catch {} }
+          void warnIfDefaultAdminPassword();
+          return parsed.doc;
+        }
+        // First boot with Firebase: push local seed/file up so it persists.
+        const local = await readLocalDb();
+        try { await remoteSet(encryptDb(JSON.stringify(local))); }
+        catch (e) { console.warn("[codebridge] Firebase initial upload failed:", (e as Error)?.message || e); }
+        return local;
+      } catch (e) {
+        console.warn("[codebridge] Firebase read failed, using local file:", (e as Error)?.message || e);
+      }
+    }
+  } catch { /* remotedb import failed — local mode */ }
+  return readLocalDb();
+}
+// Best-effort local mirror (used for backups even in Firebase mode).
+async function writeLocalCopy(db:DbShape){
+  const dir = path.dirname(file);
+  await fs.mkdir(dir,{recursive:true});
+  const tmp = file + ".tmp." + process.pid + "." + crypto.randomBytes(6).toString("hex");
+  await fs.writeFile(tmp, encryptDb(JSON.stringify(db)));
+  await fs.rename(tmp, file);
+}
+async function readLocalDb():Promise<DbShape>{ await ensure();
   let raw = "";
   try {
     raw = await fs.readFile(file, "utf8");
@@ -107,6 +142,12 @@ export async function readDb():Promise<DbShape>{ await ensure();
     catch (e) { lastErr = e; }
   }
   if (!parsed) throw lastErr instanceof Error ? lastErr : new Error("Database unreadable and no backup restored.");
+  const norm = normalizeParsed(parsed);
+  if(norm.dirty){ try{ await writeDb(norm.doc); }catch{} }
+  void warnIfDefaultAdminPassword();
+  return norm.doc; }
+// Schema migrations + pruning shared by file and Firebase paths.
+export function normalizeParsed(parsed:DbShape):{doc:DbShape;dirty:boolean}{
   if(!parsed.tasks) parsed.tasks=[]; let dirty=false;
   for(const u of (parsed.usage||[])){ if(u.balance===undefined){ u.balance=10000; dirty=true; } if(u.usedTotal===undefined){ u.usedTotal=0; dirty=true; } }
   for(const t of (parsed.tasks||[])){ if(!t.kind) t.kind="compile"; if(!t.files) t.files=[]; if(t.tokensEst===undefined) t.tokensEst=0; if(t.tokensCharged===undefined) t.tokensCharged=0; if(!t.artifacts) { t.artifacts=[]; if((t as any).apkSize) t.artifacts.push({name:"app-debug.apk",size:(t as any).apkSize}); if((t as any).jarSize) t.artifacts.push({name:(t as any).jarName||"plugin.jar",size:(t as any).jarSize}); if(t.artifacts.length) dirty=true; } }
@@ -128,9 +169,7 @@ export async function readDb():Promise<DbShape>{ await ensure();
   if(kept.length!==(parsed.earnNonces as EarnNonce[]).length){ parsed.earnNonces=kept; dirty=true; }
   const keptRt=((parsed as any).resetTokens as ResetToken[]||[]).filter(t=>!t.used&&t.expires>Date.now());
   if(keptRt.length!==(((parsed as any).resetTokens as ResetToken[]||[]).length)){ (parsed as any).resetTokens=keptRt; dirty=true; }
-  if(dirty){ try{ await writeDb(parsed); }catch{} }
-  void warnIfDefaultAdminPassword();
-  return parsed; }
+  return {doc:parsed,dirty}; }
 export async function writeDb(db:DbShape){
   // Serialize writes in-process: concurrent read-modify-write cycles would
   // otherwise lose updates (last-writer-wins on events/usage/balances).
@@ -138,6 +177,18 @@ export async function writeDb(db:DbShape){
 }
 let writeChain: Promise<void> = Promise.resolve();
 async function writeDbInner(db:DbShape){
+  await writeLocalInner(db);
+  // Mirror to Firebase when configured — failures must not break the request
+  // (local file stays source of truth for this boot), but warn loudly.
+  try {
+    const { remoteEnabled, remoteSet } = await import("./remotedb");
+    if (remoteEnabled()) {
+      try { await remoteSet(encryptDb(JSON.stringify(db))); }
+      catch (e) { console.warn("[codebridge] Firebase write failed (local copy kept):", (e as Error)?.message || e); }
+    }
+  } catch { /* local-only mode */ }
+}
+async function writeLocalInner(db:DbShape){
   const dir = path.dirname(file);
   await fs.mkdir(dir,{recursive:true});
   // Bound growth: dashboard aggregations scan these arrays on every poll.

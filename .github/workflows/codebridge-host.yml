@@ -19,6 +19,8 @@
 #   ADMIN_EMAIL (default admin@local.test), ADMIN_PASSWORD (auto-generated, shown in build log)
 #   GOOGLE_SITE_VERIFICATION (Search Console meta, empty = skip)
 #   DB_MASTER_KEY (empty = plaintext DB like local dev)
+#   FIREBASE_DATABASE_URL + FIREBASE_SERVICE_ACCOUNT (shared DB — without them
+#     each runner uses its own empty local file; see .env.example)
 #   GH_PAT - classic PAT (repo + workflow) for zero-downtime self-chain.
 #     Without it the job still runs 6h; restart relies on schedule (may gap).
 #
@@ -60,7 +62,16 @@ jobs:
             [ -n "${ADMIN_PASSWORD:-}" ] && echo "ADMIN_PASSWORD=$ADMIN_PASSWORD"
             [ -n "${DB_MASTER_KEY:-}" ] && echo "DB_MASTER_KEY=$DB_MASTER_KEY"
             [ -n "${GOOGLE_SITE_VERIFICATION:-}" ] && echo "GOOGLE_SITE_VERIFICATION=$GOOGLE_SITE_VERIFICATION"
+            [ -n "${FIREBASE_DATABASE_URL:-}" ] && echo "FIREBASE_DATABASE_URL=$FIREBASE_DATABASE_URL"
+            [ -n "${FIREBASE_DB_PATH:-}" ] && echo "FIREBASE_DB_PATH=$FIREBASE_DB_PATH"
           } > .env
+          # service-account JSON may contain newlines — write via node to keep it intact
+          if [ -n "${FIREBASE_SERVICE_ACCOUNT:-}" ]; then
+            node -e "const fs=require('fs');let e=fs.readFileSync('.env','utf8');e+='FIREBASE_SERVICE_ACCOUNT='+process.env.FIREBASE_SERVICE_ACCOUNT.replace(/\n/g,'\\n')+'\n';fs.writeFileSync('.env',e)"
+            echo "firebase service account configured"
+          else
+            echo "no firebase config — local file mode"
+          fi
           echo ".env written (auth secret ${#AUTH} chars)"
         env:
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
@@ -69,6 +80,9 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           DB_MASTER_KEY: ${{ secrets.DB_MASTER_KEY }}
           GOOGLE_SITE_VERIFICATION: ${{ secrets.GOOGLE_SITE_VERIFICATION }}
+          FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
+          FIREBASE_DB_PATH: ${{ secrets.FIREBASE_DB_PATH }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
       - name: Build
         run: npm run build
