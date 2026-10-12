@@ -143,5 +143,6 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   // Host routing needs to see every request; skip Next internals and static files.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|txt|xml)$).*)"],
+  // google*.html = Search Console verification (must serve without middleware).
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|google[^/]*\\.html|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|txt|xml)$).*)"],
 };
