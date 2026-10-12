@@ -21,14 +21,25 @@ const VIG_ZONE = "11997991";
 const PUBLIC_HOSTS = ["roun.sryze.cc", "www.roun.sryze.cc"];
 
 export const metadata: Metadata = {
-  title: "CodeBridge — Request to Cloud Build",
+  title: {
+    default: "CodeBridge — Request to Cloud Build",
+    template: "%s | CodeBridge",
+  },
   description:
     "Send a compile request on the web, OpenCode builds it in the cloud, the output comes back to you. Plus Game Studio: plan, build and play AI games.",
+  keywords: ["CodeBridge", "cloud build", "OpenCode", "compile online", "AI fix", "APK build", "Game Studio", "roun.sryze.cc"],
   metadataBase: new URL(process.env.SITE_URL || "https://roun.sryze.cc"),
+  alternates: { canonical: "/" },
+  robots: { index: true, follow: true },
+  verification: process.env.GOOGLE_SITE_VERIFICATION
+    ? { google: process.env.GOOGLE_SITE_VERIFICATION }
+    : undefined,
   openGraph: {
     title: "CodeBridge — Request to Cloud Build + Game Studio",
     description: "Cloud builds with AI auto-fix. Chat to plan, build and play single-file HTML5 games.",
     type: "website",
+    url: "/",
+    siteName: "CodeBridge",
   },
   twitter: { card: "summary_large_image", title: "CodeBridge", description: "Request → cloud build → result. Plus AI Game Studio." },
 };
@@ -51,6 +62,19 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         )}
       </head>
       <body>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              name: "CodeBridge",
+              url: "https://roun.sryze.cc",
+              description:
+                "Send a compile request on the web, OpenCode builds it in the cloud. Plus AI Game Studio.",
+            }),
+          }}
+        />
         <CinematicBackdrop />
         <CinematicFX />
         <MonetagTag />
