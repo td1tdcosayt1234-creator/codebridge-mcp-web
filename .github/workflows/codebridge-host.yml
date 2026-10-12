@@ -63,6 +63,8 @@ jobs:
             echo "ADMIN_EMAIL=${ADMIN_EMAIL:-admin@local.test}"
             [ -n "${ADMIN_PASSWORD:-}" ] && echo "ADMIN_PASSWORD=$ADMIN_PASSWORD"
             [ -n "${DB_MASTER_KEY:-}" ] && echo "DB_MASTER_KEY=$DB_MASTER_KEY"
+            [ -n "${ELSEMAIL_URL:-}" ] && echo "ELSEMAIL_URL=$ELSEMAIL_URL"
+            [ -n "${ELSEMAIL_API_KEY:-}" ] && echo "ELSEMAIL_API_KEY=$ELSEMAIL_API_KEY"
             [ -n "${GOOGLE_SITE_VERIFICATION:-}" ] && echo "GOOGLE_SITE_VERIFICATION=$GOOGLE_SITE_VERIFICATION"
             [ -n "${FIREBASE_DATABASE_URL:-}" ] && echo "FIREBASE_DATABASE_URL=$FIREBASE_DATABASE_URL"
             [ -n "${FIREBASE_DB_PATH:-}" ] && echo "FIREBASE_DB_PATH=$FIREBASE_DB_PATH"
@@ -85,6 +87,8 @@ jobs:
           FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
           FIREBASE_DB_PATH: ${{ secrets.FIREBASE_DB_PATH }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          ELSEMAIL_URL: ${{ secrets.ELSEMAIL_URL }}
+          ELSEMAIL_API_KEY: ${{ secrets.ELSEMAIL_API_KEY }}
 
       - name: Build
         run: npm run build
