@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import PageHero from "../../components/PageHero";
+
+export const metadata: Metadata = {
+  title: "Terms of Service",
+  description: "CodeBridge terms of service: accounts, tokens and fair use.",
+};
 import Reveal from "../../components/Reveal";
 
 export default function Terms() {

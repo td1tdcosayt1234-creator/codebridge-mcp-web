@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Docs",
+  description: "CodeBridge documentation: requests, builds, MCP keys, tokens and billing.",
+};
 import CopyBtn from "../../components/CopyBtn";
 import PageHero from "../../components/PageHero";
 import Reveal from "../../components/Reveal";

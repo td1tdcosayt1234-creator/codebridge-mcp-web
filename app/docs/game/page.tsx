@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Game Studio Docs",
+  description: "How Game Studio works: describe, plan, confirm and play AI-built HTML5 games.",
+};
 import PageHero from "../../../components/PageHero";
 import Reveal from "../../../components/Reveal";
 

@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "About",
+  description: "What CodeBridge is: web requests become cloud builds with AI auto-fix, plus Game Studio.",
+};
 import Counter from "../../components/Counter";
 import PageHero from "../../components/PageHero";
 import Reveal from "../../components/Reveal";

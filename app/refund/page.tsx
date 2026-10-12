@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import PageHero from "../../components/PageHero";
+
+export const metadata: Metadata = {
+  title: "Refund Policy",
+  description: "CodeBridge refund policy for Pro and Team purchases.",
+};
 import Reveal from "../../components/Reveal";
 
 export default function RefundPolicy() {

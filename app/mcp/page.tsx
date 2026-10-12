@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "MCP for Agents",
+  description: "Connect your coding agent to CodeBridge via MCP: compile and fix in the cloud.",
+};
 import CopyBtn from "../../components/CopyBtn";
 import PageHero from "../../components/PageHero";
 import Reveal from "../../components/Reveal";

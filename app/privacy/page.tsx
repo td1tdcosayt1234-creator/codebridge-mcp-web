@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import PageHero from "../../components/PageHero";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy",
+  description: "CodeBridge privacy policy: sessions, quota counting and abuse prevention.",
+};
 import Reveal from "../../components/Reveal";
 
 export default function Privacy() {
