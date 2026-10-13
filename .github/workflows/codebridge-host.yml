@@ -140,7 +140,10 @@ jobs:
         timeout-minutes: 335
 
       - name: Self-chain replacement (zero downtime)
-        if: always()
+        # success() only: a keeper-cancelled / failed run must NOT chain —
+        # otherwise every prune spawns a replacement and runs die in ~10m
+        # instead of living the full 6h (cancel-loop).
+        if: success()
         continue-on-error: true
         run: |
           if [ -z "${GH_PAT}" ]; then echo "GH_PAT not set - relying on schedule (may gap)"; exit 0; fi
@@ -153,7 +156,7 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
 
       - name: Hold until 6h mark then exit
-        if: always()
+        if: success()
         run: |
           sleep 1500 # ~25m overlap while replacement boots
           echo "--- tail logs ---"; tail -20 prod-server.log; tail -10 tunnel.log
