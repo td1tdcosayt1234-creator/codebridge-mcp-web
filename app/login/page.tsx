@@ -42,7 +42,15 @@ export default function Login() {
   const [needVerify, setNeedVerify] = useState(false);
   const [tmp, setTmp] = useState("");
   const [code, setCode] = useState("");
+  const [justVerified, setJustVerified] = useState(false);
   const [ts] = useState(() => Date.now());
+
+  function verifiedThenGo(role: string) {
+    setNeedVerify(false);
+    setErr("");
+    setJustVerified(true);
+    setTimeout(() => { postLogin(role); }, 1800);
+  }
 
   useEffect(() => {
     fetch("/api/auth/google/status", { cache: "no-store" })
@@ -167,8 +175,15 @@ export default function Login() {
         <h1>
           Login to <span className="grad-anim">Roun</span>
         </h1>
+        {justVerified && (
+          <p className="small" style={{ marginTop: 0 }} role="status">
+            <span className="badge ok" style={{ display: "block", textAlign: "center", padding: "10px 12px", fontSize: 13.5 }}>
+              🎉 Email verified — welcome back to Roun! Taking you in…
+            </span>
+          </p>
+        )}
         {needVerify ? (
-          <VerifyEmail email={email} remember={remember} onDone={(role) => { postLogin(role); }} />
+          <VerifyEmail email={email} remember={remember} onDone={verifiedThenGo} />
         ) : need2fa ? (
           <form onSubmit={verify2fa}>
             <p className="muted small" style={{ marginTop: 0 }}>

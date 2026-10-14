@@ -29,6 +29,7 @@ export default function Signup() {
   const [needSurvey, setNeedSurvey] = useState(false);
   const [mailSlow, setMailSlow] = useState(false);
   const [role, setRole] = useState("user");
+  const [welcomed, setWelcomed] = useState(false);
   const [ts] = useState(() => Date.now());
 
   // Logged-in users skip the form; unfinished surveys resume instead of
@@ -110,6 +111,7 @@ export default function Signup() {
     try { localStorage.removeItem(PENDING_KEY); } catch {}
     setRole(r || "user");
     setNeedVerify(false);
+    setWelcomed(true);
     setNeedSurvey(true);
   }
 
@@ -136,6 +138,13 @@ export default function Signup() {
         <p className="muted small" style={{ marginTop: 0 }}>
           <strong className="grad-anim">10,000 coins</strong> included. Password: min 12 characters, letters + numbers.
         </p>
+        {welcomed && needSurvey && (
+          <p className="small" style={{ marginTop: 0 }} role="status">
+            <span className="badge ok" style={{ display: "block", textAlign: "center", padding: "10px 12px", fontSize: 13.5 }}>
+              🎉 Email verified — welcome to Roun! 10,000 coins credited. One quick step left:
+            </span>
+          </p>
+        )}
         {needSurvey ? (
           <ProfileSurvey onDone={() => { window.location.href = destFor(role); }} />
         ) : needVerify ? (
