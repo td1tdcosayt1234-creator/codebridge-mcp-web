@@ -52,7 +52,7 @@ const GAME_SYSTEM = (style: string) =>
     "- Best score in localStorage. Fixed-timestep logic so speed is device-independent.",
   ].join("\n");
 
-async function aiGameHTML(req: Request, prompt: string, style: string, preferred = ""): Promise<{ html: string; provider: string } | null> {
+async function aiGameHTML(req: Request, prompt: string, style: string, preferred = "", setStage?: (s: JobStage) => void): Promise<{ html: string; provider: string } | null> {
   const cleanPrompt = String(prompt || "").slice(0, 500);
   // Chat mode sends style:"auto" — no preset palettes, AI picks visuals to fit the idea.
   const styleLabel = !style || style === "auto" ? "AI-chosen to best match the game idea" : String(style).slice(0, 40);
@@ -64,11 +64,16 @@ async function aiGameHTML(req: Request, prompt: string, style: string, preferred
   // Strict model routing: a user-selected model is tried FIRST and alone —
   // no silent fallback to another model. Auto ("") rotates all Roun models.
   try {
-    const { rounGameHTML } = await import("@/lib/openrouter");
+    const { rounGameHTML, ROUN_LABELS } = await import("@/lib/openrouter");
     const sel = cleanRounModel(preferred);
+    setStage?.({ key: "prepare", en: "Preparing", bn: "idea sajano hocche" });
     const ai = sel
-      ? await rounGameHTML(cleanPrompt, styleLabel, system, sel, true)
-      : await rounGameHTML(cleanPrompt, styleLabel, system, "", false);
+      ? await rounGameHTML(cleanPrompt, styleLabel, system, sel, true, (a) =>
+          setStage?.({ key: "coding", en: "Coding", bn: "game code likhche", model: ROUN_LABELS[a.id] || a.id, attempt: a.index, of: a.total }),
+        )
+      : await rounGameHTML(cleanPrompt, styleLabel, system, "", false, (a) =>
+          setStage?.({ key: "coding", en: "Coding", bn: "game code likhche", model: ROUN_LABELS[a.id] || a.id, attempt: a.index, of: a.total }),
+        );
     if (ai) return { html: ai.html, provider: ai.provider };
     console.warn("[game] Roun Co Pilot failed (selected=" + (sel || "auto") + ") — returning 503");
     return null;
@@ -137,16 +142,20 @@ async function aiSummary(prompt: string, provider: string, html: string): Promis
 }
 
 // In-memory game-generation jobs. Lost on restart (acceptable: client shows error and user retries).
-const jobs = new Map<string, { owner: string; status: "running" | "done" | "error"; html?: string; provider?: string; summary?: string; error?: string; at: number }>();
+// stage = REAL pipeline position (prepare -> coding[model] -> finalize), polled by the client.
+export type JobStage = { key: "prepare" | "coding" | "finalize"; en: string; bn: string; model?: string; attempt?: number; of?: number };
+const jobs = new Map<string, { owner: string; status: "running" | "done" | "error"; html?: string; provider?: string; summary?: string; error?: string; at: number; stage?: JobStage }>();
 function startJob(id: string, owner: string, prompt: string, style: string, model: string, req: Request) {
   // Prune stale jobs so the map can't grow forever.
   jobs.forEach((v, k) => { if (Date.now() - v.at > 10 * 60 * 1000) jobs.delete(k); });
-  jobs.set(id, { owner, status: "running", at: Date.now() });
-  aiGameHTML(req, prompt, style, model)
+  jobs.set(id, { owner, status: "running", at: Date.now(), stage: { key: "prepare", en: "Preparing", bn: "idea sajano hocche" } });
+  const setStage = (s: JobStage) => { const j = jobs.get(id); if (j && j.status === "running") jobs.set(id, { ...j, stage: s }); };
+  aiGameHTML(req, prompt, style, model, setStage)
     .then(async (ai) => {
       const j = jobs.get(id);
       if (!j) return;
       if (ai) {
+        setStage({ key: "finalize", en: "Finalizing", bn: "final touch + summary" });
         const summary = await aiSummary(prompt, ai.provider, ai.html);
         jobs.set(id, { owner: j.owner, status: "done", html: ai.html, provider: ai.provider, summary, at: Date.now() });
       }
@@ -170,7 +179,7 @@ export async function GET(req: Request){
     const j = jobs.get(id);
     if (!j) return NextResponse.json({ error: "Unknown job" }, { status: 404 });
     if (j.owner !== (user as any).sub) return NextResponse.json({ error: "Not your job." }, { status: 403 });
-    if (j.status === "running") return NextResponse.json({ ok: true, status: "running" });
+    if (j.status === "running") return NextResponse.json({ ok: true, status: "running", stage: j.stage || { key: "prepare", en: "Preparing", bn: "idea sajano hocche" } });
     if (j.status === "error") return NextResponse.json({ ok: false, error: j.error }, { status: 503 });
     return NextResponse.json({ ok: true, status: "done", html: j.html, summary: j.summary || "", name: "index.html", size: (j.html || "").length, engine: "ai", provider: j.provider });
   }

@@ -121,12 +121,15 @@ export async function rounGameHTML(
   system: string,
   preferred = "",
   singleTry = false,
+  onAttempt?: (info: { index: number; total: number; id: string; label: string }) => void,
 ): Promise<{ html: string; provider: string; model: string } | null> {
   const cleanPrompt = String(prompt || "").slice(0, 500);
   const tries = rounRotation(preferred);
   const list = singleTry ? tries.slice(0, 1) : tries;
-  for (const id of list) {
+  for (let i = 0; i < list.length; i++) {
+    const id = list[i];
     const real = ROUN_MODEL_MAP[id];
+    try { onAttempt?.({ index: i + 1, total: list.length, id, label: ROUN_LABELS[id] || id }); } catch { /* progress only */ }
     const raw = await orChat(
       [
         { role: "system", content: system },

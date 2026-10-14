@@ -85,21 +85,11 @@ const GAME_CSS = `
 
 type Msg = { role: "user" | "ai"; text: string; err?: boolean };
 
-// Live build stages shown while the AI works (timed, honest labels).
-const STAGES = [
-  { at: 0, icon: "📋", en: "Preparing", bn: "idea sajano hocche" },
-  { at: 8, icon: "🎨", en: "Designing", bn: "look + level design" },
-  { at: 20, icon: "💻", en: "Coding", bn: "game code likhche" },
-  { at: 45, icon: "🔧", en: "Fixing", bn: "bug fix + test" },
-  { at: 70, icon: "✏️", en: "Editing", bn: "tune + balance" },
-  { at: 95, icon: "✨", en: "Modifying", bn: "juice + polish" },
-  { at: 130, icon: "🚀", en: "Finalizing", bn: "final file ready hocche" },
-];
-const stageFor = (sec: number) => {
-  let i = 0;
-  STAGES.forEach((s, k) => { if (sec >= s.at) i = k; });
-  return i;
-};
+// Live build stage comes from the SERVER (poll ?job=id) — no fake timer.
+// prepare = idea queued · coding = real model writing code · finalize = summary.
+const STAGE_ICON: Record<string, string> = { prepare: "📋", coding: "💻", finalize: "✨" };
+type LiveStage = { key: string; en: string; bn: string; detail: string; frac: number };
+const LIVE_PREPARE: LiveStage = { key: "prepare", en: "Preparing", bn: "idea sajano hocche", detail: "", frac: 0.12 };
 
 export default function GameStudio(){
   const [msgs,setMsgs]=useState<Msg[]>([]);
@@ -111,7 +101,7 @@ export default function GameStudio(){
   const [html,setHtml]=useState("");
   const [provider,setProvider]=useState("");
   const [loading,setLoading]=useState(false);
-  const [stageIdx,setStageIdx]=useState(0);
+  const [live,setLive]=useState<LiveStage>(LIVE_PREPARE);
   const [elapsed,setElapsed]=useState(0);
   const [showCode,setShowCode]=useState(false);
   const [isFs,setIsFs]=useState(false);
@@ -131,17 +121,13 @@ export default function GameStudio(){
 
   useEffect(()=>{
     threadRef.current?.scrollTo({top: 999999});
-  },[msgs,loading,stageIdx]);
+  },[msgs,loading,live]);
 
-  // Stage timer while generating — advances Preparing → … → Finalizing.
+  // Elapsed clock only — the STAGE itself streams from the server (no rotation).
   useEffect(()=>{
-    if(!loading){ setStageIdx(0); setElapsed(0); return; }
+    if(!loading){ setElapsed(0); setLive(LIVE_PREPARE); return; }
     const t0 = Date.now();
-    const iv = setInterval(()=>{
-      const sec = Math.floor((Date.now()-t0)/1000);
-      setElapsed(sec);
-      setStageIdx(stageFor(sec));
-    },1000);
+    const iv = setInterval(()=>setElapsed(Math.floor((Date.now()-t0)/1000)),1000);
     return ()=>clearInterval(iv);
   },[loading]);
 
@@ -281,6 +267,15 @@ export default function GameStudio(){
           const pj = await pr.json().catch(()=>({}));
           if (pr.status === 503) throw new Error(pj.error || "Generate failed 503");
           if (!pr.ok && pr.status !== 404) throw new Error(pj.error || ("Generate failed "+pr.status));
+          // Real server stage -> live UI (prepare / coding[model] / finalize).
+          if (pj.stage && typeof pj.stage.en === "string") {
+            const st = pj.stage as { key: string; en: string; bn: string; model?: string; attempt?: number; of?: number };
+            const detail = st.key === "coding"
+              ? `${st.model || "AI"}${st.attempt && st.of ? ` · try ${st.attempt}/${st.of}` : ""}`
+              : "";
+            const frac = st.key === "finalize" ? 0.92 : st.key === "coding" && st.attempt && st.of ? 0.15 + 0.7 * (st.attempt / Math.max(1, st.of)) : 0.12;
+            setLive({ key: st.key, en: st.en, bn: st.bn || "", detail, frac });
+          }
           if (pj.status === "done") { j = pj; done = true; break; }
           if (pr.status === 404) throw new Error("Server restarted while generating — try again.");
         }
@@ -391,7 +386,7 @@ export default function GameStudio(){
               {msgs.map((m,i)=>(
                 <div key={i} className={"msg "+(m.role==="user" ? "msg-user" : "msg-ai"+(m.err?" err":""))}>{m.text}</div>
               ))}
-              {loading && <div className="msg msg-ai">{STAGES[stageIdx].icon} {STAGES[stageIdx].en}… <span style={{opacity:.6}}>({STAGES[stageIdx].bn} · {elapsed}s)</span></div>}
+              {loading && <div className="msg msg-ai">{STAGE_ICON[live.key] || "💻"} {live.en}… <span style={{opacity:.6}}>({live.bn}{live.detail ? ` · ${live.detail}` : ""} · {elapsed}s)</span></div>}
             </div>
 
             <div>
@@ -465,18 +460,17 @@ export default function GameStudio(){
                 {loading ? (
                   <div className="skeleton" style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
                     <div className="pulse"/>
-                    <div style={{fontWeight:800,fontSize:17}}>{STAGES[stageIdx].icon} {STAGES[stageIdx].en}…</div>
-                    <div style={{opacity:.6,fontSize:12}}>{STAGES[stageIdx].bn} · {elapsed}s · {provider || "ai working"}</div>
-                    <div className="stage-bar"><div className="stage-fill" style={{width:Math.min(100,((stageIdx+1)/STAGES.length)*100)+"%"}}/></div>
+                    <div style={{fontWeight:800,fontSize:17}}>{STAGE_ICON[live.key] || "💻"} {live.en}…</div>
+                    <div style={{opacity:.6,fontSize:12}}>{live.bn}{live.detail ? ` · ${live.detail}` : ""} · {elapsed}s · {provider || "Roun Co Pilot"}</div>
+                    <div className="stage-bar"><div className="stage-fill" style={{width:Math.round(live.frac*100)+"%"}}/></div>
                     <div className="stage-list">
-                      {/* Show only the CURRENT stage, one at a time */}
-                      <div key={stageIdx} className="stage-row active" style={{animation:"stagePop .5s cubic-bezier(.34,1.56,.64,1)"}}>
-                        <span className="stage-ico" style={{animation:"icoBounce 1s ease-in-out infinite",display:"inline-block"}}>{STAGES[stageIdx].icon}</span>
-                        <span>{STAGES[stageIdx].en}</span>
+                      <div key={live.key+live.detail} className="stage-row active" style={{animation:"stagePop .5s cubic-bezier(.34,1.56,.64,1)"}}>
+                        <span className="stage-ico" style={{animation:"icoBounce 1s ease-in-out infinite",display:"inline-block"}}>{STAGE_ICON[live.key] || "💻"}</span>
+                        <span>{live.en}{live.detail ? ` — ${live.detail}` : ""}</span>
                         <span className="stage-dots"><span>.</span><span>.</span><span>.</span></span>
                       </div>
                       <div style={{opacity:.55,fontSize:11,fontWeight:600,marginTop:4,paddingLeft:4}}>
-                        step {stageIdx + 1}/{STAGES.length} · done: {STAGES.slice(0,stageIdx).map(s=>s.en).join(" → ") || "none"}
+                        live from server · {elapsed}s elapsed
                       </div>
                     </div>
                   </div>
