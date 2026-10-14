@@ -10,7 +10,7 @@ const LOCK_MS = 15 * 60 * 1000;
 export async function POST(req: Request) {
   if (!csrfCheck(req)) return csrfBlock();
   const ip = clientIp(req);
-  if (isBanned(ip)) return banResponse();
+  if (isBanned(ip)) return banResponse(ip);
   const { email, password, remember, website, ts } = await req.json().catch(() => ({}));
   const { honeypot, isBotUA, humanTimingOk } = await import("@/lib/antifraud");
   if (honeypot({ website })) { recordViolation(ip, 5); return NextResponse.json({ error: "Bot detected." }, { status: 400 }); }

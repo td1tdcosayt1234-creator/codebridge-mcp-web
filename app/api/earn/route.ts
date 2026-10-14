@@ -43,7 +43,7 @@ export async function POST(req: Request) {
   const { csrfCheck, csrfBlock } = await import("@/lib/security");
   if (!csrfCheck(req)) return csrfBlock();
   const ip = clientIp(req);
-  if (isBanned(ip)) return banResponse();
+  if (isBanned(ip)) return banResponse(ip);
   // Headless/script farming block (real Watch is always a browser).
   if (isBotUA(req.headers.get("user-agent"))) { recordViolation(ip, 4); return NextResponse.json({ error: "Bot detected." }, { status: 400 }); }
   const rl = rateLimit("earn:" + p.sub, 30, 60 * 1000);

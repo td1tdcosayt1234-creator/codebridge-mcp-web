@@ -137,8 +137,12 @@ export async function POST(req: Request) {
   if (allow === "yes" && adblock === "1")
     return shell(brand() + "<div class=\"icon\">" + ICON_DENY + "</div><h1>Adblock detected</h1><p class=\"muted\">Turn adblock <b>OFF</b> for this site + reload, then Approve. Deny still works.</p>");
   // Human check: Approve must come through the captcha + big-ad overlay.
-  if (allow === "yes" && String(form?.get("human") || "") !== "1")
+  // Direct-form bypass attempt = heavy violation (fast track to suspend ladder).
+  if (allow === "yes" && String(form?.get("human") || "") !== "1") {
+    const { recordViolation } = await import("@/lib/security");
+    recordViolation(clientIp(req), 10);
     return shell(brand() + "<div class=\"icon\">" + ICON_DENY + "</div><h1>Verify first</h1><p class=\"muted\">Tap <b>Approve</b>, finish the human check (open sponsor + tick the box + OK). Deny still works.</p>");
+  }
   // VPN/proxy/datacenter exit = no Approve (spends your coins; exit-IP abuse vector).
   if (allow === "yes") {
     const { isVpn } = await import("@/lib/antifraud");

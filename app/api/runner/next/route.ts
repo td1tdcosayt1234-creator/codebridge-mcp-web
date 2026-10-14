@@ -13,7 +13,7 @@ const STUCK_MS = 45 * 60 * 1000;
 export async function GET(req: Request) {
   const { rateLimit, clientIp, isBanned, banResponse, recordViolation } = await import("@/lib/security");
   const ip = clientIp(req);
-  if (isBanned(ip)) return banResponse();
+  if (isBanned(ip)) return banResponse(ip);
   const rl = rateLimit("runner:" + ip, 60, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Rate limited. Retry in " + rl.retryAfterSec + "s." }, { status: 429 });
   const db = await readDb();

@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   const { rateLimit, clientIp, cookieSecure, cookieDomain, csrfCheck, csrfBlock, recordViolation, isBanned, banResponse } = await import("@/lib/security");
   if (!csrfCheck(req)) return csrfBlock();
   const ip = clientIp(req);
-  if (isBanned(ip)) return banResponse();
+  if (isBanned(ip)) return banResponse(ip);
   const rl = rateLimit("2fa_verify:" + ip, 10, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Too many tries." }, { status: 429 });
   const body = await req.json().catch(() => ({}));

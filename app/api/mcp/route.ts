@@ -319,7 +319,7 @@ async function handleOne(req: Request, m: RpcMsg): Promise<{ resp: object | null
 
 export async function POST(req: Request) {
   const { rateLimit, clientIp, csrfCheck, csrfBlock, hasBearer, sameOrigin, isBanned, banResponse } = await import("@/lib/security");
-  if (isBanned(clientIp(req))) return banResponse() as unknown as ReturnType<typeof err>;
+  if (isBanned(clientIp(req))) return banResponse(clientIp(req)) as unknown as ReturnType<typeof err>;
   const rl = rateLimit("mcp:" + clientIp(req), 120, 60 * 1000);
   if (!rl.ok) return err(null, -32000, "Rate limited. Retry in " + rl.retryAfterSec + "s.");
   // Cookie-authed browser calls must be same-origin; Bearer machine clients bypass.

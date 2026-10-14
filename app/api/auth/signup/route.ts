@@ -9,7 +9,7 @@ import { cleanName, nameError, countryError } from "@/lib/profile";
 export async function POST(req: Request) {
   if (!csrfCheck(req)) return csrfBlock();
   const ip = clientIp(req);
-  if (isBanned(ip)) return banResponse();
+  if (isBanned(ip)) return banResponse(ip);
   const rl = rateLimit("signup:" + ip, 5, 60 * 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Too many signups from this network. Try again later." }, { status: 429 });
   const body = await req.json().catch(() => ({}));

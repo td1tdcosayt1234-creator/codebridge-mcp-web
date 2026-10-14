@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   const { csrfCheck, csrfBlock, rateLimit, clientIp, isBanned, banResponse, recordViolation } = await import("@/lib/security");
   if (!csrfCheck(req)) return csrfBlock();
   const ip = clientIp(req);
-  if (isBanned(ip)) return banResponse();
+  if (isBanned(ip)) return banResponse(ip);
   const rl = rateLimit("runner_apk:" + ip, 30, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   const db = await readDb();

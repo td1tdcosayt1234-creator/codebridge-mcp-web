@@ -33,14 +33,21 @@ export function clientIp(req: Request): string {
   return "local";
 }
 
-// ---- Tier-1 edge shield: violation score + auto-ban ----
-// Beyond per-route rate limits: repeated hostile signals (bad tokens,
-// bad signatures, CSRF fails, auth fails) from one IP accumulate.
-// 20 points in 10 min -> 15-min ban (403). Legit typos never reach it.
-const viol = new Map<string, { score: number; first: number; bannedUntil: number }>();
+// ---- Tier-1 edge shield: violation score + ESCALATING suspends ----
+// Repeated hostile signals (bad tokens, bad signatures, CSRF fails, auth
+// fails, bot traps, bypass attempts) from one IP accumulate.
+// 20 points in 10 min -> suspend. Each suspend climbs the ladder:
+// 10 min -> 30 min -> 1 hour -> 12 hours -> 3 weeks. Legit typos never reach it.
+const viol = new Map<string, { score: number; first: number; bannedUntil: number; offenses: number }>();
 const BAN_SCORE = 20;
 const BAN_WINDOW_MS = 10 * 60 * 1000;
-const BAN_MS = 15 * 60 * 1000;
+const BAN_TIERS_MIN = [10, 30, 60, 12 * 60, 21 * 24 * 60];
+export function banTierMin(offenses: number): number {
+  return BAN_TIERS_MIN[Math.min(Math.max(0, offenses), BAN_TIERS_MIN.length - 1)];
+}
+export function banOffenses(ip: string): number {
+  return viol.get(ip)?.offenses || 0;
+}
 export function isBanned(ip: string): boolean {
   if (!ip || ip === "local") return false;
   const v = viol.get(ip);
@@ -63,18 +70,34 @@ export function recordViolation(ip: string, weight = 1): void {
       if (v.bannedUntil < now && now - v.first > BAN_WINDOW_MS) viol.delete(k);
     });
   }
-  const v = viol.get(ip) || { score: 0, first: now, bannedUntil: 0 };
+  const v = viol.get(ip) || { score: 0, first: now, bannedUntil: 0, offenses: 0 };
   if (now - v.first > BAN_WINDOW_MS) {
     v.score = 0;
     v.first = now;
     v.bannedUntil = 0;
   }
   v.score += weight;
-  if (v.score >= BAN_SCORE) v.bannedUntil = now + BAN_MS;
+  // Fresh suspend only when not already serving one — each new suspend climbs
+  // the ladder (10m, 30m, 1h, 12h, 3 weeks) and bumps the offense counter.
+  if (v.score >= BAN_SCORE && v.bannedUntil <= now) {
+    v.bannedUntil = now + banTierMin(v.offenses) * 60 * 1000;
+    v.offenses += 1;
+  }
   viol.set(ip, v);
 }
-export function banResponse(): Response {
-  return Response.json({ error: "Blocked for abuse. Try again later." }, { status: 403 });
+function banTimeLeft(ip: string): string {
+  const s = banRemainingSec(ip);
+  if (s <= 0) return "a while";
+  if (s < 3600) return Math.ceil(s / 60) + " min";
+  if (s < 86400) return Math.floor(s / 3600) + "h " + Math.ceil((s % 3600) / 60) + "m";
+  return Math.floor(s / 86400) + " days";
+}
+export function banResponse(ip = ""): Response {
+  const n = ip ? banOffenses(ip) : 0;
+  const msg = n > 1
+    ? `Suspended for repeated abuse (offense ${n}). Try again in ${banTimeLeft(ip)}.`
+    : "Blocked for abuse. Try again later.";
+  return Response.json({ error: msg }, { status: 403 });
 }
 
 // ---- Timing-safe string compare (tokens/secrets) ----
