@@ -65,6 +65,7 @@ jobs:
             [ -n "${DB_MASTER_KEY:-}" ] && echo "DB_MASTER_KEY=$DB_MASTER_KEY"
             [ -n "${ELSEMAIL_URL:-}" ] && echo "ELSEMAIL_URL=$ELSEMAIL_URL"
             [ -n "${ELSEMAIL_API_KEY:-}" ] && echo "ELSEMAIL_API_KEY=$ELSEMAIL_API_KEY"
+            [ -n "${OPENROUTER_API_KEY:-}" ] && echo "OPENROUTER_API_KEY=$OPENROUTER_API_KEY"
             [ -n "${GOOGLE_CLIENT_ID:-}" ] && echo "GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID"
             [ -n "${GOOGLE_CLIENT_SECRET:-}" ] && echo "GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET"
             [ -n "${GOOGLE_SITE_VERIFICATION:-}" ] && echo "GOOGLE_SITE_VERIFICATION=$GOOGLE_SITE_VERIFICATION"
@@ -91,6 +92,7 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           ELSEMAIL_URL: ${{ secrets.ELSEMAIL_URL }}
           ELSEMAIL_API_KEY: ${{ secrets.ELSEMAIL_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
 

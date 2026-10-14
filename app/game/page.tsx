@@ -107,12 +107,12 @@ export default function GameStudio(){
   const [context,setContext]=useState("");
   const [models,setModels]=useState<string[]>([]);
   const [modelSel,setModelSel]=useState("auto");
+  const [rounLabels,setRounLabels]=useState<Record<string,string>>({});
   const [html,setHtml]=useState("");
   const [provider,setProvider]=useState("");
   const [loading,setLoading]=useState(false);
   const [stageIdx,setStageIdx]=useState(0);
   const [elapsed,setElapsed]=useState(0);
-  const [kiloModels,setKiloModels]=useState<string[]>([]);
   const [showCode,setShowCode]=useState(false);
   const [isFs,setIsFs]=useState(false);
   const [toast,setToast]=useState("");
@@ -147,14 +147,10 @@ export default function GameStudio(){
 
   useEffect(()=>{
     fetch("/api/game/generate",{cache:"no-store"}).then(r=>r.json()).then(j=>{
-      const custom = Array.isArray(j?.customModels) ? j.customModels : [];
-      const oc = Array.isArray(j?.opencodeModels) ? j.opencodeModels : [];
-      const kl = Array.isArray(j?.kiloModels) ? j.kiloModels : [];
-      if (custom.length || oc.length || kl.length) setModels([...custom, ...oc, ...kl]);
-      else if(Array.isArray(j?.freeModels)) setModels(j.freeModels);
-      if(Array.isArray(j?.kiloModels)) setKiloModels(j.kiloModels);
-      // Default to custom hl model when available
-      if (custom.length) setModelSel(custom[0]);
+      const rm = Array.isArray(j?.rounModels) ? j.rounModels : [];
+      if (rm.length) setModels(rm);
+      if (j?.rounLabels && typeof j.rounLabels === "object") setRounLabels(j.rounLabels);
+      // Default stays "auto" (rotates all Roun models for best availability).
     }).catch(()=>{});
     const sp=new URLSearchParams(location.search);
     const q=sp.get("prompt");
@@ -401,32 +397,11 @@ export default function GameStudio(){
             <div>
               <div className="label"><span>MODEL — FREE</span><span style={{opacity:.6}}>{provider || "auto"}</span></div>
               <select className="field" value={modelSel} onChange={e=>setModelSel(e.target.value)} style={{padding:"11px 14px"}}>
-                <option value="auto">✦ Auto — best available</option>
-                {models.filter(m=>!m.startsWith("opencode/") && !m.startsWith("kilo/")).length>0 && (
-                  <optgroup label="Custom (localhost:20128)">
-                    {models.filter(m=>!m.startsWith("opencode/") && !m.startsWith("kilo/")).map(m=>(
-                      <option key={m} value={m}>{m} ★</option>
-                    ))}
-                  </optgroup>
-                )}
+                <option value="auto">✦ Auto — Roun Co Pilot (free)</option>
                 {models.length>0 && (
-                  <optgroup label="opencode free (login once)">
-                    {models.filter(m=>m.startsWith("opencode/")).map(m=>(
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </optgroup>
-                )}
-                {models.filter(m=>m.startsWith("kilo/")).length>0 && (
-                  <optgroup label="Kilo free (no key)">
-                    {models.filter(m=>m.startsWith("kilo/")).map(m=>(
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </optgroup>
-                )}
-                {kiloModels.length>0 && models.filter(m=>m.startsWith("kilo/")).length===0 && (
-                  <optgroup label="Kilo free (no key)">
-                    {kiloModels.map(m=>(
-                      <option key={m} value={m}>{m.replace(/^kilo\//,"")}</option>
+                  <optgroup label="Roun Co Pilot (free)">
+                    {models.map(m=>(
+                      <option key={m} value={m}>Roun Co Pilot — {rounLabels[m] || m.replace(/^roun\//,"")}</option>
                     ))}
                   </optgroup>
                 )}

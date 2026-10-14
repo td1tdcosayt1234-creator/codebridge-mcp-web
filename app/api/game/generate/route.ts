@@ -3,39 +3,18 @@ import { cookies } from "next/headers";
 import { verifyJwt } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
-// --- AI game generation: Kilo Code only. No templates, no other providers. ---
+// --- AI game generation: Roun Co Pilot (OpenRouter free models) only. ---
+import { ROUN_MODELS, ROUN_DEFAULT, cleanRounModel } from "@/lib/openrouter";
+
 function baseModels(defaultModel: string) {
-  return Array.from(
-    new Set([defaultModel, "muse-spark-1.3-contributor-free", "big-pickle", "mimo-v2.6-flash-free"]),
-  );
+  return Array.from(new Set([defaultModel, ...ROUN_MODELS]));
 }
 
-// Free-tier models on Zen (no per-token charge) — selectable in Game Studio chat.
-const FREE_MODELS = [
-  "big-pickle",
-  "ling-3.0-flash-fin-free",
-  "mimo-v2.5-free",
-  "mimo-v2.6-flash-free",
-  "muse-spark-1.2-contributor-free",
-  "muse-spark-1.3-contributor-free",
-  "nemotron-3-ultra-free",
-  "nemotron-3.5-lightning-free",
-  "jev-1.13-free",
-  "space-bunny-free",
-];
 // Only allow known models — the key owner pays for anything outside free tier.
-function customModelId(): string {
-  return (process.env.OPENCODE_MODEL || "hl").trim().slice(0, 120) || "hl";
-}
 function cleanModel(m: unknown, defaultModel: string): string {
   const s = String(m || "").slice(0, 120);
   if (!/^[A-Za-z0-9._:\/-]+$/.test(s)) return "";
-  if (FREE_MODELS.includes(s) || s === defaultModel) return s;
-  // Custom OpenAI-compatible endpoint model (e.g. "hl" on localhost:20128).
-  if (s === customModelId() || s === "hl" || s === "custom/hl") return s;
-  // Kilo CLI + opencode CLI free models pass through to their providers.
-  // Each provider re-validates against its own allow-list (lib/kilo.ts, lib/opencode.ts).
-  if (s.startsWith("kilo/") || s.startsWith("opencode/")) return s;
+  if (ROUN_MODELS.includes(s) || s === defaultModel) return s;
   return "";
 }
 
@@ -73,52 +52,6 @@ const GAME_SYSTEM = (style: string) =>
     "- Best score in localStorage. Fixed-timestep logic so speed is device-independent.",
   ].join("\n");
 
-async function directGameHTML(prompt: string, styleLabel: string, system: string, preferred = ""): Promise<{ html: string; provider: string } | null> {
-  try {
-    const { zenConfig, zenKeyOk } = await import("@/lib/ai");
-    const cfg = await zenConfig();
-    if (!zenKeyOk(cfg.key)) return null;
-    const model = preferred && (preferred === "hl" || preferred === "custom/hl" || preferred === cfg.model)
-      ? (preferred === "custom/hl" ? cfg.model : preferred)
-      : (cfg.model || "hl");
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 190000);
-    try {
-      const r = await fetch(cfg.base.replace(/\/+$/, "") + "/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.key },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: system },
-            { role: "user", content: `Game idea: ${String(prompt || "").slice(0, 500)}\n\nOutput ONLY raw HTML — no markdown, no fences, no explanation.` },
-          ],
-          temperature: 0.8,
-          max_tokens: 16000,
-        }),
-        signal: ctrl.signal,
-      });
-      if (!r.ok) {
-        console.warn(`[game] direct ${model}: HTTP ${r.status}`);
-        return null;
-      }
-      const j = await r.json().catch(() => ({}));
-      const raw: string =
-        j?.choices?.[0]?.message?.content ||
-        j?.choices?.[0]?.text || "";
-      const html = extractHTML(raw);
-      if (looksLikeGame(html)) return { html, provider: "custom:" + model };
-      console.warn(`[game] direct ${model}: bad output (${String(raw).length} chars)`);
-      return null;
-    } finally {
-      clearTimeout(timer);
-    }
-  } catch (e) {
-    console.warn(`[game] direct failed: ${String(e).slice(0, 200)}`);
-    return null;
-  }
-}
-
 async function aiGameHTML(req: Request, prompt: string, style: string, preferred = ""): Promise<{ html: string; provider: string } | null> {
   const cleanPrompt = String(prompt || "").slice(0, 500);
   // Chat mode sends style:"auto" — no preset palettes, AI picks visuals to fit the idea.
@@ -128,58 +61,16 @@ async function aiGameHTML(req: Request, prompt: string, style: string, preferred
   const timer = setTimeout(() => ctrl.abort(), 200000);
   // Client gave up (tab closed, navigated away)? Stop the upstream calls too.
   req.signal.addEventListener("abort", () => { try { ctrl.abort(); } catch {} });
-  // Strict model routing: a user-selected model ALWAYS wins — no silent fallback
-  // to another provider's model. Auto ("") keeps direct-custom first, then opencode, kilo.
-  const wantOC = preferred.startsWith("opencode/");
-  const wantKilo = preferred.startsWith("kilo/");
-  const wantCustom = preferred === "hl" || preferred === "custom/hl" || (!wantOC && !wantKilo && preferred.length > 0);
+  // Strict model routing: a user-selected model is tried FIRST and alone —
+  // no silent fallback to another model. Auto ("") rotates all Roun models.
   try {
-    // Provider 0: custom OpenAI-compatible endpoint (e.g. localhost:20128/v1 + hl).
-    if (!wantOC && !wantKilo) {
-      const direct = await directGameHTML(cleanPrompt, styleLabel, system, preferred);
-      if (direct) return direct;
-      // User explicitly picked the custom model — never silently build with another provider.
-      if (wantCustom) {
-        console.warn("[game] selected custom model failed — returning 503 (no cross-provider fallback)");
-        return null;
-      }
-    }
-    // Provider 1: opencode CLI (free Zen models after one `opencode auth login`).
-    if (!wantKilo) {
-      try {
-        const { opencodeGameHTML, OPENCODE_DEFAULT_MODEL } = await import("@/lib/opencode");
-        const ocModel = wantOC ? preferred : OPENCODE_DEFAULT_MODEL;
-        const oc = await opencodeGameHTML(cleanPrompt, styleLabel, system, ocModel);
-        if (oc) return oc;
-      } catch {
-        /* opencode CLI unavailable / not logged in / bad output */
-      }
-      // User explicitly picked an opencode model — never silently build with kilo instead.
-      if (wantOC) {
-        console.warn("[game] selected opencode model failed — returning 503 (no cross-provider fallback)");
-        return null;
-      }
-    }
-    // Provider 2: Kilo Code CLI (free Gateway models, keyless anonymous works).
-    if (!wantOC) {
-      try {
-        const { kiloGameHTML, KILO_DEFAULT_MODEL } = await import("@/lib/kilo");
-        const kiloModel = wantKilo ? preferred : KILO_DEFAULT_MODEL;
-        // Auto mode: free routes stall ~50% of the time, so rotate 3 models.
-        // Selected mode: ONLY the chosen model, retried (never another model).
-        const tries = wantKilo
-          ? [kiloModel, kiloModel]
-          : Array.from(new Set([kiloModel, "kilo/cohere/north-mini-code:free", "kilo/thinkingmachines/inkling-small:free"]));
-        for (let attempt = 0; attempt < tries.length; attempt++) {
-          const kilo = await kiloGameHTML(cleanPrompt, styleLabel, system, tries[attempt]);
-          if (kilo) return kilo;
-          console.warn(`[game] kilo attempt ${attempt + 1}/${tries.length} (${tries[attempt]}) failed`);
-        }
-      } catch {
-        /* Kilo CLI unavailable or bad output */
-      }
-    }
-    console.warn("[game] all providers failed (custom + opencode + kilo) — returning 503");
+    const { rounGameHTML } = await import("@/lib/openrouter");
+    const sel = cleanRounModel(preferred);
+    const ai = sel
+      ? await rounGameHTML(cleanPrompt, styleLabel, system, sel, true)
+      : await rounGameHTML(cleanPrompt, styleLabel, system, "", false);
+    if (ai) return { html: ai.html, provider: ai.provider };
+    console.warn("[game] Roun Co Pilot failed (selected=" + (sel || "auto") + ") — returning 503");
     return null;
   } catch {
     return null;
@@ -205,8 +96,7 @@ export async function POST(req: Request){
     const rawModel = String(model || "").trim();
     // Enforce model allow-list: key owner pays for non-free models.
     if (rawModel) {
-      const { OPENCODE_DEFAULT_MODEL } = await import("@/lib/opencode");
-      const cleaned = cleanModel(rawModel, OPENCODE_DEFAULT_MODEL);
+      const cleaned = cleanModel(rawModel, ROUN_DEFAULT);
       if (!cleaned) return NextResponse.json({ error: "Unknown model." }, { status: 400 });
     }
     // Pure AI generation — no templates. Kilo Code only.
@@ -221,43 +111,26 @@ export async function POST(req: Request){
 // AI-written completion summary for the chat thread (no more hardcoded text).
 async function aiSummary(prompt: string, provider: string, html: string): Promise<string> {
   try {
-    const { zenConfig, zenKeyOk } = await import("@/lib/ai");
-    const cfg = await zenConfig();
-    if (!zenKeyOk(cfg.key)) return "";
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 60000);
-    try {
-      const hasCanvas = html.toLowerCase().includes("<canvas");
-      const sizeKb = Math.round(html.length / 1024);
-      const r = await fetch(cfg.base.replace(/\/+$/, "") + "/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.key },
-        body: JSON.stringify({
-          model: cfg.model || "hl",
-          messages: [
-            {
-              role: "system",
-              content:
-                "You are Game Studio assistant. A browser game was just generated and is already live in the preview. Write a short chat reply (max 4 lines) in the user's language (Bengali mix if they wrote Bengali, else English). Mention: 1) what game was built, 2) controls (keyboard + touch), 3) one line inviting refinement (e.g. 'aro ki change chao?'). No markdown fences, no code, plain chat text with 1-2 emojis max.",
-            },
-            {
-              role: "user",
-              content: `Game idea: ${String(prompt || "").slice(0, 400)}\nProvider: ${provider}\nHTML size: ${sizeKb}KB, canvas: ${hasCanvas}\nWrite the completion reply.`,
-            },
-          ],
-          temperature: 0.7,
-          max_tokens: 400,
-        }),
-        signal: ctrl.signal,
-      });
-      if (!r.ok) return "";
-      const j = await r.json().catch(() => ({}));
-      const text: string = j?.choices?.[0]?.message?.content?.trim() || "";
-      if (text.length < 10 || text.length > 2000) return "";
-      return text;
-    } finally {
-      clearTimeout(timer);
-    }
+    const { orChat, ROUN_MODEL_MAP, ROUN_DEFAULT, orKeyOk } = await import("@/lib/openrouter");
+    if (!orKeyOk()) return "";
+    const hasCanvas = html.toLowerCase().includes("<canvas");
+    const sizeKb = Math.round(html.length / 1024);
+    const text = await orChat(
+      [
+        {
+          role: "system",
+          content:
+            "You are Game Studio assistant. A browser game was just generated and is already live in the preview. Write a short chat reply (max 4 lines) in the user's language (Bengali mix if they wrote Bengali, else English). Mention: 1) what game was built, 2) controls (keyboard + touch), 3) one line inviting refinement (e.g. 'aro ki change chao?'). No markdown fences, no code, plain chat text with 1-2 emojis max.",
+        },
+        {
+          role: "user",
+          content: `Game idea: ${String(prompt || "").slice(0, 400)}\nProvider: ${provider}\nHTML size: ${sizeKb}KB, canvas: ${hasCanvas}\nWrite the completion reply.`,
+        },
+      ],
+      { model: ROUN_MODEL_MAP[ROUN_DEFAULT], maxTokens: 400, temperature: 0.7, timeoutMs: 60000 },
+    );
+    if (text.length < 10 || text.length > 2000) return "";
+    return text;
   } catch {
     return "";
   }
@@ -291,12 +164,7 @@ export async function GET(req: Request){
   const { rateLimit } = await import("@/lib/security");
   const rl = rateLimit("gamepoll:" + (user as any).sub, 60, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
-  const { KILO_FREE_MODELS, KILO_DEFAULT_MODEL } = await import("@/lib/kilo");
-  const { OPENCODE_FREE_MODELS, OPENCODE_DEFAULT_MODEL, opencodeAuthOk } = await import("@/lib/opencode");
-  const { zenConfig, zenKeyOk } = await import("@/lib/ai");
-  const zc = await zenConfig().catch(() => null);
-  const customId = (process.env.OPENCODE_MODEL || "hl").trim() || "hl";
-  const customModels = zc && zenKeyOk(zc.key) ? [customId] : [customId];
+  const { ROUN_MODELS, ROUN_DEFAULT, ROUN_LABEL, ROUN_LABELS, orKeyOk } = await import("@/lib/openrouter");
   const id = new URL(req.url).searchParams.get("job");
   if (id) {
     const j = jobs.get(id);
@@ -306,5 +174,5 @@ export async function GET(req: Request){
     if (j.status === "error") return NextResponse.json({ ok: false, error: j.error }, { status: 503 });
     return NextResponse.json({ ok: true, status: "done", html: j.html, summary: j.summary || "", name: "index.html", size: (j.html || "").length, engine: "ai", provider: j.provider });
   }
-  return NextResponse.json({ ok:true, service:"game-generate", ai: true, model: customId, customModels, customDefault: customId, customBase: zc?.base || "", source: "custom+opencode+kilo", opencodeModels: OPENCODE_FREE_MODELS, opencodeDefault: OPENCODE_DEFAULT_MODEL, opencodeAuth: await opencodeAuthOk(), freeModels: KILO_FREE_MODELS, kiloModels: KILO_FREE_MODELS, kiloDefault: KILO_DEFAULT_MODEL });
+  return NextResponse.json({ ok:true, service:"game-generate", ai: orKeyOk(), model: ROUN_DEFAULT, rounModels: ROUN_MODELS, rounDefault: ROUN_DEFAULT, rounLabel: ROUN_LABEL, rounLabels: ROUN_LABELS, source: "roun-co-pilot" });
 }
