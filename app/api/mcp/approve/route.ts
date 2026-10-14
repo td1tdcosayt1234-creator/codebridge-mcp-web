@@ -111,7 +111,7 @@ export async function POST(req: Request) {
   if (allow === "yes") {
     const { isVpn } = await import("@/lib/antifraud");
     if (await isVpn(clientIp(req)))
-      return shell(brand() + "<div class=\"icon\">" + ICON_DENY + "</div><h1>VPN detected</h1><p class=\"muted\">Turn VPN/Proxy <b>OFF</b> + reload, then Approve. Deny still works.</p>");
+      return shell(brand() + "<div class=\"icon\">" + ICON_DENY + "</div><h1>VPN detected</h1><p class=\"muted\">Turn VPN/Proxy <b>OFF</b> + reload, then Approve. No VPN on? Wait ~10 min and retry. Deny still works.</p>");
   }
   const me = await verifyJwt(t);
   if (!me) {

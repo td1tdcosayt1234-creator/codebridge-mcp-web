@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     recordViolation(clientIp(req), 2);
     return NextResponse.json({ error: "Adblock detected. Turn it off to send requests." }, { status: 403 });
   }
-  // VPN/proxy/datacenter exit = no new requests (coin-spend abuse vector).
+  // VPN/proxy exit = no new requests (coin-spend abuse vector).
   // Agent API path (bearer) skips this: agents run from datacenters legitimately.
   const { hasBearer } = await import("@/lib/security");
   if (!hasBearer(req)) {
@@ -48,13 +48,13 @@ export async function POST(req: Request) {
     if (await isVpn(clientIp(req))) {
       const { readDb, writeDb, uid } = await import("@/lib/db");
       const { recordViolation } = await import("@/lib/security");
-      recordViolation(clientIp(req), 3);
+      recordViolation(clientIp(req), 1); // soft signal only — VPN flags have false positives
       try {
         const db = await readDb();
         db.events.push({ id: uid("e"), userId: p.sub, action: "vpn_block", detail: "task from VPN/proxy", at: new Date().toISOString() });
         await writeDb(db);
       } catch { /* best effort */ }
-      return NextResponse.json({ error: "VPN/Proxy detected. Disable it to send requests." }, { status: 403 });
+      return NextResponse.json({ error: "VPN/Proxy detected. Disable it to send requests. No VPN on? Wait ~10 min and retry." }, { status: 403 });
     }
   }
   const out = await createTaskAndDispatch(p.sub, String(title || ""), String(prompt || ""), {

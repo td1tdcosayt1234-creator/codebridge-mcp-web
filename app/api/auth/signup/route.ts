@@ -18,11 +18,11 @@ export async function POST(req: Request) {
   if (isBotUA(req.headers.get("user-agent"))) { recordViolation(ip, 5); return NextResponse.json({ error: "Bot detected." }, { status: 400 }); }
   if (!humanTimingOk((body as Record<string, unknown>).ts, 2000)) { recordViolation(ip, 4); return NextResponse.json({ error: "Too fast. Please fill the form normally." }, { status: 400 }); }
   if (await isVpn(ip)) {
-    recordViolation(ip, 3);
+    recordViolation(ip, 1); // soft signal only — VPN flags have false positives
     const db0 = await readDb();
     db0.events.push({ id: uid("e"), userId: "anon", action: "vpn_block", detail: "signup from VPN/proxy", at: new Date().toISOString() });
     await writeDb(db0);
-    return NextResponse.json({ error: "VPN/Proxy connections are not allowed. Disable it and try again." }, { status: 403 });
+    return NextResponse.json({ error: "VPN/Proxy connections are not allowed. Disable it and try again. No VPN on? Wait ~10 min and retry (network check refreshes)." }, { status: 403 });
   }
   const { email, password, firstName, lastName, country } = body;
   const mail = clampText(email, 120).trim().toLowerCase();

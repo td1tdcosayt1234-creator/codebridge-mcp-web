@@ -62,8 +62,8 @@ export async function POST(req: Request) {
     if (await isVpn(ip)) {
       db.events.push({ id: uid("e"), userId: p.sub, action: "vpn_block", detail: "earn-start from VPN/proxy", at: new Date().toISOString() });
       await writeDb(db);
-      recordViolation(ip, 3);
-      return NextResponse.json({ error: "VPN/Proxy detected. Disable it to earn coins." }, { status: 403 });
+      recordViolation(ip, 1); // soft signal only — VPN flags have false positives
+      return NextResponse.json({ error: "VPN/Proxy detected. Disable it to earn coins. No VPN on? Wait ~10 min and retry." }, { status: 403 });
     }
     // One active session + min gap: parallel tabs / instant re-start = farm.
     const last = [...db.earnNonces].reverse().find((n) => n.userId === p.sub);
@@ -79,8 +79,8 @@ export async function POST(req: Request) {
     if (await isVpn(clientIp(req))) {
       db.events.push({ id: uid("e"), userId: p.sub, action: "vpn_block", detail: "earn from VPN/proxy", at: new Date().toISOString() });
       await writeDb(db);
-      recordViolation(ip, 3);
-      return NextResponse.json({ error: "VPN/Proxy detected. Disable it to earn coins." }, { status: 403 });
+      recordViolation(ip, 1); // soft signal only — VPN flags have false positives
+      return NextResponse.json({ error: "VPN/Proxy detected. Disable it to earn coins. No VPN on? Wait ~10 min and retry." }, { status: 403 });
     }
     // Sponsor must actually open (client-asserted; popup-blocked = retry).
     if (opened !== true) { recordViolation(ip, 2); return NextResponse.json({ error: "Sponsor did not open. Allow popups and Watch again." }, { status: 400 }); }

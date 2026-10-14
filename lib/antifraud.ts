@@ -62,14 +62,19 @@ async function flagB(ip: string): Promise<boolean | null> {
     return !!j.proxy;
   } catch { return null; }
 }
+// Short TTL on purpose: a transient misflag clears itself in ~20 min,
+// and real VPN users flipping it off don't stay punished for an hour.
+const VPN_CACHE_MS = 20 * 60 * 1000;
 export async function isVpn(ip: string): Promise<boolean> {
   if (isPrivateIp(ip)) return false;
+  if (!/^[0-9a-fA-F:.]{7,45}$/.test(ip)) return false; // garbage IP = allow
   const c = proxyCache.get(ip);
-  if (c && Date.now() - c.at < 3600000) return c.v;
+  if (c && Date.now() - c.at < VPN_CACHE_MS) return c.v;
   const [a, b] = await Promise.all([flagA(ip), flagB(ip)]);
   if (a === null && b === null) return false; // fail-open: never block on total lookup failure
   const v = a === true || b === true;
-  proxyCache.set(ip, { v, at: Date.now() });
+  // Cache clean verdicts longer, blocks shorter (re-check sooner).
+  proxyCache.set(ip, { v, at: Date.now() - (v ? VPN_CACHE_MS / 2 : 0) });
   return v;
 }
 
