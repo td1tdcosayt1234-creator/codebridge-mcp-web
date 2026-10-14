@@ -50,8 +50,8 @@ export default function Inbox() {
             <h3 style={{ margin: 0 }}>Inbox</h3>
             <p className="muted small" style={{ margin: "4px 0 0" }}>Latest {list.length} mail(s) via elsemail API — OTPs, verify links, receipts.</p>
           </div>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search to / from / subject…" style={{ minWidth: 220 }} aria-label="Search mails" />
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search to / from / subject…" style={{ minWidth: 0, flex: "1 1 160px" }} aria-label="Search mails" />
             <button className="btn" type="button" onClick={load}>↻ Refresh</button>
           </div>
         </div>
@@ -60,7 +60,8 @@ export default function Inbox() {
       {err && <p><span className="badge bad">{err}</span></p>}
 
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-        <table>
+        <div style={{ overflowX: "auto" }}>
+        <table style={{ minWidth: 560 }}>
           <thead><tr><th>Time</th><th>To</th><th>Subject</th><th>Status</th><th>DKIM</th></tr></thead>
           <tbody>
             {list.map((m) => {
@@ -78,6 +79,7 @@ export default function Inbox() {
             {!list.length && <tr><td colSpan={5} className="muted small" style={{ textAlign: "center", padding: 24 }}>No mails found.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
 
       {cur && (

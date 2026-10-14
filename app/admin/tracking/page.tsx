@@ -25,8 +25,8 @@ export default function AdminTracking(){
         <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search user or detail..." style={{maxWidth:260}}/>
         <button className="btn-ghost" onClick={csv}>Export CSV</button>
       </div>
-      <table><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Detail</th></tr></thead><tbody>
+      <div className="table-wrap" style={{border:0}}><table><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Detail</th></tr></thead><tbody>
         {evs.slice(0,200).map((e:any)=>(<tr key={e.id}><td className="small">{e.at}</td><td className="small">{e.userId}</td><td><span className="badge">{e.action}</span></td><td className="small">{e.detail}</td></tr>))}
-      </tbody></table>
+      </tbody></table></div>
     </div></div>);
 }

@@ -394,7 +394,7 @@ export default function Home() {
         <div className="promo-band">
           <div className="promo-inner">
             <div className="promo-art">{ICONS.gamepad}</div>
-            <div style={{ flex: 1, minWidth: 250 }}>
+            <div style={{ flex: "1 1 200px", minWidth: 0 }}>
               <div className="kicker" style={{ marginBottom: 8 }}>
                 <span className="pulse-dot" />
                 Game Studio

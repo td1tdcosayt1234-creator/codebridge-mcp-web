@@ -862,7 +862,7 @@ input[type="checkbox"] { width: auto; min-width: 0; padding: 0; border: 0; backg
    ============================================================ */
 
 table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-th, td { text-align: left; padding: 12px 13px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th, td { text-align: left; padding: 12px 13px; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
 th { color: var(--muted-2); font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
 tbody tr { transition: background 0.2s; }
 tbody tr:hover { background: rgba(139, 92, 246, 0.07); }
