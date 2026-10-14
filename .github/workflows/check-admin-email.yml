@@ -19,9 +19,11 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: List admin emails from Firebase (no secrets, no hashes)
+        timeout-minutes: 3
         run: |
-          node -e '
+          timeout 150 node -e '
           (async () => {
+            const withTimeout = (p, ms, label) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("timeout:" + label)), ms))]);
             const crypto = require("crypto");
             function decWith(secret, enc) {
               try {
@@ -39,13 +41,16 @@ jobs:
             const svc = (process.env.FIREBASE_SERVICE_ACCOUNT || "").trim();
             const dbPath = (process.env.FIREBASE_DB_PATH || "codebridge/maindb").trim().replace(/^\/+|\/+$/g, "") || "codebridge/maindb";
             const masterKey = (process.env.DB_MASTER_KEY || "").trim();
+            let host = "";
+            try { host = new URL(url).hostname; } catch {}
             console.log("dbPath=" + dbPath);
-            console.log("url_set=" + (url ? "yes len=" + url.length : "no"));
+            console.log("url_host=" + (host || "none"));
             console.log("svc_set=" + (svc ? "yes len=" + svc.length : "no"));
-            if (!url) { console.log("RESULT: firebase disabled (no URL)"); return; }
+            if (!url) { console.log("RESULT: firebase disabled (no URL)"); process.exit(0); }
             if (!svc && !(process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY)) {
-              console.log("RESULT: firebase disabled (no service account)"); return;
+              console.log("RESULT: firebase disabled (no service account)"); process.exit(0);
             }
+            console.log("init_admin...");
             const admin = require("firebase-admin");
             let cred;
             if (svc) {
@@ -53,8 +58,9 @@ jobs:
               try { parsed = JSON.parse(svc); }
               catch (e) {
                 try { parsed = JSON.parse(svc.replace(/\n/g, "\\n")); }
-                catch (e2) { console.log("RESULT: service account JSON parse failed"); return; }
+                catch (e2) { console.log("RESULT: service account JSON parse failed"); process.exit(0); }
               }
+              console.log("svc_project=" + (parsed.project_id || "unknown"));
               cred = admin.cert(parsed);
             } else {
               cred = admin.cert({
@@ -64,10 +70,12 @@ jobs:
               });
             }
             admin.initializeApp({ credential: cred, databaseURL: url });
+            console.log("connecting...");
             const { getDatabase } = require("firebase-admin/database");
             const ref = getDatabase().ref(dbPath);
-            const snap = await ref.get();
-            if (!snap.exists()) { console.log("RESULT: empty node, no data yet"); return; }
+            const snap = await withTimeout(ref.get(), 45000, "rtdb-get");
+            console.log("fetched");
+            if (!snap.exists()) { console.log("RESULT: empty node, no data yet"); process.exit(0); }
             const v = snap.val();
             let payload = null;
             if (typeof v === "string") payload = v;
@@ -95,6 +103,8 @@ jobs:
             const admins = users.filter((u) => u.role === "admin");
             console.log("RESULT: admin_count=" + admins.length);
             for (const a of admins) console.log("ADMIN email=" + a.email + " id=" + a.id);
+            try { const apps = admin.apps || []; if (apps.length && admin.app) await admin.app().delete().catch(()=>{}); } catch {}
+            process.exit(0);
           })().catch((e) => { console.log("RESULT: error " + (e && e.message || e)); process.exit(0); });
           '
         env:
