@@ -13,6 +13,11 @@ const TAG_ZONE = "293462";
 const VIG_SRC = "https://n6wxm.com/vignette.min.js";
 const VIG_ZONE = "11997991";
 const VIG_ZONE_2 = "12029788"; // Industrious tag (Vignette Banner, video/interstitial)
+// Standalone OnClick popunder (high CPM) + In-Page Push banner.
+const ONCLICK_SRC = "https://al5sm.com/tag.min.js";
+const ONCLICK_ZONE = "12029909";
+const INPAGE_SRC = "https://nap5k.com/tag.min.js";
+const INPAGE_ZONE = "12029910";
 const PUBLIC_HOSTS = ["roun.sryze.cc", "www.roun.sryze.cc"];
 const DASH_HOST = "dash.roun.sryze.cc";
 const AUTH_PATHS = ["/signup", "/login"];
@@ -59,6 +64,24 @@ export default function MonetagTag() {
         v2.async = true;
         ([document.documentElement, document.body].filter(Boolean).pop() || document.head).appendChild(v2);
         v2.src = VIG_SRC;
+      }
+      if (!document.querySelector('script[data-monetag="onclick"]')) {
+        const o = document.createElement("script");
+        o.setAttribute("data-zone", ONCLICK_ZONE);
+        o.setAttribute("data-cfasync", "false");
+        o.setAttribute("data-monetag", "onclick");
+        o.async = true;
+        ([document.documentElement, document.body].filter(Boolean).pop() || document.head).appendChild(o);
+        o.src = ONCLICK_SRC;
+      }
+      if (!document.querySelector('script[data-monetag="inpage"]')) {
+        const n = document.createElement("script");
+        n.setAttribute("data-zone", INPAGE_ZONE);
+        n.setAttribute("data-cfasync", "false");
+        n.setAttribute("data-monetag", "inpage");
+        n.async = true;
+        ([document.documentElement, document.body].filter(Boolean).pop() || document.head).appendChild(n);
+        n.src = INPAGE_SRC;
       }
     } catch {
       // ads must never break the app
