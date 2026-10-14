@@ -6,6 +6,24 @@ export function honeypot(body: Record<string, unknown> | null | undefined): bool
   return !!((body as Record<string, unknown>).website || (body as Record<string, unknown>).url);
 }
 
+// ---- Headless / script UA block (browser forms only) ----
+const BOT_UA = /(headlesschrome|phantomjs|selenium|puppeteer|playwright|cypress|webdriver|curl|wget|python-requests?|python\/|axios|node-fetch|got\/|scrapy|httpclient|okhttp|java\/|libwww|bot|crawler|spider|scraper)/i;
+export function isBotUA(ua: string | null | undefined): boolean {
+  const s = (ua || "").trim();
+  if (!s) return true; // real browsers always send UA; empty = script
+  if (s.length < 20) return true; // too short to be a real browser
+  return BOT_UA.test(s);
+}
+
+// ---- Form timing trap: humans need >minMs from render to submit ----
+export function humanTimingOk(ts: unknown, minMs: number): boolean {
+  const t = Number(ts);
+  if (!Number.isFinite(t) || t <= 0) return true; // fail-open for old cached pages
+  const age = Date.now() - t;
+  if (age < 0 || age > 3600000) return false; // future clock or stale replay
+  return age >= minMs;
+}
+
 // ---- Anti-VPN/proxy: best-effort check, fail-open, cached 1h ----
 const proxyCache = new Map<string, { v: boolean; at: number }>();
 function isPrivateIp(ip: string): boolean {

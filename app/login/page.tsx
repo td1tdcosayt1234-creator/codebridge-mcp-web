@@ -42,6 +42,7 @@ export default function Login() {
   const [needVerify, setNeedVerify] = useState(false);
   const [tmp, setTmp] = useState("");
   const [code, setCode] = useState("");
+  const [ts] = useState(() => Date.now());
 
   useEffect(() => {
     fetch("/api/auth/google/status", { cache: "no-store" })
@@ -87,7 +88,7 @@ export default function Login() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, remember, website: hp }),
+        body: JSON.stringify({ email, password, remember, website: hp, ts }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {

@@ -11,9 +11,11 @@ export async function POST(req: Request) {
   if (!csrfCheck(req)) return csrfBlock();
   const ip = clientIp(req);
   if (isBanned(ip)) return banResponse();
-  const { email, password, remember, website } = await req.json().catch(() => ({}));
-  const { honeypot } = await import("@/lib/antifraud");
-  if (honeypot({ website })) return NextResponse.json({ error: "Bot detected." }, { status: 400 });
+  const { email, password, remember, website, ts } = await req.json().catch(() => ({}));
+  const { honeypot, isBotUA, humanTimingOk } = await import("@/lib/antifraud");
+  if (honeypot({ website })) { recordViolation(ip, 5); return NextResponse.json({ error: "Bot detected." }, { status: 400 }); }
+  if (isBotUA(req.headers.get("user-agent"))) { recordViolation(ip, 4); return NextResponse.json({ error: "Bot detected." }, { status: 400 }); }
+  if (!humanTimingOk(ts, 800)) { recordViolation(ip, 3); return NextResponse.json({ error: "Too fast. Please try again normally." }, { status: 400 }); }
   const mail = String(email || "").trim().toLowerCase().slice(0, 120);
   // Two buckets: per-IP+mail (targeted) AND per-IP global (rotating-mail bypass).
   const rl = rateLimit("login:" + ip + ":" + mail, 10, 60 * 1000);

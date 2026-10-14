@@ -29,6 +29,7 @@ export default function Signup() {
   const [needSurvey, setNeedSurvey] = useState(false);
   const [mailSlow, setMailSlow] = useState(false);
   const [role, setRole] = useState("user");
+  const [ts] = useState(() => Date.now());
 
   // Logged-in users skip the form; unfinished surveys resume instead of
   // jumping to the dashboard. Refresh mid-OTP restores from localStorage.
@@ -75,7 +76,7 @@ export default function Signup() {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, remember, website: hp, firstName, lastName, country }),
+        body: JSON.stringify({ email, password, remember, website: hp, firstName, lastName, country, ts }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {

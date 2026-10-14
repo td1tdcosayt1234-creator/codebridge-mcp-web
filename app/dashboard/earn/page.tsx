@@ -3,7 +3,7 @@
 const SMARTLINK_URL = "https://uplcm.com/4/12029550";
 export default function Earn(){
   const [info,setInfo]=useState<any>(null); const [nonce,setNonce]=useState(""); const [left,setLeft]=useState(0); const [msg,setMsg]=useState(""); const [adblock,setAdblock]=useState(false);
-  const finishing=useRef(false);
+  const finishing=useRef(false); const openedRef=useRef(false);
   async function load(){ const r=await fetch("/api/earn"); const j=await r.json(); if(r.ok) setInfo(j); }
   useEffect(()=>{ load(); },[]);
   useEffect(()=>{
@@ -27,7 +27,9 @@ export default function Earn(){
     setMsg("");
     finishing.current=false;
     if(adblock){ setMsg("Ad blocker detected. Disable it to earn coins."); return; }
-    try { window.open(SMARTLINK_URL, "_blank", "noopener,noreferrer"); } catch {}
+    openedRef.current = false;
+    try { const w = window.open(SMARTLINK_URL, "_blank", "noopener,noreferrer"); if (w) openedRef.current = true; } catch {}
+    if (!openedRef.current) { setMsg("Popup blocked — allow popups for this site, or use Open sponsor manually, then Watch again."); }
     const r=await fetch("/api/earn",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"start"})});
     const j=await r.json();
     if(!r.ok){ setMsg(j.error||"Failed"); return; }
@@ -36,7 +38,7 @@ export default function Earn(){
   async function finish(){
     if(finishing.current) return; finishing.current=true;
     try {
-      const r=await fetch("/api/earn",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"complete",nonce})});
+      const r=await fetch("/api/earn",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"complete",nonce,opened:openedRef.current})});
       const j=await r.json().catch(()=>({}));
       setNonce("");
       if(!r.ok){ setMsg(j.error||"Failed"); load(); return; }
