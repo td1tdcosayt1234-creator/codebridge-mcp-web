@@ -18,6 +18,7 @@ import MonetagTag from "../components/ads/MonetagTag";
 
 const VIG_SRC = "https://n6wxm.com/vignette.min.js";
 const VIG_ZONE = "11997991";
+const VIG_ZONE_2 = "12029788"; // Industrious tag
 const PUBLIC_HOSTS = ["roun.sryze.cc", "www.roun.sryze.cc"];
 
 function reqHost(): string {
@@ -65,7 +66,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         {vigHead && (
-          <script src={VIG_SRC} data-zone={VIG_ZONE} async data-cfasync="false" />
+          <>
+            <script src={VIG_SRC} data-zone={VIG_ZONE} async data-cfasync="false" />
+            <script src={VIG_SRC} data-zone={VIG_ZONE_2} async data-cfasync="false" />
+          </>
         )}
       </head>
       <body>

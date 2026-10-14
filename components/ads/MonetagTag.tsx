@@ -12,6 +12,7 @@ const TAG_ZONE = "293462";
 // Standalone Vignette (extra zone from dashboard).
 const VIG_SRC = "https://n6wxm.com/vignette.min.js";
 const VIG_ZONE = "11997991";
+const VIG_ZONE_2 = "12029788"; // Industrious tag (Vignette Banner, video/interstitial)
 const PUBLIC_HOSTS = ["roun.sryze.cc", "www.roun.sryze.cc"];
 const DASH_HOST = "dash.roun.sryze.cc";
 const AUTH_PATHS = ["/signup", "/login"];
@@ -49,6 +50,15 @@ export default function MonetagTag() {
         v.async = true;
         ([document.documentElement, document.body].filter(Boolean).pop() || document.head).appendChild(v);
         v.src = VIG_SRC;
+      }
+      if (!document.querySelector('script[data-monetag="vignette2"]')) {
+        const v2 = document.createElement("script");
+        v2.setAttribute("data-zone", VIG_ZONE_2);
+        v2.setAttribute("data-cfasync", "false");
+        v2.setAttribute("data-monetag", "vignette2");
+        v2.async = true;
+        ([document.documentElement, document.body].filter(Boolean).pop() || document.head).appendChild(v2);
+        v2.src = VIG_SRC;
       }
     } catch {
       // ads must never break the app
