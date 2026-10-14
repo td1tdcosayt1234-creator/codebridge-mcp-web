@@ -1,18 +1,12 @@
 "use client"; import { useEffect, useState } from "react";
+import { useAdblock } from "../../../components/ads/useAdblock";
 type F = { path:string; content:string };
 export default function Tasks(){
   const [tasks,setTasks]=useState<any[]>([]); const [title,setTitle]=useState(""); const [prompt,setPrompt]=useState("");
   const [kind,setKind]=useState<"compile"|"fix-compile">("compile");
   const [files,setFiles]=useState<F[]>([{path:"",content:""}]);
   const [msg,setMsg]=useState(""); const [open,setOpen]=useState<string|null>(null); const [bal,setBal]=useState<number|null>(null); const [hp,setHp]=useState("");
-  const [adblock,setAdblock]=useState(false);
-  useEffect(()=>{
-    const d=document.createElement("div");
-    d.className="adsbox ad-banner sponsored"; d.style.cssText="height:1px;width:1px;position:absolute;left:-9999px;";
-    document.body.appendChild(d);
-    setAdblock(d.offsetHeight===0);
-    d.remove();
-  },[]);
+  const { adblock, recheck } = useAdblock();
   async function load(){ try {
     const r=await fetch("/api/overview"); const j=await r.json().catch(()=>({})); if(r.ok){ setBal(j.usage?.balance??null); }
     const t=await fetch("/api/tasks"); const tj=await t.json().catch(()=>({})); if(t.ok) setTasks(tj.tasks||[]);
@@ -22,9 +16,10 @@ export default function Tasks(){
   const bytes = files.reduce((n,f)=>n+f.path.length+f.content.length,0);
   async function send(e:any){
     e.preventDefault();
-    if(adblock){ setMsg("Error: Adblock detected — turn it off to send requests."); return; }
+    const blockedNow = recheck();
+    if(blockedNow){ setMsg("Error: Adblock detected — turn it off to send requests."); return; }
     setMsg("Sending request — AI will start in the cloud...");
-    const r=await fetch("/api/tasks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,prompt,kind,website:hp,adblock,files:files.filter(f=>f.path.trim())})});
+    const r=await fetch("/api/tasks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,prompt,kind,website:hp,adblock:blockedNow,files:files.filter(f=>f.path.trim())})});
     const j=await r.json();
     if(!r.ok){ setMsg("Error: "+(j.error||"failed")); return; }
     setMsg("Request sent. id="+j.task.id+" (~"+j.task.tokensEst+" coins held) — Roun Co Pilot will deliver the output here.");

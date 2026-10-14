@@ -82,13 +82,17 @@ export async function GET(req: Request) {
     "<div style=\"margin-top:8px;font-size:11.5px;color:#66749a\">Request from " + esc(creatorIp) + " • " + esc((p.fp?.ua || "unknown agent").slice(0, 60)) + "</div>" +
     netWarn +
     "<div class=\"user\">" + avatar(email) + "</div>" +
-    "<form method=\"POST\" action=\"/api/mcp/approve\"><input type=\"hidden\" name=\"req\" value=\"" + esc(p.id) + "\"/>" +
+    "<form method=\"POST\" action=\"/api/mcp/approve\" id=\"apvForm\"><input type=\"hidden\" name=\"req\" value=\"" + esc(p.id) + "\"/>" +
     "<input type=\"hidden\" name=\"adblock\" id=\"adblock\" value=\"1\"/>" +
     "<label class=\"remember\"><input type=\"checkbox\" name=\"always\" value=\"yes\" checked/><span>Always allow this agent<small>Approve once — never ask again on this device.</small></span></label>" +
     "<div class=\"row\"><button class=\"btn yes\" id=\"apvYes\" name=\"allow\" value=\"yes\" type=\"submit\" disabled>Approve</button>" +
     "<button class=\"btn no\" id=\"apvNo\" name=\"allow\" value=\"no\" type=\"submit\" disabled>Deny</button></div></form>" +
     "<p class=\"foot\" id=\"adblockWarn\" style=\"color:#f87171\">Checking adblock… (Approve needs it OFF)</p>" +
-    "<script>(function(){try{var d=document.createElement('div');d.className='adsbox ad-banner sponsored';d.style.cssText='height:1px;width:1px;position:absolute;left:-9999px;';document.body.appendChild(d);var b=d.offsetHeight===0;d.remove();var f=document.getElementById('adblock');if(f)f.value=b?'1':'0';var y=document.getElementById('apvYes'),n=document.getElementById('apvNo'),w=document.getElementById('adblockWarn');if(!b){if(y)y.disabled=false;if(n)n.disabled=false;if(w)w.style.display='none';}else{if(w)w.textContent='Adblock detected — turn it off + reload to Approve. Deny still works.';if(n)n.disabled=false;}}catch(e){}})();</script>" +
+    "<script>(function(){function probe(){try{var d=document.createElement('div');d.className='adsbox ad-banner sponsored';d.style.cssText='height:1px;width:1px;position:absolute;left:-9999px;';document.body.appendChild(d);var b=d.offsetHeight===0;d.remove();return b;}catch(e){return false;}}" +
+    "function apply(){var b=probe();var f=document.getElementById('adblock');if(f)f.value=b?'1':'0';var y=document.getElementById('apvYes'),n=document.getElementById('apvNo'),w=document.getElementById('adblockWarn');if(!b){if(y)y.disabled=false;if(n)n.disabled=false;if(w)w.style.display='none';}else{if(w)w.textContent='Adblock detected — turn it off + reload to Approve. Deny still works.';if(n)n.disabled=false;}return b;}" +
+    "apply();setTimeout(apply,2500);" +
+    "var fm=document.getElementById('apvForm');if(fm)fm.addEventListener('submit',function(){apply();});" +
+    "})();</script>" +
     "<p class=\"foot\">Safe to close this tab after deciding.</p>"
   );
 }

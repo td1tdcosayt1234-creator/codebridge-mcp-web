@@ -33,6 +33,8 @@ function addTag(key: string, src: string, zone: string, toHead: boolean) {
   s.setAttribute("data-cfasync", "false");
   s.setAttribute("data-monetag", key);
   s.async = true;
+  // Network-level block (script never loads) = real adblock signal for useAdblock.
+  s.onerror = () => { try { (window as unknown as { __mtBlocked?: boolean }).__mtBlocked = true; } catch { /* ignore */ } };
   if (toHead) document.head.appendChild(s);
   else ([document.documentElement, document.body].filter(Boolean).pop() || document.head).appendChild(s);
   s.src = src;
