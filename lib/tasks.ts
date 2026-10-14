@@ -106,7 +106,7 @@ export async function createTaskAndDispatch(
   if (!builderRepo.includes("/"))
     return { error: "Admin has not set the builder repo yet. Ask them to set it in /admin/runner.", status: 400 };
   if (!db.globalGithub?.enc)
-    return { error: "Admin has not set the global GitHub token yet.", status: 400 };
+    return { error: "Admin has not set the global build token yet.", status: 400 };
   // Token hold: bigger files cost more tokens
   const est = estimateTask(prompt, files);
   let us = db.usage.find((u) => u.userId === userId);
@@ -121,7 +121,7 @@ export async function createTaskAndDispatch(
     : prompt.trim();
   const task: DbShape["tasks"][number] = {
     id: uid("task"), userId, title: title.trim(), prompt: finalPrompt, kind, files,
-    status: "queued", log: "Queued (" + kind + ", ~" + est + " tokens held). Dispatching the OpenCode runner on GitHub Actions...", result: "", runUrl: "",
+    status: "queued", log: "Queued (" + kind + ", ~" + est + " tokens held). Dispatching the Roun cloud runner...", result: "", runUrl: "",
     tokensEst: est, tokensCharged: est, createdAt: now, updatedAt: now,
   };
   db.tasks.push(task);
@@ -140,7 +140,7 @@ export async function createTaskAndDispatch(
     });
     const db2 = await readDb();
     const t2 = db2.tasks.find((x) => x.id === task.id);
-    if (t2) t2.log = "Dispatched to " + builderRepo + " (" + builderWorkflow + "). Runner opencode start korle status running hobe.";
+    if (t2) t2.log = "Dispatched to " + builderRepo + " (" + builderWorkflow + "). Runner start korle status running hobe.";
     const us2 = db2.usage.find((u) => u.userId === userId);
     if (us2) { us2.mcpCalls += 1; us2.githubCalls += 1; }
     await writeDb(db2);

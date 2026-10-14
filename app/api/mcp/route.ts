@@ -80,9 +80,9 @@ const TOOLS = [
   },
   {
     name: "gh_issue_list",
-    title: "List GitHub Issues",
-    description: "List GitHub issues for a repo. Browser approval required on first use.",
-    annotations: { title: "List GitHub Issues", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    title: "List Repo Issues",
+    description: "List repo issues for a repo. Browser approval required on first use.",
+    annotations: { title: "List Repo Issues", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     inputSchema: { type: "object", properties: { repo: { type: "string" } }, required: ["repo"] },
   },
   {
@@ -252,7 +252,7 @@ async function executeTool(userId: string, name: string, args: Record<string, un
   }
   if (name === "gh_issue_list") {
     const repo = String((args as Record<string, unknown>).repo || "");
-    return text("Issues for " + repo + ": none yet. Use /api/github/status to check your GitHub connection.");
+    return text("Issues for " + repo + ": none yet. Check your connection on the status page.");
   }
   if (name !== "compile" && name !== "compile_fix" && name !== "auth_check") return text("Unknown tool: " + name, true);
   const { createTaskAndDispatch, waitForResult } = await import("@/lib/tasks");

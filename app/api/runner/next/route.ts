@@ -58,7 +58,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ id: task.id, title: task.title, prompt: task.prompt, kind: task.kind, files: task.files, status: task.status, resumed: true, runner_token: task.runnerNonce });
   }
   task.status = "running";
-  task.log = "Runner started OpenCode (" + task.kind + ")...";
+  task.log = "Runner started Roun Co Pilot (" + task.kind + ")...";
   task.updatedAt = new Date().toISOString();
   {
     const crypto = await import("crypto");

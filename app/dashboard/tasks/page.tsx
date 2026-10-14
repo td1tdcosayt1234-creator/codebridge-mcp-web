@@ -27,19 +27,19 @@ export default function Tasks(){
     const r=await fetch("/api/tasks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,prompt,kind,website:hp,adblock,files:files.filter(f=>f.path.trim())})});
     const j=await r.json();
     if(!r.ok){ setMsg("Error: "+(j.error||"failed")); return; }
-    setMsg("Request sent. id="+j.task.id+" (~"+j.task.tokensEst+" coins held) — OpenCode will deliver the output here.");
+    setMsg("Request sent. id="+j.task.id+" (~"+j.task.tokensEst+" coins held) — Roun Co Pilot will deliver the output here.");
     setTitle(""); setPrompt(""); setFiles([{path:"",content:""}]); load();
   }
   return (<div>
     <h2>Compile request — bigger files cost more coins</h2>
-    <p className="muted small">Compile only (all types). Balance: <b>{bal===null?"...":bal}</b> coins • this request costs ~<b>{est}</b>. On failure, <b>fix-with-compile</b> lets OpenCode fix it with AI (fix size is charged too).</p>
+    <p className="muted small">Compile only (all types). Balance: <b>{bal===null?"...":bal}</b> coins • this request costs ~<b>{est}</b>. On failure, <b>fix-with-compile</b> lets Roun Co Pilot fix it with AI (fix size is charged too).</p>
     <div className="card"><form onSubmit={send}>
       <label>Title</label><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="E.g. compile app.py"/>
       <label>Mode</label><select value={kind} onChange={e=>setKind(e.target.value as any)}>
         <option value="compile">Compile only</option>
         <option value="fix-compile">Fix with compile (on fail → AI auto-fix, max 3 retries)</option>
       </select>
-      <label>Prompt — exactly what OpenCode must compile/fix</label><textarea rows={4} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="E.g. compile the attached app.py with python and report errors..."/>
+      <label>Prompt — exactly what Roun Co Pilot must compile/fix</label><textarea rows={4} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="E.g. compile the attached app.py with python and report errors..."/>
       <label>Files (optional, max 200KB total — now {Math.round(bytes/1024)}KB)</label>
       {files.map((f,i)=>(<div key={i} style={{border:"1px solid #ffffff14",borderRadius:12,padding:10,marginBottom:8}}>
         <input value={f.path} onChange={e=>{const c=[...files];c[i].path=e.target.value;setFiles(c);}} placeholder="Path, e.g. app.py / src/index.js"/>
@@ -56,7 +56,7 @@ export default function Tasks(){
     {tasks.map((t:any)=>(<div key={t.id} className="card" style={{marginTop:8}}>
       <div><span className="badge">{t.status}</span> <span className="badge">{t.kind||"compile"}</span> <b>{t.title}</b> <span className="muted small">{t.id} • charged {t.tokensCharged||0}</span>{t.apkSize>0&&<span> • <a href={"/api/tasks/"+t.id+"/apk"}>Download APK ({Math.round(t.apkSize/1048576*10)/10} MB)</a></span>}{t.jarSize>0&&<span> • <a href={"/api/tasks/"+t.id+"/jar"}>Download JAR ({t.jarName||"plugin.jar"}, {Math.round(t.jarSize/1048576*10)/10} MB)</a></span>}{t.exeSize>0&&<span> • <a href={"/api/tasks/"+t.id+"/exe"}>Download EXE ({t.exeName||"app.exe"}, {Math.round(t.exeSize/1048576*10)/10} MB)</a></span>}{t.debSize>0&&<span> • <a href={"/api/tasks/"+t.id+"/deb"}>Download DEB ({t.debName||"app.deb"}, {Math.round(t.debSize/1048576*10)/10} MB)</a></span>}</div>
       <div style={{marginTop:8}}><button className="btn-ghost" onClick={()=>setOpen(open===t.id?null:t.id)}>{open===t.id?"Hide output":"Show output"}</button></div>
-      {open===t.id&&(<div style={{marginTop:8}}><div className="muted small">Prompt:</div><pre>{t.prompt}</pre><div className="muted small">Log:</div><pre>{t.log||"—"}</pre><div className="muted small">Result:</div><pre>{t.result||"— not yet, OpenCode is working"}</pre></div>)}
+      {open===t.id&&(<div style={{marginTop:8}}><div className="muted small">Prompt:</div><pre>{t.prompt}</pre><div className="muted small">Log:</div><pre>{t.log||"—"}</pre><div className="muted small">Result:</div><pre>{t.result||"— not yet, Roun Co Pilot is working"}</pre></div>)}
     </div>))}
   </div>);
 }

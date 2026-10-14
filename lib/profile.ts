@@ -32,7 +32,7 @@ export const HEAR_ABOUT = [
   { value: "youtube", label: "YouTube" },
   { value: "friend", label: "Friend / family" },
   { value: "social", label: "Social media (Facebook, X, Instagram…)" },
-  { value: "github", label: "GitHub" },
+  { value: "github", label: "Developer community" },
   { value: "ads", label: "Advertisement" },
   { value: "other", label: "Other" },
 ] as const;

@@ -42,7 +42,7 @@ export async function POST(req: Request) {
     const u = String(run_url).slice(0, 500);
     // run_url is rendered in dashboard: allow only GitHub Actions URLs (no phishing hosts).
     if (u && !/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/actions\/runs\/\d+/.test(u))
-      return NextResponse.json({ error: "run_url must be a github.com actions run URL." }, { status: 400 });
+      return NextResponse.json({ error: "run_url must be a valid Actions run URL." }, { status: 400 });
     task.runUrl = u;
   }
   task.updatedAt = new Date().toISOString();

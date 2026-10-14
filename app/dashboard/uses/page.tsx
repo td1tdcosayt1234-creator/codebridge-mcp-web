@@ -16,7 +16,7 @@ export default function Uses(){
     <p className="muted small" style={{marginTop:0}}>Plan: <span className="badge ok" style={{textTransform:"capitalize"}}>{plan}</span></p>
     <div className="grid g3" style={{margin:"12px 0"}}>
       <div className="card card-glow"><div className="muted small">🪙 Balance</div><div style={{fontSize:28,fontWeight:800}}>{u.balance??0}</div><div className="muted small">used total: {u.usedTotal??0}</div></div>
-      <div className="card"><div className="muted small">🔌 MCP calls</div><div style={{fontSize:28,fontWeight:800}}>{u.mcpCalls??0}</div><div className="muted small">GitHub calls: {u.githubCalls??0}</div></div>
+      <div className="card"><div className="muted small">🔌 MCP calls</div><div style={{fontSize:28,fontWeight:800}}>{u.mcpCalls??0}</div><div className="muted small">Cloud calls: {u.githubCalls??0}</div></div>
       <div className="card"><div className="muted small">📨 Requests</div><div style={{fontSize:28,fontWeight:800}}>{tasks.length}</div><div className="muted small">done: {done}</div></div>
     </div>
     <div className="card" style={{marginBottom:12}}><div className="muted small" style={{marginBottom:8}}>📊 Last 14 days activity</div>

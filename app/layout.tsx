@@ -43,8 +43,8 @@ export async function generateMetadata(): Promise<Metadata> {
       default: "Roun — Request to Cloud Build",
       template: "%s | Roun",
     },    description:
-      "Send a compile request on the web, OpenCode builds it in the cloud, the output comes back to you. Plus Game Studio: plan, build and play AI games.",
-    keywords: ["Roun", "cloud build", "OpenCode", "compile online", "AI fix", "APK build", "Game Studio", "roun.sryze.cc"],
+      "Send a compile request on the web, Roun Co Pilot builds it in the cloud, the output comes back to you. Plus Game Studio: plan, build and play AI games.",
+    keywords: ["Roun", "Roun Co Pilot", "cloud build", "compile online", "AI fix", "APK build", "Game Studio", "roun.sryze.cc"],
     metadataBase: new URL(process.env.SITE_URL || "https://roun.sryze.cc"),
     robots: indexable ? { index: true, follow: true } : { index: false, follow: false },
     verification: process.env.GOOGLE_SITE_VERIFICATION
@@ -88,7 +88,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               name: "Roun",
               url: "https://roun.sryze.cc",
               description:
-                "Send a compile request on the web, OpenCode builds it in the cloud. Plus AI Game Studio.",
+                "Send a compile request on the web, Roun Co Pilot builds it in the cloud. Plus AI Game Studio.",
             }),
           }}
         />

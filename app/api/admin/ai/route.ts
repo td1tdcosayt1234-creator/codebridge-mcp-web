@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { verifyJwt } from "@/lib/auth";
 import { readDb, writeDb, uid } from "@/lib/db";
 import { encToken } from "@/lib/crypto";
-import { ZEN_DEFAULT_BASE, ZEN_DEFAULT_MODEL } from "@/lib/ai";
+import { OPENROUTER_BASE, ROUN_DEFAULT, cleanRounModel } from "@/lib/openrouter";
 
 async function admin() {
   const t = cookies().get("session")?.value || "";
@@ -17,8 +17,8 @@ async function admin() {
   return { ...p, email: u.email, role: "admin" as const };
 }
 
-// Admin-managed global AI key (OpenCode Zen / OpenAI-compatible) for Game Studio.
-// Priority: admin-panel key > .env OPENCODE_API_KEY. Takes effect immediately, no restart.
+// Admin-managed global AI key (Roun Co Pilot / OpenRouter free models) for Game Studio.
+// Priority: admin-panel key > .env OPENROUTER_API_KEY. Takes effect immediately, no restart.
 export async function GET() {
   const p = await admin();
   if (!p) return NextResponse.json({ error: "admin only" }, { status: 403 });
@@ -30,7 +30,7 @@ export async function GET() {
     masked: db.globalAI?.enc ? "saved (hidden)" : "",
     updatedBy: db.globalAI?.updatedBy || "",
     updatedAt: db.globalAI?.updatedAt || "",
-    envKeySet: (process.env.OPENCODE_API_KEY || "").trim().length > 10,
+    envKeySet: (process.env.OPENROUTER_API_KEY || "").trim().length > 10,
   });
 }
 
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
     );
   const k = String(key || "").trim();
   if (k.length < 12) return NextResponse.json({ error: "Paste a valid API key (min 12 chars)." }, { status: 400 });
-  const base = String(baseUrl || ZEN_DEFAULT_BASE).trim().replace(/\/+$/, "") || ZEN_DEFAULT_BASE;
+  const base = String(baseUrl || OPENROUTER_BASE).trim().replace(/\/+$/, "") || OPENROUTER_BASE;
   let parsed: URL;
   try {
     parsed = new URL(base);
@@ -64,11 +64,19 @@ export async function POST(req: Request) {
   // Only public https hosts (localhost allowed for dev).
   if (parsed.protocol !== "https:" && parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1")
     return NextResponse.json({ error: "Base URL must be https." }, { status: 400 });
-  const m = String(model || ZEN_DEFAULT_MODEL).trim().slice(0, 80) || ZEN_DEFAULT_MODEL;
+  const m = cleanRounModel(String(model || "").trim()) || ROUN_DEFAULT;
   // Live-verify before saving so a dead key never becomes the active one.
+  // OpenRouter key check first, generic /models fallback for custom bases.
   try {
-    const r = await fetch(base + "/models", { headers: { Authorization: "Bearer " + k } });
-    if (!r.ok) return NextResponse.json({ error: "Key rejected by server (HTTP " + r.status + "). Check key + base URL." }, { status: 400 });
+    let ok = false;
+    try {
+      const rk = await fetch(base + "/auth/key", { headers: { Authorization: "Bearer " + k } });
+      if (rk.ok) ok = true;
+    } catch { /* try /models next */ }
+    if (!ok) {
+      const r = await fetch(base + "/models", { headers: { Authorization: "Bearer " + k } });
+      if (!r.ok) return NextResponse.json({ error: "Key rejected by server (HTTP " + r.status + "). Check key + base URL." }, { status: 400 });
+    }
   } catch {
     return NextResponse.json({ error: "AI server unreachable. Check base URL / network." }, { status: 400 });
   }

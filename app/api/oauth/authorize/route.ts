@@ -110,7 +110,7 @@ export async function GET(req: Request) {
     return page(
       "Connect",
       '<p class="eyebrow">Roun MCP</p><h1>Connect your agent</h1>' +
-        '<p class="muted">Open this page from your AI client (opencode / Cursor / Claude) so it can pass its connection details. Or connect manually: add <code>/api/mcp</code> as a remote MCP server.</p>' +
+        '<p class="muted">Open this page from your AI client (ChatGPT / Cursor / Claude) so it can pass its connection details. Or connect manually: add <code>/api/mcp</code> as a remote MCP server.</p>' +
         '<p class="foot">No client details found in this URL.</p>'
     );
   // Lenient DCR: register unknown clients on the fly (localhost-friendly).
@@ -180,7 +180,7 @@ export async function POST(req: Request) {
     return page(
       "Connect",
       '<p class="eyebrow">Roun MCP</p><h1>Missing connection details</h1>' +
-        '<p class="muted">Open this page from your AI client (opencode / Cursor / Claude) so it can pass its connection details, then click Connect again.</p>'
+        '<p class="muted">Open this page from your AI client (ChatGPT / Cursor / Claude) so it can pass its connection details, then click Connect again.</p>'
     );
   const sep = p.redirectUri.includes("?") ? "&" : "?";
   const errBack =

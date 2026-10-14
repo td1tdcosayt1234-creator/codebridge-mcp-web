@@ -38,7 +38,7 @@ jobs:
           console.log('files:',(t.files||[]).length,'kind:',t.kind);
           "
           ls task-work 2>/dev/null || echo "(no files — prompt-only task)"
-      - name: Run opencode (Zen free Muse Spark, fallback Ollama)
+      - name: Run builder (cloud model, fallback Ollama)
         env:
           OPENCODE_API_KEY: \${{ secrets.OPENCODE_API_KEY }}
         run: |
@@ -50,12 +50,12 @@ jobs:
           if [ "$KIND" = "fix-compile" ]; then MAX_TRY=3; fi
           : > agent.log
           EXIT_CODE=1
-          # 1) Zen free (Muse Spark, by-default free via OpenCode CLI) — needs OPENCODE_API_KEY secret
+          # 1) Cloud model (free via builder CLI) — needs OPENCODE_API_KEY secret
           if [ -n "$OPENCODE_API_KEY" ]; then
-            echo "model=opencode/muse-spark-1.3-contributor-free (zen free)" | tee -a agent.log
+            echo "model=roun-co-pilot (cloud free)" | tee -a agent.log
             export OPENCODE_API_KEY
             for i in $(seq 1 $MAX_TRY); do
-              echo "=== attempt $i/$MAX_TRY ($KIND, zen) ===" | tee -a agent.log
+              echo "=== attempt $i/$MAX_TRY ($KIND, cloud) ===" | tee -a agent.log
               opencode run --auto -m opencode/muse-spark-1.3-contributor-free "$(cat prompt.txt)" 2>&1 | tee -a agent.log
               EXIT_CODE=\${PIPESTATUS[0]}
               echo "attempt $i exit=$EXIT_CODE" | tee -a agent.log
@@ -548,8 +548,8 @@ export default function AdminRunner(){
   if(!st) return <p className="muted">Loading...</p>;
   if(st.error) return <p>Admin only. <a href="/login">Login</a></p>;
   return (<div>
-    <h2>Runner — OpenCode in Actions</h2>
-    <p className="muted small">Users send requests on the web → the web dispatches the workflow on the builder repo → OpenCode runs in Actions → output returns to the web → users read it. Users never touch repos.</p>
+    <h2>Runner — Cloud builds in Actions</h2>
+    <p className="muted small">Users send requests on the web → the web dispatches the workflow on the builder repo → the cloud runner builds in Actions → output returns to the web → users read it. Users never touch repos.</p>
     <div className="grid g2">
       <div className="card"><h3>1️⃣ Builder repo</h3><form onSubmit={save}>
         <label>Builder repo (owner/repo) — the workflow file must live here</label><input value={repo} onChange={e=>setRepo(e.target.value)} placeholder="owner/repo"/>
@@ -562,7 +562,7 @@ export default function AdminRunner(){
         {newToken&&<pre style={{marginTop:8}}>{newToken}</pre>}</div>
     </div>
     <div className="card" style={{marginTop:12}}><h3>3️⃣ Workflow file — create <code>.github/workflows/{wf||"opencode-task.yml"}</code> in the builder repo</h3>
-      <p className="muted small">Required repo secrets: <code>WEB_URL</code> (public URL — localhost is unreachable from GitHub runners, otherwise use a self-hosted runner on your PC), <code>RUNNER_TOKEN</code> (above), <code>OPENCODE_API_KEY</code> (Zen key for free Muse Spark — without it Ollama fallback runs).</p>
+      <p className="muted small">Required repo secrets: <code>WEB_URL</code> (public URL — localhost is unreachable from cloud runners, otherwise use a self-hosted runner on your PC), <code>RUNNER_TOKEN</code> (above), <code>OPENCODE_API_KEY</code> (cloud model key for the builder — without it Ollama fallback runs).</p>
       <pre>{YAML}</pre></div>
     <div className="card" style={{marginTop:12}}><h3>Recent tasks</h3>
       {(st.recent||[]).length===0&&<p className="muted small">No tasks yet.</p>}

@@ -30,6 +30,26 @@ export function orKey(): string {
 export function orKeyOk(k = orKey()): boolean {
   return k.replace(/^sk-or-v1-/, "").length > 20;
 }
+
+export type OrCfg = { key: string; base: string; source: "admin" | "env" };
+// Effective config: admin-panel key wins, .env is fallback. No restart needed.
+export async function orConfig(): Promise<OrCfg> {
+  try {
+    const { readDb } = await import("./db");
+    const { decToken } = await import("./crypto");
+    const db = await readDb();
+    if (db.globalAI?.enc) {
+      const k = decToken(db.globalAI.enc);
+      if (k && k.trim().length > 20) {
+        const base = (db.globalAI.baseUrl || OPENROUTER_BASE).replace(/\/+$/, "");
+        return { key: k.trim(), base: base.startsWith("https://") ? base : OPENROUTER_BASE, source: "admin" };
+      }
+    }
+  } catch {
+    /* fall through to env */
+  }
+  return { key: orKey(), base: OPENROUTER_BASE, source: "env" };
+}
 export function cleanRounModel(m: unknown): string {
   const s = String(m || "").slice(0, 120);
   if (!/^[A-Za-z0-9._:\/-]+$/.test(s)) return "";
@@ -47,16 +67,16 @@ export async function orChat(
     maxTokens: 800,
   },
 ): Promise<string> {
-  const key = orKey();
-  if (!orKeyOk(key)) return "";
+  const cfg = await orConfig().catch(() => ({ key: "", base: OPENROUTER_BASE }) as OrCfg);
+  if (!orKeyOk(cfg.key)) return "";
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs || 90000);
   try {
-    const r = await fetch(OPENROUTER_BASE + "/chat/completions", {
+    const r = await fetch(cfg.base + "/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: "Bearer " + key,
+        Authorization: "Bearer " + cfg.key,
         "HTTP-Referer": siteRef(),
         "X-Title": ROUN_LABEL,
       },
