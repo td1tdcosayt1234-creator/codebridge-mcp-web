@@ -1230,3 +1230,23 @@ details.faq[open] summary { color: var(--text); }
   .price-pop { transform: none; }
   .price-pop:hover { transform: translateY(-6px) !important; }
 }
+
+/* ============================================================
+   26 · MOBILE PERF — kill the heaviest fixed-layer work on phones.
+   Grain (0.6s repaint), scan, shooting stars, beams + 90px blurred
+   auroras + backdrop-blur are the top mobile GPU killers.
+   ============================================================ */
+@media (max-width: 768px), (pointer: coarse) {
+  .cine-grain, .cine-scan, .cine-shoot { display: none !important; }
+  .cine-beams { display: none; }
+  .cine-stars { animation: none; opacity: 0.7; }
+  .cine-grid { animation: none; opacity: 0.35; }
+  .aurora { filter: blur(46px); animation: none; }
+  .hero-orbit .ring--2, .hero-orbit .ring--3 { display: none; }
+  .hero-aurora { animation: none; filter: blur(24px); }
+  .nav { backdrop-filter: blur(10px) saturate(130%); -webkit-backdrop-filter: blur(10px) saturate(130%); }
+  .card, .glass, .auth-card { backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .marquee-track { animation-duration: 60s; }
+  .float-slow, .chip--hot, .promo-art { animation: none; }
+  .shine::after { display: none; }
+}
