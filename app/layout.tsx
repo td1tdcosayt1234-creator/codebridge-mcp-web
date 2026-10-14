@@ -42,8 +42,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: {
       default: "Roun — Request to Cloud Build",
       template: "%s | Roun",
-    },
-    description:
+    },    description:
       "Send a compile request on the web, OpenCode builds it in the cloud, the output comes back to you. Plus Game Studio: plan, build and play AI games.",
     keywords: ["Roun", "cloud build", "OpenCode", "compile online", "AI fix", "APK build", "Game Studio", "roun.sryze.cc"],
     metadataBase: new URL(process.env.SITE_URL || "https://roun.sryze.cc"),
@@ -59,6 +58,14 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: "Roun",
     },
     twitter: { card: "summary_large_image", title: "Roun", description: "Request → cloud build → result. Plus AI Game Studio." },
+    icons: {
+      icon: [
+        { url: "/icon.svg", type: "image/svg+xml" },
+        { url: "/icon.png", type: "image/png", sizes: "512x512" },
+      ],
+      apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+    },
+    themeColor: "#070a14",
   };
 }
 
