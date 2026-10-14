@@ -24,10 +24,11 @@ export function humanTimingOk(ts: unknown, minMs: number): boolean {
   return age >= minMs;
 }
 
-// ---- Anti-VPN/proxy/datacenter: dual-provider, fail-open, cached 1h ----
-// Provider A: ipapi.co proxy flag. Provider B: ip-api.com proxy+hosting flags
-// (hosting = datacenter exit = bot farm / commercial VPN pop). Block if EITHER
-// says bad; allow only when both were reachable and clean, or all failed.
+// ---- Anti-VPN/proxy: dual-provider, fail-open, cached 1h ----
+// Provider A: ipapi.co proxy flag. Provider B: ip-api.com proxy flag.
+// Block if EITHER says proxy; allow when both reachable and clean, or all fail.
+// Datacenter ("hosting") ranges are NOT blocked — mobile data / shared NAT
+// users without any VPN were getting false-blocked.
 const proxyCache = new Map<string, { v: boolean; at: number }>();
 function isPrivateIp(ip: string): boolean {
   return (
@@ -47,15 +48,18 @@ async function flagA(ip: string): Promise<boolean | null> {
   } catch { return null; }
 }
 async function flagB(ip: string): Promise<boolean | null> {
+  // NOTE: ip-api "hosting" (datacenter exit) is DELIBERATELY ignored —
+  // mobile carriers / corporate NATs often sit in flagged ranges and real
+  // users without any VPN got blocked. Only the explicit proxy flag counts.
   try {
     const ctl = new AbortController();
     const to = setTimeout(() => ctl.abort(), 3000);
-    const r = await fetch("http://ip-api.com/json/" + encodeURIComponent(ip) + "?fields=status,proxy,hosting", { signal: ctl.signal });
+    const r = await fetch("http://ip-api.com/json/" + encodeURIComponent(ip) + "?fields=status,proxy", { signal: ctl.signal });
     clearTimeout(to);
     if (!r.ok) return null;
-    const j = await r.json().catch(() => null) as { status?: string; proxy?: boolean; hosting?: boolean } | null;
+    const j = await r.json().catch(() => null) as { status?: string; proxy?: boolean } | null;
     if (!j || j.status !== "success") return null;
-    return !!(j.proxy || j.hosting);
+    return !!j.proxy;
   } catch { return null; }
 }
 export async function isVpn(ip: string): Promise<boolean> {
