@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   const rl = rateLimit("task:" + p.sub, 10, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Too many requests. Wait " + rl.retryAfterSec + "s." }, { status: 429 });
   const { title, prompt, kind, files, website, adblock } = await req.json().catch(() => ({}));
-  const { honeypot } = await import("@/lib/antifraud");
+  const { honeypot, isVpn } = await import("@/lib/antifraud");
   if (honeypot({ website })) return NextResponse.json({ error: "Bot detected." }, { status: 400 });
   // Strict: adblock on = no new requests (honest browsers; missing flag = old
   // cache or agent API path, fail-open). Earn gate is in /api/earn.
@@ -39,6 +39,23 @@ export async function POST(req: Request) {
     const { recordViolation, clientIp } = await import("@/lib/security");
     recordViolation(clientIp(req), 2);
     return NextResponse.json({ error: "Adblock detected. Turn it off to send requests." }, { status: 403 });
+  }
+  // VPN/proxy/datacenter exit = no new requests (coin-spend abuse vector).
+  // Agent API path (bearer) skips this: agents run from datacenters legitimately.
+  const { hasBearer } = await import("@/lib/security");
+  if (!hasBearer(req)) {
+    const { clientIp } = await import("@/lib/security");
+    if (await isVpn(clientIp(req))) {
+      const { readDb, writeDb, uid } = await import("@/lib/db");
+      const { recordViolation } = await import("@/lib/security");
+      recordViolation(clientIp(req), 3);
+      try {
+        const db = await readDb();
+        db.events.push({ id: uid("e"), userId: p.sub, action: "vpn_block", detail: "task from VPN/proxy", at: new Date().toISOString() });
+        await writeDb(db);
+      } catch { /* best effort */ }
+      return NextResponse.json({ error: "VPN/Proxy detected. Disable it to send requests." }, { status: 403 });
+    }
   }
   const out = await createTaskAndDispatch(p.sub, String(title || ""), String(prompt || ""), {
     kind: kind === "fix-compile" ? "fix-compile" : "compile",

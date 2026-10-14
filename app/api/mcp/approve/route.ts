@@ -107,6 +107,12 @@ export async function POST(req: Request) {
   // Strict: adblock on = no Approve (Deny always works — it spends nothing).
   if (allow === "yes" && adblock === "1")
     return shell(brand() + "<div class=\"icon\">" + ICON_DENY + "</div><h1>Adblock detected</h1><p class=\"muted\">Turn adblock <b>OFF</b> for this site + reload, then Approve. Deny still works.</p>");
+  // VPN/proxy/datacenter exit = no Approve (spends your coins; exit-IP abuse vector).
+  if (allow === "yes") {
+    const { isVpn } = await import("@/lib/antifraud");
+    if (await isVpn(clientIp(req)))
+      return shell(brand() + "<div class=\"icon\">" + ICON_DENY + "</div><h1>VPN detected</h1><p class=\"muted\">Turn VPN/Proxy <b>OFF</b> + reload, then Approve. Deny still works.</p>");
+  }
   const me = await verifyJwt(t);
   if (!me) {
     // Keep the request id across login so the user lands back on THIS approval.

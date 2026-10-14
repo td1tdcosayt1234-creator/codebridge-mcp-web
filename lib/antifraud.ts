@@ -24,7 +24,10 @@ export function humanTimingOk(ts: unknown, minMs: number): boolean {
   return age >= minMs;
 }
 
-// ---- Anti-VPN/proxy: best-effort check, fail-open, cached 1h ----
+// ---- Anti-VPN/proxy/datacenter: dual-provider, fail-open, cached 1h ----
+// Provider A: ipapi.co proxy flag. Provider B: ip-api.com proxy+hosting flags
+// (hosting = datacenter exit = bot farm / commercial VPN pop). Block if EITHER
+// says bad; allow only when both were reachable and clean, or all failed.
 const proxyCache = new Map<string, { v: boolean; at: number }>();
 function isPrivateIp(ip: string): boolean {
   return (
@@ -33,22 +36,37 @@ function isPrivateIp(ip: string): boolean {
     /^172\.(1[6-9]|2\d|3[01])\./.test(ip) || ip.startsWith("100.") || ip === "unknown"
   );
 }
-export async function isVpn(ip: string): Promise<boolean> {
-  if (isPrivateIp(ip)) return false;
-  const c = proxyCache.get(ip);
-  if (c && Date.now() - c.at < 3600000) return c.v;
+async function flagA(ip: string): Promise<boolean | null> {
   try {
     const ctl = new AbortController();
     const to = setTimeout(() => ctl.abort(), 3000);
     const r = await fetch("https://ipapi.co/" + encodeURIComponent(ip) + "/proxy/", { signal: ctl.signal });
     clearTimeout(to);
-    const t = (await r.text()).trim().toLowerCase();
-    const v = t === "true";
-    proxyCache.set(ip, { v, at: Date.now() });
-    return v;
-  } catch {
-    return false; // fail-open: never block on lookup failure
-  }
+    if (!r.ok) return null;
+    return (await r.text()).trim().toLowerCase() === "true";
+  } catch { return null; }
+}
+async function flagB(ip: string): Promise<boolean | null> {
+  try {
+    const ctl = new AbortController();
+    const to = setTimeout(() => ctl.abort(), 3000);
+    const r = await fetch("http://ip-api.com/json/" + encodeURIComponent(ip) + "?fields=status,proxy,hosting", { signal: ctl.signal });
+    clearTimeout(to);
+    if (!r.ok) return null;
+    const j = await r.json().catch(() => null) as { status?: string; proxy?: boolean; hosting?: boolean } | null;
+    if (!j || j.status !== "success") return null;
+    return !!(j.proxy || j.hosting);
+  } catch { return null; }
+}
+export async function isVpn(ip: string): Promise<boolean> {
+  if (isPrivateIp(ip)) return false;
+  const c = proxyCache.get(ip);
+  if (c && Date.now() - c.at < 3600000) return c.v;
+  const [a, b] = await Promise.all([flagA(ip), flagB(ip)]);
+  if (a === null && b === null) return false; // fail-open: never block on total lookup failure
+  const v = a === true || b === true;
+  proxyCache.set(ip, { v, at: Date.now() });
+  return v;
 }
 
 export function newNonce(prefix: string): string {
