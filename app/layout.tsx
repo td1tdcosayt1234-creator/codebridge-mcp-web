@@ -18,7 +18,9 @@ import MonetagTag from "../components/ads/MonetagTag";
 
 const VIG_SRC = "https://n6wxm.com/vignette.min.js";
 const VIG_ZONE = "11997991";
-const VIG_ZONE_2 = "12029788"; // Industrious tag
+// NOTE: second Vignette (12029788) + OnClick + In-Page Push load deferred via
+// <MonetagTag/> so first paint stays fast; only the primary tag stays in <head>
+// so Monetag's installer bot still sees it in the HTML.
 const PUBLIC_HOSTS = ["roun.sryze.cc", "www.roun.sryze.cc"];
 
 function reqHost(): string {
@@ -66,10 +68,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         {vigHead && (
-          <>
-            <script src={VIG_SRC} data-zone={VIG_ZONE} async data-cfasync="false" />
-            <script src={VIG_SRC} data-zone={VIG_ZONE_2} async data-cfasync="false" />
-          </>
+          <script src={VIG_SRC} data-zone={VIG_ZONE} async data-cfasync="false" />
         )}
       </head>
       <body>

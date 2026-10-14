@@ -26,8 +26,21 @@ function isAuthPath(p: string): boolean {
   return AUTH_PATHS.some((a) => p === a || p.startsWith(a + "/"));
 }
 
+function addTag(key: string, src: string, zone: string, toHead: boolean) {
+  if (document.querySelector(`script[data-monetag="${key}"]`)) return;
+  const s = document.createElement("script");
+  s.setAttribute("data-zone", zone);
+  s.setAttribute("data-cfasync", "false");
+  s.setAttribute("data-monetag", key);
+  s.async = true;
+  if (toHead) document.head.appendChild(s);
+  else ([document.documentElement, document.body].filter(Boolean).pop() || document.head).appendChild(s);
+  s.src = src;
+}
+
 export default function MonetagTag() {
   useEffect(() => {
+    let timers: ReturnType<typeof setTimeout>[] = [];
     try {
       const h = window.location.hostname.toLowerCase();
       const p = window.location.pathname.toLowerCase();
@@ -36,56 +49,22 @@ export default function MonetagTag() {
       // /dashboard/earn is served on the dash host as clean URL /earn
       const isEarn = h === DASH_HOST && (p === "/earn" || p.startsWith("/earn/"));
       if (!isPublic && !isEarn) return;
-      if (!document.querySelector('script[data-monetag="multitag"]')) {
-        const s = document.createElement("script");
-        s.src = TAG_SRC;
-        s.async = true;
-        s.setAttribute("data-zone", TAG_ZONE);
-        s.setAttribute("data-cfasync", "false");
-        s.setAttribute("data-monetag", "multitag");
-        document.head.appendChild(s);
-      }
-      if (!document.querySelector('script[data-monetag="vignette"]')) {
-        // Verbatim mirror of the dashboard snippet: append to body (else
-        // documentElement), dataset.zone set before src loads.
-        const v = document.createElement("script");
-        v.setAttribute("data-zone", VIG_ZONE);
-        v.setAttribute("data-cfasync", "false");
-        v.setAttribute("data-monetag", "vignette");
-        v.async = true;
-        ([document.documentElement, document.body].filter(Boolean).pop() || document.head).appendChild(v);
-        v.src = VIG_SRC;
-      }
-      if (!document.querySelector('script[data-monetag="vignette2"]')) {
-        const v2 = document.createElement("script");
-        v2.setAttribute("data-zone", VIG_ZONE_2);
-        v2.setAttribute("data-cfasync", "false");
-        v2.setAttribute("data-monetag", "vignette2");
-        v2.async = true;
-        ([document.documentElement, document.body].filter(Boolean).pop() || document.head).appendChild(v2);
-        v2.src = VIG_SRC;
-      }
-      if (!document.querySelector('script[data-monetag="onclick"]')) {
-        const o = document.createElement("script");
-        o.setAttribute("data-zone", ONCLICK_ZONE);
-        o.setAttribute("data-cfasync", "false");
-        o.setAttribute("data-monetag", "onclick");
-        o.async = true;
-        ([document.documentElement, document.body].filter(Boolean).pop() || document.head).appendChild(o);
-        o.src = ONCLICK_SRC;
-      }
-      if (!document.querySelector('script[data-monetag="inpage"]')) {
-        const n = document.createElement("script");
-        n.setAttribute("data-zone", INPAGE_ZONE);
-        n.setAttribute("data-cfasync", "false");
-        n.setAttribute("data-monetag", "inpage");
-        n.async = true;
-        ([document.documentElement, document.body].filter(Boolean).pop() || document.head).appendChild(n);
-        n.src = INPAGE_SRC;
-      }
+      // Deferred + staggered: ad scripts must never fight first paint.
+      // Multitag first when idle, rest 1.2s apart so low-end phones stay smooth.
+      const run = () => {
+        addTag("multitag", TAG_SRC, TAG_ZONE, true);
+        timers.push(setTimeout(() => addTag("vignette", VIG_SRC, VIG_ZONE, false), 1200));
+        timers.push(setTimeout(() => addTag("vignette2", VIG_SRC, VIG_ZONE_2, false), 2400));
+        timers.push(setTimeout(() => addTag("onclick", ONCLICK_SRC, ONCLICK_ZONE, false), 3600));
+        timers.push(setTimeout(() => addTag("inpage", INPAGE_SRC, INPAGE_ZONE, false), 4800));
+      };
+      const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
+      if (typeof ric === "function") ric(run, { timeout: 4000 });
+      else timers.push(setTimeout(run, 2500));
     } catch {
       // ads must never break the app
     }
+    return () => { timers.forEach(clearTimeout); };
   }, []);
   return null;
 }
