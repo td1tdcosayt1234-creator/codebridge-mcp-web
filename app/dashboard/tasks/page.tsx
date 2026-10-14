@@ -5,6 +5,14 @@ export default function Tasks(){
   const [kind,setKind]=useState<"compile"|"fix-compile">("compile");
   const [files,setFiles]=useState<F[]>([{path:"",content:""}]);
   const [msg,setMsg]=useState(""); const [open,setOpen]=useState<string|null>(null); const [bal,setBal]=useState<number|null>(null); const [hp,setHp]=useState("");
+  const [adblock,setAdblock]=useState(false);
+  useEffect(()=>{
+    const d=document.createElement("div");
+    d.className="adsbox ad-banner sponsored"; d.style.cssText="height:1px;width:1px;position:absolute;left:-9999px;";
+    document.body.appendChild(d);
+    setAdblock(d.offsetHeight===0);
+    d.remove();
+  },[]);
   async function load(){ try {
     const r=await fetch("/api/overview"); const j=await r.json().catch(()=>({})); if(r.ok){ setBal(j.usage?.balance??null); }
     const t=await fetch("/api/tasks"); const tj=await t.json().catch(()=>({})); if(t.ok) setTasks(tj.tasks||[]);
@@ -13,8 +21,10 @@ export default function Tasks(){
   const est = Math.max(1,Math.ceil(prompt.length/4)) + Math.max(1,Math.ceil(files.map(f=>f.path+"\n"+f.content).join("\n").length/4));
   const bytes = files.reduce((n,f)=>n+f.path.length+f.content.length,0);
   async function send(e:any){
-    e.preventDefault(); setMsg("Sending request — AI will start in the cloud...");
-    const r=await fetch("/api/tasks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,prompt,kind,website:hp,files:files.filter(f=>f.path.trim())})});
+    e.preventDefault();
+    if(adblock){ setMsg("Error: Adblock detected — turn it off to send requests."); return; }
+    setMsg("Sending request — AI will start in the cloud...");
+    const r=await fetch("/api/tasks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,prompt,kind,website:hp,adblock,files:files.filter(f=>f.path.trim())})});
     const j=await r.json();
     if(!r.ok){ setMsg("Error: "+(j.error||"failed")); return; }
     setMsg("Request sent. id="+j.task.id+" (~"+j.task.tokensEst+" coins held) — OpenCode will deliver the output here.");
@@ -38,7 +48,8 @@ export default function Tasks(){
       </div>))}
       <button type="button" className="btn-ghost" onClick={()=>setFiles([...files,{path:"",content:""}])}>+ Add file</button>
       <input name="website" value={hp} onChange={e=>setHp(e.target.value)} autoComplete="off" tabIndex={-1} aria-hidden="true" style={{position:"absolute",left:"-9999px",opacity:0,height:0}}/>
-      <div style={{marginTop:10}}><button className="btn">Send request (~{est} coins)</button></div>
+      {adblock&&<p className="small" style={{color:"#f87171"}}>Adblock detected — requests paused. Turn it off + reload.</p>}
+      <div style={{marginTop:10}}><button className="btn" disabled={adblock}>Send request (~{est} coins)</button></div>
     </form>{msg&&<p className="small">{msg}</p>}</div>
     <h3 style={{marginTop:18}}>My requests (auto refresh)</h3>
     {tasks.length===0&&<p className="muted small">No requests yet.</p>}

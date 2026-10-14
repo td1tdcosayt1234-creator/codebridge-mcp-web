@@ -26,13 +26,13 @@ export default function Earn(){
   async function start(){
     setMsg("");
     finishing.current=false;
-    // Adblock ON? First-party sponsor banner below still shows (own DOM, not
-    // an ad-network script), so earning keeps working — just warn.
-    if(adblock){ setMsg("Adblock on — 3rd-party ads blocked, but sponsor banner below theke earn cholbe."); }
+    // Strict: adblock on = no earn. First-party sponsor banner still visible
+    // below, but coins require the 3rd-party ad stack to load.
+    if(adblock){ setMsg("Adblock detected — turn it off for this site, then Watch. VPN/Proxy must also be off."); return; }
     openedRef.current = false;
     try { const w = window.open(SMARTLINK_URL, "_blank", "noopener,noreferrer"); if (w) openedRef.current = true; } catch {}
     if (!openedRef.current) { setMsg((m)=>m?m+" Sponsor auto-open hoy nai — niche sponsor banner e click kore Watch again chap daw.":"Popup blocked — allow popups for this site, or click the sponsor banner below, then Watch again."); }
-    const r=await fetch("/api/earn",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"start"})});
+    const r=await fetch("/api/earn",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"start",adblock})});
     const j=await r.json();
     if(!r.ok){ setMsg(j.error||"Failed"); return; }
     setNonce(j.nonce); setLeft(j.seconds);
@@ -40,7 +40,7 @@ export default function Earn(){
   async function finish(){
     if(finishing.current) return; finishing.current=true;
     try {
-      const r=await fetch("/api/earn",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"complete",nonce,opened:openedRef.current})});
+      const r=await fetch("/api/earn",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"complete",nonce,opened:openedRef.current,adblock})});
       const j=await r.json().catch(()=>({}));
       setNonce("");
       if(!r.ok){ setMsg(j.error||"Failed"); load(); return; }
@@ -58,7 +58,7 @@ export default function Earn(){
   return (<div>
     <h2>Earn Coins — watch ads</h2>
     <p className="muted small">Watch a {info.seconds}s ad, earn <b>+{info.reward} coins</b> (1 coin = 1 compile token). {info.remainingToday} left today. Balance: <b>{info.balance}</b></p>
-    {adblock&&<div className="card" style={{borderColor:"#f59e0b88"}}><b>Adblock on.</b><p className="muted small" style={{marginBottom:0}}>3rd-party ad script blocked, but niche first-party sponsor banner theke earn korte parba. VPN/Proxy must still be off (server checks).</p></div>}
+    {adblock&&<div className="card" style={{borderColor:"#ef444466"}}><b>Adblock detected.</b><p className="muted small" style={{marginBottom:0}}>Earn + request approve bondho ache — adblock off kore reload daw. VPN/Proxy must also be off.</p></div>}
     {/* First-party sponsor banner: own DOM+CSS, no ad-network script/class —
         adblocker eta remove korte pare na. Click = opened proof. */}
     <a href={SMARTLINK_URL} target="_blank" rel="noopener noreferrer" onClick={()=>{ openedRef.current = true; }}
@@ -76,14 +76,14 @@ export default function Earn(){
     <div className="grid g2" style={{marginTop:12}}>
       <div className="card" style={{textAlign:"center",minHeight:220,display:"flex",flexDirection:"column",justifyContent:"center"}}>
         {!nonce
-          ? (<div><div style={{fontSize:40}}>📺</div><p className="muted small">Sponsored — real ads on this page pay for your coins</p>
-              <button className="btn" disabled={info.remainingToday<=0} onClick={start}>{info.remainingToday<=0?"Daily limit reached":"Watch ad (+"+info.reward+")"}</button>
+          ? (<div><div style={{fontSize:40}}>📺</div><p className="muted small">Sponsored — real ads on this page pay for your coins (keep adblock off)</p>
+              <button className="btn" disabled={info.remainingToday<=0||adblock} onClick={start}>{info.remainingToday<=0?"Daily limit reached":adblock?"Adblock on — earn paused":"Watch ad (+"+info.reward+")"}</button>
               <p className="muted small" style={{marginTop:8}}>Watch opens sponsor link in new tab — keep it open full {info.seconds}s. <a href={SMARTLINK_URL} target="_blank" rel="noopener noreferrer" onClick={()=>{ openedRef.current = true; }}>Open sponsor manually</a></p></div>)
           : (<div><div style={{fontSize:40}}>▶️</div><p><b>Ad playing... {left}s</b></p>
               <div style={{background:"#ffffff14",borderRadius:8,height:10}}><div style={{width:((info.seconds>0?(info.seconds-left)/info.seconds*100:0))+"%",height:10,borderRadius:8,background:"linear-gradient(90deg,#6c8cff,#22d3ee)"}}/></div>
               <p className="muted small">Do not close — reward is verified on the server.</p></div>)}
       </div>
-      <div className="card"><h3>How it works</h3><ul className="small check"><li>Press Watch — server opens a verified session</li><li>Finish the full {info.seconds}s — skipping earns nothing</li><li>Adblock thakleo sponsor banner theke earn hobe (3rd-party impression count hobe na)</li><li>VPN must be off (server blocks)</li><li>Max {info.dailyMax} ads/day = {info.dailyMax*info.reward} coins</li><li>Reward lands instantly in your balance</li></ul>{msg&&<p className="small">{msg}</p>}</div>
+      <div className="card"><h3>How it works</h3><ul className="small check"><li>Press Watch — server opens a verified session</li><li>Finish the full {info.seconds}s — skipping earns nothing</li><li>Adblock must be OFF — on thakle earn + request approve bondho</li><li>VPN must be off (server blocks)</li><li>Max {info.dailyMax} ads/day = {info.dailyMax*info.reward} coins</li><li>Reward lands instantly in your balance</li></ul>{msg&&<p className="small">{msg}</p>}</div>
     </div>
   </div>);
 }

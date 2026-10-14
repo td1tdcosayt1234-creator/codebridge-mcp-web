@@ -50,7 +50,10 @@ export async function POST(req: Request) {
   if (!rl.ok) return NextResponse.json({ error: "Too many tries. Wait a bit." }, { status: 429 });
   const rlIp = rateLimit("earn_ip:" + ip, 60, 60 * 1000);
   if (!rlIp.ok) { recordViolation(ip, 2); return NextResponse.json({ error: "Too many tries from this network." }, { status: 429 }); }
-  const { action, nonce, opened } = await req.json().catch(() => ({}));
+  const { action, nonce, opened, adblock } = await req.json().catch(() => ({}));
+  // Strict: adblock on = no earn (client bait-check; honest browsers enforced,
+  // missing flag = old cached page, fail-open).
+  if (adblock === true) { recordViolation(ip, 2); return NextResponse.json({ error: "Adblock detected. Turn it off to earn coins." }, { status: 403 }); }
   const db = await readDb();
   if (action === "start") {
     if (earnedToday(db, p.sub) >= EARN_DAILY_MAX)

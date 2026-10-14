@@ -83,9 +83,12 @@ export async function GET(req: Request) {
     netWarn +
     "<div class=\"user\">" + avatar(email) + "</div>" +
     "<form method=\"POST\" action=\"/api/mcp/approve\"><input type=\"hidden\" name=\"req\" value=\"" + esc(p.id) + "\"/>" +
+    "<input type=\"hidden\" name=\"adblock\" id=\"adblock\" value=\"1\"/>" +
     "<label class=\"remember\"><input type=\"checkbox\" name=\"always\" value=\"yes\" checked/><span>Always allow this agent<small>Approve once — never ask again on this device.</small></span></label>" +
-    "<div class=\"row\"><button class=\"btn yes\" name=\"allow\" value=\"yes\" type=\"submit\">Approve</button>" +
-    "<button class=\"btn no\" name=\"allow\" value=\"no\" type=\"submit\">Deny</button></div></form>" +
+    "<div class=\"row\"><button class=\"btn yes\" id=\"apvYes\" name=\"allow\" value=\"yes\" type=\"submit\" disabled>Approve</button>" +
+    "<button class=\"btn no\" id=\"apvNo\" name=\"allow\" value=\"no\" type=\"submit\" disabled>Deny</button></div></form>" +
+    "<p class=\"foot\" id=\"adblockWarn\" style=\"color:#f87171\">Checking adblock… (Approve needs it OFF)</p>" +
+    "<script>(function(){try{var d=document.createElement('div');d.className='adsbox ad-banner sponsored';d.style.cssText='height:1px;width:1px;position:absolute;left:-9999px;';document.body.appendChild(d);var b=d.offsetHeight===0;d.remove();var f=document.getElementById('adblock');if(f)f.value=b?'1':'0';var y=document.getElementById('apvYes'),n=document.getElementById('apvNo'),w=document.getElementById('adblockWarn');if(!b){if(y)y.disabled=false;if(n)n.disabled=false;if(w)w.style.display='none';}else{if(w)w.textContent='Adblock detected — turn it off + reload to Approve. Deny still works.';if(n)n.disabled=false;}}catch(e){}})();</script>" +
     "<p class=\"foot\">Safe to close this tab after deciding.</p>"
   );
 }
@@ -100,6 +103,10 @@ export async function POST(req: Request) {
   const id = String(form?.get("req") || "");
   const allow = String(form?.get("allow") || "");
   const always = String(form?.get("always") || "") === "yes";
+  const adblock = String(form?.get("adblock") || "");
+  // Strict: adblock on = no Approve (Deny always works — it spends nothing).
+  if (allow === "yes" && adblock === "1")
+    return shell(brand() + "<div class=\"icon\">" + ICON_DENY + "</div><h1>Adblock detected</h1><p class=\"muted\">Turn adblock <b>OFF</b> for this site + reload, then Approve. Deny still works.</p>");
   const me = await verifyJwt(t);
   if (!me) {
     // Keep the request id across login so the user lands back on THIS approval.

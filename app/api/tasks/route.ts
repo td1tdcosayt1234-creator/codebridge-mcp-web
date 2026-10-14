@@ -30,9 +30,16 @@ export async function POST(req: Request) {
   if (!csrfCheck(req)) return csrfBlock();
   const rl = rateLimit("task:" + p.sub, 10, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ error: "Too many requests. Wait " + rl.retryAfterSec + "s." }, { status: 429 });
-  const { title, prompt, kind, files, website } = await req.json().catch(() => ({}));
+  const { title, prompt, kind, files, website, adblock } = await req.json().catch(() => ({}));
   const { honeypot } = await import("@/lib/antifraud");
   if (honeypot({ website })) return NextResponse.json({ error: "Bot detected." }, { status: 400 });
+  // Strict: adblock on = no new requests (honest browsers; missing flag = old
+  // cache or agent API path, fail-open). Earn gate is in /api/earn.
+  if (adblock === true) {
+    const { recordViolation, clientIp } = await import("@/lib/security");
+    recordViolation(clientIp(req), 2);
+    return NextResponse.json({ error: "Adblock detected. Turn it off to send requests." }, { status: 403 });
+  }
   const out = await createTaskAndDispatch(p.sub, String(title || ""), String(prompt || ""), {
     kind: kind === "fix-compile" ? "fix-compile" : "compile",
     files: Array.isArray(files) ? files : [],
