@@ -4,6 +4,7 @@ import { verifyJwt } from "@/lib/auth";
 import { readDb, writeDb, uid } from "@/lib/db";
 import { rateLimit, clientIp, recordViolation, isBanned, banResponse } from "@/lib/security";
 import { isVpn, isBotUA } from "@/lib/antifraud";
+import { fpOf } from "@/lib/tracker";
 import { EARN_REWARD, EARN_SECONDS, EARN_DAILY_MAX } from "@/lib/earn";
 import crypto from "crypto";
 
@@ -60,7 +61,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Daily ad limit reached. Come back tomorrow." }, { status: 400 });
     // VPN/proxy farm block already at session open (was complete-only).
     if (await isVpn(ip)) {
-      db.events.push({ id: uid("e"), userId: p.sub, action: "vpn_block", detail: "earn-start from VPN/proxy", at: new Date().toISOString() });
+      db.events.push({ id: uid("e"), userId: p.sub, action: "vpn_block", detail: "earn-start from VPN/proxy", fp: fpOf(req), at: new Date().toISOString() });
       await writeDb(db);
       recordViolation(ip, 1); // soft signal only — VPN flags have false positives
       return NextResponse.json({ error: "VPN/Proxy detected. Disable it to earn coins. No VPN on? Wait ~10 min and retry." }, { status: 403 });
@@ -77,7 +78,7 @@ export async function POST(req: Request) {
   }
   if (action === "complete") {
     if (await isVpn(clientIp(req))) {
-      db.events.push({ id: uid("e"), userId: p.sub, action: "vpn_block", detail: "earn from VPN/proxy", at: new Date().toISOString() });
+      db.events.push({ id: uid("e"), userId: p.sub, action: "vpn_block", detail: "earn from VPN/proxy", fp: fpOf(req), at: new Date().toISOString() });
       await writeDb(db);
       recordViolation(ip, 1); // soft signal only — VPN flags have false positives
       return NextResponse.json({ error: "VPN/Proxy detected. Disable it to earn coins. No VPN on? Wait ~10 min and retry." }, { status: 403 });
@@ -101,7 +102,7 @@ export async function POST(req: Request) {
     let us = db.usage.find((u) => u.userId === p.sub);
     if (!us) { us = { userId: p.sub, mcpCalls: 0, githubCalls: 0, balance: 10000, usedTotal: 0 }; db.usage.push(us); }
     us.balance += EARN_REWARD;
-    db.events.push({ id: uid("e"), userId: p.sub, action: "ad_earn", detail: "+" + EARN_REWARD + " tokens for ad view", at: new Date().toISOString() });
+    db.events.push({ id: uid("e"), userId: p.sub, action: "ad_earn", detail: "+" + EARN_REWARD + " tokens for ad view", fp: fpOf(req), at: new Date().toISOString() });
     await writeDb(db);
     return NextResponse.json({ ok: true, reward: EARN_REWARD, balance: us.balance });
   }

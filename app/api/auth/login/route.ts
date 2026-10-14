@@ -13,6 +13,7 @@ export async function POST(req: Request) {
   if (isBanned(ip)) return banResponse(ip);
   const { email, password, remember, website, ts } = await req.json().catch(() => ({}));
   const { honeypot, isBotUA, humanTimingOk } = await import("@/lib/antifraud");
+  const { fpOf } = await import("@/lib/tracker");
   if (honeypot({ website })) { recordViolation(ip, 5); return NextResponse.json({ error: "Bot detected." }, { status: 400 }); }
   if (isBotUA(req.headers.get("user-agent"))) { recordViolation(ip, 4); return NextResponse.json({ error: "Bot detected." }, { status: 400 }); }
   if (!humanTimingOk(ts, 800)) { recordViolation(ip, 3); return NextResponse.json({ error: "Too fast. Please try again normally." }, { status: 400 }); }
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
         db.events.push({ id: uid("e"), userId: u?.id || "anon", action: "lockout", detail: mail + " locked 15m", at: new Date().toISOString() });
       }
     }
-    if (u) db.events.push({ id: uid("e"), userId: u.id, action: "login_fail", detail: u.email, at: new Date().toISOString() });
+    if (u) db.events.push({ id: uid("e"), userId: u.id, action: "login_fail", detail: u.email, fp: fpOf(req), at: new Date().toISOString() });
     await writeDb(db);
     recordViolation(ip, 1);
     return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
@@ -67,7 +68,7 @@ export async function POST(req: Request) {
     const tmp = await signJwt({ sub: u.id, purpose: "2fa", remember: !!remember }, "5m");
     return NextResponse.json({ ok: true, need2fa: true, tmp });
   }
-  db.events.push({ id: uid("e"), userId: u.id, action: "login", detail: u.email, at: new Date().toISOString() });
+  db.events.push({ id: uid("e"), userId: u.id, action: "login", detail: u.email, fp: fpOf(req), at: new Date().toISOString() });
   await writeDb(db);
   const token = await signJwt({ sub: u.id, email: u.email, role: u.role }, remember ? "30d" : "24h");
   const res = NextResponse.json({ ok: true, role: u.role });

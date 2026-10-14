@@ -18,6 +18,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     ["/admin/users", "Users", "◎"],
     ["/admin/tokens", "Tokens", "◉"],
     ["/admin/tracking", "Tracking", "◎"],
+    ["/admin/spam", "Spam Radar", "⚠"],
     ["/admin/mcp-control", "MCP Control", "⌘"],
     ["/admin/content", "Content", "✎"],
     ["/admin/support", "Support", "✦"],

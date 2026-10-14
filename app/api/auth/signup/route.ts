@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { readDb, writeDb, uid } from "@/lib/db";
 import { rateLimit, clientIp, passwordError, clampText, csrfCheck, csrfBlock, recordViolation, isBanned, banResponse } from "@/lib/security";
 import { honeypot, isVpn, isBotUA, humanTimingOk } from "@/lib/antifraud";
+import { fpOf } from "@/lib/tracker";
 import { sendSignupOtp } from "@/lib/elsemail";
 import { cleanName, nameError, countryError } from "@/lib/profile";
 
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
   if (await isVpn(ip)) {
     recordViolation(ip, 1); // soft signal only — VPN flags have false positives
     const db0 = await readDb();
-    db0.events.push({ id: uid("e"), userId: "anon", action: "vpn_block", detail: "signup from VPN/proxy", at: new Date().toISOString() });
+    db0.events.push({ id: uid("e"), userId: "anon", action: "vpn_block", detail: "signup from VPN/proxy", fp: fpOf(req), at: new Date().toISOString() });
     await writeDb(db0);
     return NextResponse.json({ error: "VPN/Proxy connections are not allowed. Disable it and try again. No VPN on? Wait ~10 min and retry (network check refreshes)." }, { status: 403 });
   }
@@ -61,7 +62,7 @@ export async function POST(req: Request) {
   // (Missing emailVerified on old rows means verified — grandfathered.)
   const u = { id: uid("u"), email: mail, passHash, role: "user" as const, plan: "free" as const, createdAt: new Date().toISOString(), emailVerified: false as const, firstName: first, lastName: last, country: ctry };
   db.users.push(u);
-  db.events.push({ id: uid("e"), userId: u.id, action: "signup", detail: u.email, at: new Date().toISOString() });
+  db.events.push({ id: uid("e"), userId: u.id, action: "signup", detail: u.email, fp: fpOf(req), at: new Date().toISOString() });
   await writeDb(db);
   const mailRes = await sendSignupOtp(mail);
   if (!mailRes.ok) {
