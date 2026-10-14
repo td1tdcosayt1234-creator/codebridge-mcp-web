@@ -1,4 +1,6 @@
 "use client"; import { useEffect, useRef, useState } from "react";
+// Monetag SmartLink (sponsor) — opens on Watch, reward still verified server-side.
+const SMARTLINK_URL = "https://uplcm.com/4/12029550";
 export default function Earn(){
   const [info,setInfo]=useState<any>(null); const [nonce,setNonce]=useState(""); const [left,setLeft]=useState(0); const [msg,setMsg]=useState(""); const [adblock,setAdblock]=useState(false);
   const finishing=useRef(false);
@@ -25,6 +27,7 @@ export default function Earn(){
     setMsg("");
     finishing.current=false;
     if(adblock){ setMsg("Ad blocker detected. Disable it to earn coins."); return; }
+    try { window.open(SMARTLINK_URL, "_blank", "noopener,noreferrer"); } catch {}
     const r=await fetch("/api/earn",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"start"})});
     const j=await r.json();
     if(!r.ok){ setMsg(j.error||"Failed"); return; }
@@ -56,7 +59,8 @@ export default function Earn(){
       <div className="card" style={{textAlign:"center",minHeight:220,display:"flex",flexDirection:"column",justifyContent:"center"}}>
         {!nonce
           ? (<div><div style={{fontSize:40}}>📺</div><p className="muted small">Sponsored — real ads on this page pay for your coins (keep adblock off)</p>
-              <button className="btn" disabled={info.remainingToday<=0||adblock} onClick={start}>{info.remainingToday<=0?"Daily limit reached":"Watch ad (+"+info.reward+")"}</button></div>)
+              <button className="btn" disabled={info.remainingToday<=0||adblock} onClick={start}>{info.remainingToday<=0?"Daily limit reached":"Watch ad (+"+info.reward+")"}</button>
+              <p className="muted small" style={{marginTop:8}}>Watch opens sponsor link in new tab — keep it open full {info.seconds}s. <a href={SMARTLINK_URL} target="_blank" rel="noopener noreferrer">Open sponsor manually</a></p></div>)
           : (<div><div style={{fontSize:40}}>▶️</div><p><b>Ad playing... {left}s</b></p>
               <div style={{background:"#ffffff14",borderRadius:8,height:10}}><div style={{width:((info.seconds>0?(info.seconds-left)/info.seconds*100:0))+"%",height:10,borderRadius:8,background:"linear-gradient(90deg,#6c8cff,#22d3ee)"}}/></div>
               <p className="muted small">Do not close — reward is verified on the server.</p></div>)}
