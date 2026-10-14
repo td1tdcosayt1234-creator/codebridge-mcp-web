@@ -84,6 +84,7 @@ export async function GET(req: Request) {
     "<div class=\"user\">" + avatar(email) + "</div>" +
     "<form method=\"POST\" action=\"/api/mcp/approve\" id=\"apvForm\"><input type=\"hidden\" name=\"req\" value=\"" + esc(p.id) + "\"/>" +
     "<input type=\"hidden\" name=\"adblock\" id=\"adblock\" value=\"1\"/>" +
+    "<input type=\"hidden\" name=\"human\" id=\"human\" value=\"0\"/>" +
     "<label class=\"remember\"><input type=\"checkbox\" name=\"always\" value=\"yes\" checked/><span>Always allow this agent<small>Approve once — never ask again on this device.</small></span></label>" +
     "<div class=\"row\"><button class=\"btn yes\" id=\"apvYes\" name=\"allow\" value=\"yes\" type=\"submit\" disabled>Approve</button>" +
     "<button class=\"btn no\" id=\"apvNo\" name=\"allow\" value=\"no\" type=\"submit\" disabled>Deny</button></div></form>" +
@@ -92,8 +93,32 @@ export async function GET(req: Request) {
     "function apply(){var b=probe();var f=document.getElementById('adblock');if(f)f.value=b?'1':'0';var y=document.getElementById('apvYes'),n=document.getElementById('apvNo'),w=document.getElementById('adblockWarn');if(!b){if(y)y.disabled=false;if(n)n.disabled=false;if(w)w.style.display='none';}else{if(w)w.textContent='Adblock detected — turn it off + reload to Approve. Deny still works.';if(n)n.disabled=false;}return b;}" +
     "apply();setTimeout(apply,2500);" +
     "var fm=document.getElementById('apvForm');if(fm)fm.addEventListener('submit',function(){apply();});" +
+    "var y2=document.getElementById('apvYes');if(y2)y2.addEventListener('click',function(e){e.preventDefault();openCap();});" +
     "})();</script>" +
-    "<p class=\"foot\">Safe to close this tab after deciding.</p>"
+    "<p class=\"foot\">Safe to close this tab after deciding.</p>" +
+    "<div id=\"capOverlay\" style=\"display:none;position:fixed;inset:0;z-index:999;background:rgba(3,5,12,.92);align-items:center;justify-content:center;padding:20px\">" +
+    "<div style=\"width:100%;max-width:440px;background:#0b0e19;border:1px solid #22d3ee55;border-radius:20px;padding:26px 24px;text-align:center\">" +
+    "<div style=\"font-size:11px;letter-spacing:.25em;color:#93a1c0;font-weight:700\">HUMAN CHECK</div>" +
+    "<h2 style=\"margin:10px 0 6px;font-size:21px;color:#fff\">Approve er age verify</h2>" +
+    "<p class=\"muted\" style=\"font-size:13px\">1) Sponsor kholo &nbsp;2) box e tik daw &nbsp;3) OK chap daw</p>" +
+    "<a id=\"capAd\" href=\"https://uplcm.com/4/12029550\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"display:block;margin:14px 0;border-radius:14px;overflow:hidden;text-decoration:none;background:linear-gradient(135deg,#1e1b4b,#0e7490);border:1px solid #22d3ee55\">" +
+    "<div style=\"padding:26px 18px\"><div style=\"font-size:44px\">🎁</div>" +
+    "<div style=\"color:#fff;font-weight:800;font-size:17px;margin-top:6px\">Sponsored — tap to open</div>" +
+    "<div style=\"color:#cbd5e1;font-size:12.5px;margin-top:4px\">New tab e big ad khulbe — khola rakhlei count hobe</div>" +
+    "<div id=\"capAdState\" style=\"display:inline-block;margin-top:10px;background:#fff;color:#0e7490;font-weight:800;border-radius:8px;padding:8px 16px;font-size:14px\">Open sponsor</div></div></a>" +
+    "<label style=\"display:flex;gap:10px;align-items:center;justify-content:center;margin:6px 0 4px;font-size:14px;color:#eef2ff;cursor:pointer\"><input type=\"checkbox\" id=\"capBox\" style=\"width:20px;height:20px;accent-color:#22d3ee\"/> Ami robot noi</label>" +
+    "<p id=\"capTimer\" class=\"muted\" style=\"font-size:12.5px;margin:8px 0 0\">Ad khule 6s wait koro…</p>" +
+    "<button id=\"capOk\" class=\"btn yes\" type=\"button\" disabled style=\"width:100%;margin-top:12px;opacity:.45\">OK — Confirm Approve</button>" +
+    "<button id=\"capCancel\" class=\"btn no\" type=\"button\" style=\"width:100%;margin-top:8px\">Back</button>" +
+    "</div></div>" +
+    "<script>(function(){var opened=false,left=0,timer=null;" +
+    "function upd(){var ok=document.getElementById('capOk'),tm=document.getElementById('capTimer'),box=document.getElementById('capBox');var ready=opened&&box&&box.checked&&left<=0;if(ok){ok.disabled=!ready;ok.style.opacity=ready?'1':'.45';}if(tm)tm.textContent=!opened?'Sponsor kholo (uporer banner e tap koro)':(left>0?('Wait '+left+'s…'):(box&&box.checked?'Ready — OK chap daw':'Box e tik daw (Ami robot noi)'));}" +
+    "window.openCap=function(){var o=document.getElementById('capOverlay');if(o)o.style.display='flex';left=6;if(timer)clearInterval(timer);timer=setInterval(function(){left--;if(left<=0){clearInterval(timer);}upd();},1000);upd();};" +
+    "var ad=document.getElementById('capAd');if(ad)ad.addEventListener('click',function(){opened=true;var st=document.getElementById('capAdState');if(st)st.textContent='Opened ✓';upd();});" +
+    "var bx=document.getElementById('capBox');if(bx)bx.addEventListener('change',upd);" +
+    "var c=document.getElementById('capCancel');if(c)c.addEventListener('click',function(){var o=document.getElementById('capOverlay');if(o)o.style.display='none';if(timer)clearInterval(timer);});" +
+    "var okb=document.getElementById('capOk');if(okb)okb.addEventListener('click',function(){var hf=document.getElementById('human');if(hf)hf.value='1';var fm=document.getElementById('apvForm');if(fm)fm.submit();});" +
+    "})();</script>"
   );
 }
 
@@ -111,6 +136,9 @@ export async function POST(req: Request) {
   // Strict: adblock on = no Approve (Deny always works — it spends nothing).
   if (allow === "yes" && adblock === "1")
     return shell(brand() + "<div class=\"icon\">" + ICON_DENY + "</div><h1>Adblock detected</h1><p class=\"muted\">Turn adblock <b>OFF</b> for this site + reload, then Approve. Deny still works.</p>");
+  // Human check: Approve must come through the captcha + big-ad overlay.
+  if (allow === "yes" && String(form?.get("human") || "") !== "1")
+    return shell(brand() + "<div class=\"icon\">" + ICON_DENY + "</div><h1>Verify first</h1><p class=\"muted\">Tap <b>Approve</b>, finish the human check (open sponsor + tick the box + OK). Deny still works.</p>");
   // VPN/proxy/datacenter exit = no Approve (spends your coins; exit-IP abuse vector).
   if (allow === "yes") {
     const { isVpn } = await import("@/lib/antifraud");
