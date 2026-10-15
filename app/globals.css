@@ -1076,6 +1076,11 @@ details.faq .a { padding: 0 18px 18px 56px; color: #c3cade; font-size: 14.3px; l
   details.faq summary { padding: 14px; gap: 10px; font-size: 14.5px; }
 }
 
+/* Wide desktop: full-bleed layout, no empty side gutters. */
+@media (min-width: 1280px) {
+  .container { max-width: 100%; padding: 0 40px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
