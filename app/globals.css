@@ -478,6 +478,7 @@ ul { margin: 0; }
 
 .word-mask { display: inline-block; overflow: hidden; vertical-align: bottom; }
 .word-mask > span { display: inline-block; animation: wordUp 0.9s var(--ease) both; }
+.word-mask > span.grad-anim { animation: wordUp 0.9s var(--ease) both, gradShift 8s linear infinite; }
 @keyframes wordUp { from { transform: translateY(105%) rotate(2deg); opacity: 0; filter: blur(8px); } to { transform: none; opacity: 1; filter: none; } }
 
 .shine { position: relative; overflow: hidden; }

@@ -143,10 +143,10 @@ const FAQ_TEASER = [
   ["Which stacks are supported?", "Python, Node, Go, Rust, Java, C++, TypeScript, PHP, Ruby, Swift, C# and Android — real builds, not simulations."],
 ];
 
-function Word({ children, delay }: { children: string; delay: number }) {
+function Word({ children, delay, grad }: { children: string; delay: number; grad?: boolean }) {
   return (
     <span className="word-mask">
-      <span style={{ animationDelay: `${delay}ms` }}>{children}</span>
+      <span className={grad ? "grad-anim" : undefined} style={{ animationDelay: `${delay}ms` }}>{children}</span>
     </span>
   );
 }
@@ -172,9 +172,9 @@ export default function Home() {
             <h1>
               <Word delay={80}>Stop</Word> <Word delay={150}>babysitting</Word> <Word delay={220}>builds.</Word>
               <br />
-              <span className="grad-anim text-glow">
-                <Word delay={300}>Ship</Word> <Word delay={370}>code,</Word> <Word delay={440}>not</Word>{" "}
-                <Word delay={510}>commands.</Word>
+              <span className="text-glow">
+                <Word delay={300} grad>Ship</Word> <Word delay={370} grad>code,</Word> <Word delay={440} grad>not</Word>{" "}
+                <Word delay={510} grad>commands.</Word>
               </span>
             </h1>
 
