@@ -132,7 +132,11 @@ export async function middleware(req: NextRequest) {
     }
     const gate = await gameGate(req, p);
     if (gate) return gate;
-    return NextResponse.next();
+    // Expose pathname to server components (layout hides the head ad tag
+    // on auth pages). Request headers — response headers are invisible here.
+    const reqHeaders = new Headers(req.headers);
+    reqHeaders.set("x-pathname", p.toLowerCase());
+    return NextResponse.next({ request: { headers: reqHeaders } });
   }
 
   // ---- dev / LAN / unknown hosts (e.g. codebridge.elsemail.indevs.in): full app ----

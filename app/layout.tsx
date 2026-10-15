@@ -33,6 +33,21 @@ function reqHost(): string {
   }
 }
 
+function reqPath(): string {
+  try {
+    return (headers().get("x-pathname") || "").split("?")[0].trim().toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+// Auth forms: no ad tags ever (popunder/vignette would hijack form taps).
+// Matches AUTH_PATHS in <MonetagTag/> — keep the two lists in sync.
+const AUTH_PATHS = ["/login", "/signup"];
+function isAuthPath(p: string): boolean {
+  return AUTH_PATHS.some((a) => p === a || p.startsWith(a + "/"));
+}
+
 // Host-aware metadata: ONLY the public site is indexable. dash/api hosts
 // serve app UI / MCP — indexing them creates duplicate + login-walled pages.
 export async function generateMetadata(): Promise<Metadata> {
@@ -70,7 +85,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {
-  const vigHead = PUBLIC_HOSTS.includes(reqHost());
+  // Primary vignette in <head> so Monetag's installer bot sees it in HTML —
+  // never on auth forms (same rule as <MonetagTag/>).
+  const vigHead = PUBLIC_HOSTS.includes(reqHost()) && !isAuthPath(reqPath());
   return (
     <html lang="en">
       <head>
