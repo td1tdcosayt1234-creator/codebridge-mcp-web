@@ -63,6 +63,7 @@ jobs:
             echo "ADMIN_EMAIL=${ADMIN_EMAIL:-admin@local.test}"
             [ -n "${ADMIN_PASSWORD:-}" ] && echo "ADMIN_PASSWORD=$ADMIN_PASSWORD"
             [ -n "${DB_MASTER_KEY:-}" ] && echo "DB_MASTER_KEY=$DB_MASTER_KEY"
+            [ -n "${VPN_ALLOWLIST:-}" ] && echo "VPN_ALLOWLIST=$VPN_ALLOWLIST"
             [ -n "${ELSEMAIL_URL:-}" ] && echo "ELSEMAIL_URL=$ELSEMAIL_URL"
             [ -n "${ELSEMAIL_API_KEY:-}" ] && echo "ELSEMAIL_API_KEY=$ELSEMAIL_API_KEY"
             [ -n "${OPENROUTER_API_KEY:-}" ] && echo "OPENROUTER_API_KEY=$OPENROUTER_API_KEY"
@@ -92,6 +93,7 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           ELSEMAIL_URL: ${{ secrets.ELSEMAIL_URL }}
           ELSEMAIL_API_KEY: ${{ secrets.ELSEMAIL_API_KEY }}
+          VPN_ALLOWLIST: ${{ secrets.VPN_ALLOWLIST }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}

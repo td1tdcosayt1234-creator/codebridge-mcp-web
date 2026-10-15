@@ -65,8 +65,15 @@ async function flagB(ip: string): Promise<boolean | null> {
 // Short TTL on purpose: a transient misflag clears itself in ~20 min,
 // and real VPN users flipping it off don't stay punished for an hour.
 const VPN_CACHE_MS = 20 * 60 * 1000;
+// Owner / office allowlist: comma-separated IPs that skip the VPN check.
+// Needed because RDP / office / datacenter egress IPs are flagged
+// "proxy" by IP-intel providers even with no VPN in use.
+function allowlisted(ip: string): boolean {
+  const raw = (process.env.VPN_ALLOWLIST || "").split(",").map((s) => s.trim()).filter(Boolean);
+  return !!ip && raw.includes(ip);
+}
 export async function isVpn(ip: string): Promise<boolean> {
-  if (isPrivateIp(ip)) return false;
+  if (allowlisted(ip)) return false;
   if (!/^[0-9a-fA-F:.]{7,45}$/.test(ip)) return false; // garbage IP = allow
   const c = proxyCache.get(ip);
   if (c && Date.now() - c.at < VPN_CACHE_MS) return c.v;
