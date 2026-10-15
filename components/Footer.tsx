@@ -35,7 +35,7 @@ export default function Footer() {
             </div>
           </div>
           <div className="footer-col">
-            <h4>Product</h4>
+            <h3>Product</h3>
             <Link href="/game">Game Studio</Link>
             <Link href="/game/history">Game History</Link>
             <Link href="/pricing">Pricing</Link>
@@ -44,7 +44,7 @@ export default function Footer() {
             {me?.role === "admin" && <Link href="/admin">Admin</Link>}
           </div>
           <div className="footer-col">
-            <h4>Resources</h4>
+            <h3>Resources</h3>
             <Link href="/docs">Docs</Link>
             <Link href="/docs/game">Game Docs</Link>
             <Link href="/faq">FAQ</Link>
@@ -52,7 +52,7 @@ export default function Footer() {
             <Link href="/about">About</Link>
           </div>
           <div className="footer-col">
-            <h4>Legal</h4>
+            <h3>Legal</h3>
             <Link href="/terms">Terms</Link>
             <Link href="/privacy">Privacy</Link>
             {me ? (

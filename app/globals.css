@@ -15,7 +15,7 @@
   --line-2: rgba(255, 255, 255, 0.14);
   --text: #f5f6fb;
   --muted: #99a1b8;
-  --muted-2: #6a7288;
+  --muted-2: #828aa0;
   --violet: #8b5cf6;
   --violet-2: #c4b5fd;
   --sky: #38bdf8;
@@ -989,7 +989,7 @@ details.faq .a { padding: 0 18px 18px 56px; color: #c3cade; font-size: 14.3px; l
 
 .footer { position: relative; z-index: 2; margin-top: 96px; padding: 52px 0 30px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13.5px; background: linear-gradient(180deg, transparent, rgba(4, 5, 10, 0.75)); }
 .footer-grid { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 30px; padding-bottom: 34px; }
-.footer-col h4 { margin: 0 0 14px; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted-2); font-weight: 600; }
+.footer-col h3 { margin: 0 0 14px; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted-2); font-weight: 600; }
 .footer-col a { display: block; padding: 5px 0; color: #aab2c8; transition: color 0.22s, transform 0.22s; }
 .footer-col a:hover { color: var(--text); transform: translateX(3px); }
 .footer-bottom { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-top: 22px; border-top: 1px solid var(--line); color: var(--muted-2); font-size: 12.5px; }

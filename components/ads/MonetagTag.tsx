@@ -28,6 +28,10 @@ function isAuthPath(p: string): boolean {
 
 function addTag(key: string, src: string, zone: string, toHead: boolean) {
   if (document.querySelector(`script[data-monetag="${key}"]`)) return;
+  // layout.tsx may already inject the primary vignette in <head> (no
+  // data-monetag attr) so Monetag's installer bot sees it in HTML —
+  // same zone = same tag, never load it twice (wasted bytes on slow nets).
+  if (document.querySelector(`script[data-zone="${zone}"]`)) return;
   const s = document.createElement("script");
   s.setAttribute("data-zone", zone);
   s.setAttribute("data-cfasync", "false");
