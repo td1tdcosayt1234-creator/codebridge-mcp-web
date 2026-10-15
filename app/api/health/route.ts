@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { readDb } from "@/lib/db";
+import { readDb, syncAdminFromEnv } from "@/lib/db";
 import { remoteStatus } from "@/lib/remotedb";
 
 // Must run per-request: reports live uptime + active db mode (never prerender).
@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const started = (globalThis as any).__bootAt || ((globalThis as any).__bootAt = Date.now());
   try {
+    await syncAdminFromEnv(); // boot-time admin credential sync (once/process)
     await readDb(); // throws when the database is corrupt/unreadable
     const rs = remoteStatus();
     return NextResponse.json({

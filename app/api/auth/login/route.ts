@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { readDb, writeDb, uid } from "@/lib/db";
+import { readDb, writeDb, uid, syncAdminFromEnv } from "@/lib/db";
 import { signJwt } from "@/lib/auth";
 import { rateLimit, clientIp, cookieSecure, cookieDomain, csrfCheck, csrfBlock, isBanned, banResponse, recordViolation } from "@/lib/security";
 
@@ -26,6 +26,7 @@ export async function POST(req: Request) {
   if (!mail || !password) return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
   // Bcrypt DoS guard: unbounded passwords burn CPU per attempt.
   if (String(password).length > 128) return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
+  await syncAdminFromEnv(); // env-changed admin credentials take effect
   const db = await readDb();
   const att = db.attempts.find((a) => a.email === mail);
   if (att && att.until && new Date(att.until).getTime() > Date.now())

@@ -56,9 +56,36 @@ function decryptDb(raw: string): string {
 function seedAdminEmail(){ return (process.env.ADMIN_EMAIL || "admin@local.test").trim().toLowerCase().slice(0,120) || "admin@local.test"; }
 async function seedAdminPassword(): Promise<{ password: string; generated: boolean }> {
   const pw = (process.env.ADMIN_PASSWORD || "").trim();
-  if (pw.length >= 12) return { password: pw, generated: false };
+  // Explicit env password always wins (even short ones — owner's choice).
+  if (pw) {
+    if (pw.length < 12) console.warn("[codebridge] SECURITY: ADMIN_PASSWORD is shorter than 12 chars — use a strong password.");
+    return { password: pw, generated: false };
+  }
   const { randomBytes } = await import("crypto");
   return { password: "Adm-" + randomBytes(12).toString("hex"), generated: true };
+}
+// Boot-time sync: secrets changed AFTER the first seed (the usual case —
+// shared Firebase DB already holds u_admin) must still take effect.
+// Runs once per process; no-op when ADMIN_PASSWORD is unset.
+let adminSynced = false;
+export async function syncAdminFromEnv(): Promise<void> {
+  if (adminSynced) return; adminSynced = true;
+  try {
+    const pw = (process.env.ADMIN_PASSWORD || "").trim();
+    if (!pw) return;
+    const email = seedAdminEmail();
+    const db = await readDb();
+    const admin = db.users.find((u) => u.role === "admin") || db.users.find((u) => u.id === "u_admin");
+    const bcrypt = (await import("bcryptjs")).default;
+    if (!admin) return; // ensure() seed path covers first boot
+    let ok = false;
+    try { ok = await bcrypt.compare(pw, admin.passHash); } catch { ok = false; }
+    if (ok && admin.email.toLowerCase() === email) return; // already in sync
+    admin.passHash = await bcrypt.hash(pw, 12);
+    admin.email = email;
+    await writeDb(db);
+    console.warn("[codebridge] admin credentials synced from ADMIN_EMAIL/ADMIN_PASSWORD.");
+  } catch (e) { console.warn("[codebridge] admin sync failed:", (e as Error)?.message || e); }
 }
 async function ensure(){
   try{ await fs.access(file); }catch{
