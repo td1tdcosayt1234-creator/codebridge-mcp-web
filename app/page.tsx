@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import CopyBtn from "../components/CopyBtn";
 import Counter from "../components/Counter";
@@ -136,6 +137,12 @@ const CONFIG = `{
 
 const PROMPT_EXAMPLE = `compile my attached files
 (or compile_fix to auto-fix errors)`;
+
+export const metadata: Metadata = {
+  alternates: {
+    canonical: (process.env.SITE_URL || "https://roun.sryze.cc").replace(/\/+$/, "") + "/",
+  },
+};
 
 const FAQ_TEASER = [
   ["Do I need a card to start?", "No. Signup gives you 10,000 coins and the full dashboard. No card, no trial timer."],
