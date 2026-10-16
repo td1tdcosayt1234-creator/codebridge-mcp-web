@@ -8,6 +8,7 @@ import CinematicFX from "../components/CinematicFX";
 import Footer from "../components/Footer";
 import Nav from "../components/Nav";
 import MonetagTag from "../components/ads/MonetagTag";
+import GoogleAnalytics from "../components/GoogleAnalytics";
 
 // Monetag Multitag loads client-side (site already verified in dashboard).
 // Auth pages (/signup, /login) are excluded inside <MonetagTag/> so the
@@ -93,6 +94,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   // Primary vignette in <head> so Monetag's installer bot sees it in HTML —
   // never on auth forms (same rule as <MonetagTag/>).
   const vigHead = PUBLIC_HOSTS.includes(reqHost()) && !isAuthPath(reqPath());
+  const gaId = PUBLIC_HOSTS.includes(reqHost()) ? process.env.NEXT_PUBLIC_GA_ID || "" : "";
   return (
     <html lang="en">
       <head>
@@ -117,6 +119,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <CinematicBackdrop />
         <CinematicFX />
         <MonetagTag />
+        <GoogleAnalytics id={gaId} />
 
         <header className="nav">
           <div className="nav-beam" aria-hidden="true" />

@@ -69,6 +69,7 @@ jobs:
             [ -n "${OPENROUTER_API_KEY:-}" ] && echo "OPENROUTER_API_KEY=$OPENROUTER_API_KEY"
             [ -n "${GOOGLE_CLIENT_ID:-}" ] && echo "GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID"
             [ -n "${GOOGLE_CLIENT_SECRET:-}" ] && echo "GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET"
+            [ -n "${NEXT_PUBLIC_GA_ID:-}" ] && echo "NEXT_PUBLIC_GA_ID=$NEXT_PUBLIC_GA_ID"
             [ -n "${GOOGLE_SITE_VERIFICATION:-}" ] && echo "GOOGLE_SITE_VERIFICATION=$GOOGLE_SITE_VERIFICATION"
             [ -n "${FIREBASE_DATABASE_URL:-}" ] && echo "FIREBASE_DATABASE_URL=$FIREBASE_DATABASE_URL"
             [ -n "${FIREBASE_DB_PATH:-}" ] && echo "FIREBASE_DB_PATH=$FIREBASE_DB_PATH"
@@ -97,6 +98,7 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          NEXT_PUBLIC_GA_ID: ${{ secrets.NEXT_PUBLIC_GA_ID }}
 
       - name: Build
         run: npm run build
