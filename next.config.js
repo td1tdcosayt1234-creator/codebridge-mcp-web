@@ -19,6 +19,15 @@ const csp = [
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // First-party GA4 proxy: adblockers nuke googletagmanager.com /
+  // google-analytics.com domains, so the tag loads and sends hits
+  // through our own origin instead. Query strings pass through.
+  async rewrites() {
+    return [
+      { source: "/gtagjs", destination: "https://www.googletagmanager.com/gtag/js" },
+      { source: "/g/collect", destination: "https://www.google-analytics.com/g/collect" },
+    ];
+  },
   async headers() {
     return [
       {
