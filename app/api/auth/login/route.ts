@@ -2,58 +2,26 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { readDb, writeDb, uid, syncAdminFromEnv } from "@/lib/db";
 import { signJwt } from "@/lib/auth";
-import { rateLimit, clientIp, cookieSecure, cookieDomain, csrfCheck, csrfBlock, isBanned, banResponse, recordViolation } from "@/lib/security";
-
-const MAX_FAILS = 5;
-const LOCK_MS = 15 * 60 * 1000;
+import { cookieSecure, cookieDomain, csrfCheck, csrfBlock } from "@/lib/security";
 
 export async function POST(req: Request) {
   if (!csrfCheck(req)) return csrfBlock();
-  const ip = clientIp(req);
-  if (isBanned(ip)) return banResponse(ip);
-  const { email, password, remember, website, ts } = await req.json().catch(() => ({}));
-  const { honeypot, isBotUA, humanTimingOk } = await import("@/lib/antifraud");
-  const { fpOf } = await import("@/lib/tracker");
-  if (honeypot({ website })) { recordViolation(ip, 5); return NextResponse.json({ error: "Bot detected." }, { status: 400 }); }
-  if (isBotUA(req.headers.get("user-agent"))) { recordViolation(ip, 4); return NextResponse.json({ error: "Bot detected." }, { status: 400 }); }
-  if (!humanTimingOk(ts, 800)) { recordViolation(ip, 3); return NextResponse.json({ error: "Too fast. Please try again normally." }, { status: 400 }); }
+  const { email, password, remember } = await req.json().catch(() => ({}));
+  // NOTE: all blockers (ban/bot/timing/rate/lockout) disabled by owner.
   const mail = String(email || "").trim().toLowerCase().slice(0, 120);
-  // Two buckets: per-IP+mail (targeted) AND per-IP global (rotating-mail bypass).
-  const rl = rateLimit("login:" + ip + ":" + mail, 10, 60 * 1000);
-  if (!rl.ok) return NextResponse.json({ error: "Too many attempts. Try again in " + rl.retryAfterSec + "s." }, { status: 429 });
-  const rlIp = rateLimit("login_ip:" + ip, 60, 60 * 1000);
-  if (!rlIp.ok) return NextResponse.json({ error: "Too many attempts from this network. Try again later." }, { status: 429 });
   if (!mail || !password) return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
   // Bcrypt DoS guard: unbounded passwords burn CPU per attempt.
   if (String(password).length > 128) return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
   await syncAdminFromEnv(); // env-changed admin credentials take effect
   const db = await readDb();
-  const att = db.attempts.find((a) => a.email === mail);
-  if (att && att.until && new Date(att.until).getTime() > Date.now())
-    return NextResponse.json({ error: "Account locked after failed logins. Try again later." }, { status: 423 });
   const u = db.users.find((x) => x.email.toLowerCase() === mail);
   // Always run the hash compare (constant-time UX): valid and invalid emails
   // take the same time, so the response timing reveals nothing.
   const ok = await bcrypt.compare(String(password), u?.passHash || "$2b$10$invalidinvalidinvalidinvalidinvalidinvalidinval");
   if (!u || !ok) {
-    if (!att) {
-      db.attempts.push({ email: mail, fails: 1, until: "" });
-      // Bound growth: rotating-email attackers must not bloat db.json.
-      if (db.attempts.length > 500) db.attempts = db.attempts.slice(-500);
-    }
-    else {
-      att.fails += 1;
-      // Re-arm the lockout every time the threshold is crossed again, so a
-      // sustained attack keeps hitting a fresh 15-minute window.
-      if (att.fails >= MAX_FAILS) {
-        att.until = new Date(Date.now() + LOCK_MS).toISOString();
-        att.fails = 0;
-        db.events.push({ id: uid("e"), userId: u?.id || "anon", action: "lockout", detail: mail + " locked 15m", at: new Date().toISOString() });
-      }
-    }
-    if (u) db.events.push({ id: uid("e"), userId: u.id, action: "login_fail", detail: u.email, fp: fpOf(req), at: new Date().toISOString() });
+    const { fpOf } = await import("@/lib/tracker");
+    db.events.push({ id: uid("e"), userId: u?.id || "anon", action: "login_fail", detail: mail, fp: fpOf(req), at: new Date().toISOString() });
     await writeDb(db);
-    recordViolation(ip, 1);
     return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
   }
   db.attempts = db.attempts.filter((a) => a.email !== mail);

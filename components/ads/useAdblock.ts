@@ -26,17 +26,7 @@ export function probeAdblock(): boolean {
 }
 
 export function useAdblock(): { adblock: boolean; recheck: () => boolean } {
-  const [adblock, setAdblock] = useState(false);
-  const recheck = useCallback(() => {
-    const b = probeAdblock();
-    setAdblock(b);
-    return b;
-  }, []);
-  useEffect(() => {
-    recheck();
-    // Cosmetic filters can apply late — re-probe shortly after mount too.
-    const t = setTimeout(recheck, 2500);
-    return () => clearTimeout(t);
-  }, [recheck]);
-  return { adblock, recheck };
+  // DISABLED by owner — always reports no adblock so no UI gate triggers.
+  const recheck = useCallback(() => false, []);
+  return { adblock: false, recheck };
 }

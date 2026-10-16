@@ -130,8 +130,6 @@ Mode: fix-compile + file attached`;
         <h3>Security model</h3>
         <ul className="check">
           <li>Passwords: bcrypt hash. Sessions: httpOnly cookies (secure on HTTPS).</li>
-          <li>Rate limits everywhere; accounts lock for 15 min after 5 failed logins.</li>
-          <li>Anti-bot honeypots on all forms; VPN/proxy blocked on signup and earnings; adblock must be off to earn.</li>
           <li>Secrets encrypted at rest and never shown; every sensitive action is audit-logged.</li>
         </ul>
       </Reveal>
@@ -149,8 +147,6 @@ Mode: fix-compile + file attached`;
         <h3>Troubleshooting</h3>
         <ul>
           <li><strong>402 / &ldquo;low balance&rdquo;</strong> → split files smaller or earn coins in dash.roun.sryze.cc/earn. History: dash.roun.sryze.cc/tokens.</li>
-          <li><strong>&ldquo;Bot detected&rdquo;</strong> → you tripped the bot trap; fill the form normally in a real browser.</li>
-          <li><strong>&ldquo;VPN/Proxy not allowed&rdquo;</strong> → disable VPN/proxy and retry.</li>
           <li><strong>Agent shows no tools</strong> → restart the agent after the config change; check the server URL and website login.</li>
           <li>Still stuck? Open a <Link href="/support">support ticket</Link> or read the <Link href="/faq">FAQ</Link>.</li>
         </ul>

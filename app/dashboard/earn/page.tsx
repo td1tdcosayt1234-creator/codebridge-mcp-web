@@ -54,9 +54,7 @@ export default function Earn(){
   return (<div>
     <h2>Earn Coins — watch ads</h2>
     <p className="muted small">Watch a {info.seconds}s ad, earn <b>+{info.reward} coins</b> (1 coin = 1 compile token). {info.remainingToday} left today. Balance: <b>{info.balance}</b></p>
-    {adblock&&<div className="card" style={{borderColor:"#ef444466"}}><b>Adblock detected.</b><p className="muted small" style={{marginBottom:0}}>Earn + request approve bondho ache — adblock off kore reload daw. VPN/Proxy must also be off.</p></div>}
-    {/* First-party sponsor banner: own DOM+CSS, no ad-network script/class —
-        adblocker eta remove korte pare na. Click = opened proof. */}
+    {/* First-party sponsor banner. Click = opened proof. */}
     <a href={SMARTLINK_URL} target="_blank" rel="noopener noreferrer" onClick={()=>{ openedRef.current = true; }}
        style={{display:"block",marginTop:12,borderRadius:12,overflow:"hidden",textDecoration:"none",
                background:"linear-gradient(135deg,#1e1b4b,#0e7490)",border:"1px solid #22d3ee55"}}>
@@ -72,14 +70,14 @@ export default function Earn(){
     <div className="grid g2" style={{marginTop:12}}>
       <div className="card" style={{textAlign:"center",minHeight:220,display:"flex",flexDirection:"column",justifyContent:"center"}}>
         {!nonce
-          ? (<div><div style={{fontSize:40}}>📺</div><p className="muted small">Sponsored — real ads on this page pay for your coins (keep adblock off)</p>
-              <button className="btn" disabled={info.remainingToday<=0||adblock} onClick={start}>{info.remainingToday<=0?"Daily limit reached":adblock?"Adblock on — earn paused":"Watch ad (+"+info.reward+")"}</button>
+          ? (<div><div style={{fontSize:40}}>📺</div><p className="muted small">Sponsored — real ads on this page pay for your coins</p>
+              <button className="btn" disabled={info.remainingToday<=0} onClick={start}>{info.remainingToday<=0?"Daily limit reached":"Watch ad (+"+info.reward+")"}</button>
               <p className="muted small" style={{marginTop:8}}>Watch opens sponsor link in new tab — keep it open full {info.seconds}s. <a href={SMARTLINK_URL} target="_blank" rel="noopener noreferrer" onClick={()=>{ openedRef.current = true; }}>Open sponsor manually</a></p></div>)
           : (<div><div style={{fontSize:40}}>▶️</div><p><b>Ad playing... {left}s</b></p>
               <div style={{background:"#ffffff14",borderRadius:8,height:10}}><div style={{width:((info.seconds>0?(info.seconds-left)/info.seconds*100:0))+"%",height:10,borderRadius:8,background:"linear-gradient(90deg,#6c8cff,#22d3ee)"}}/></div>
               <p className="muted small">Do not close — reward is verified on the server.</p></div>)}
       </div>
-      <div className="card"><h3>How it works</h3><ul className="small check"><li>Press Watch — server opens a verified session</li><li>Finish the full {info.seconds}s — skipping earns nothing</li><li>Adblock must be OFF — on thakle earn + request approve bondho</li><li>VPN must be off (server blocks)</li><li>Max {info.dailyMax} ads/day = {info.dailyMax*info.reward} coins</li><li>Reward lands instantly in your balance</li></ul>{msg&&<p className="small">{msg}</p>}</div>
+      <div className="card"><h3>How it works</h3><ul className="small check"><li>Press Watch — server opens a verified session</li><li>Finish the full {info.seconds}s — skipping earns nothing</li><li>Max {info.dailyMax} ads/day = {info.dailyMax*info.reward} coins</li><li>Reward lands instantly in your balance</li></ul>{msg&&<p className="small">{msg}</p>}</div>
     </div>
   </div>);
 }

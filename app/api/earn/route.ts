@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifyJwt } from "@/lib/auth";
 import { readDb, writeDb, uid } from "@/lib/db";
-import { rateLimit, clientIp, recordViolation, isBanned, banResponse } from "@/lib/security";
-import { isVpn, isBotUA } from "@/lib/antifraud";
 import { fpOf } from "@/lib/tracker";
 import { EARN_REWARD, EARN_SECONDS, EARN_DAILY_MAX } from "@/lib/earn";
 import crypto from "crypto";
@@ -43,55 +41,28 @@ export async function POST(req: Request) {
   if (!p) return NextResponse.json({ error: "auth" }, { status: 401 });
   const { csrfCheck, csrfBlock } = await import("@/lib/security");
   if (!csrfCheck(req)) return csrfBlock();
-  const ip = clientIp(req);
-  if (isBanned(ip)) return banResponse(ip);
-  // Headless/script farming block (real Watch is always a browser).
-  if (isBotUA(req.headers.get("user-agent"))) { recordViolation(ip, 4); return NextResponse.json({ error: "Bot detected." }, { status: 400 }); }
-  const rl = rateLimit("earn:" + p.sub, 30, 60 * 1000);
-  if (!rl.ok) return NextResponse.json({ error: "Too many tries. Wait a bit." }, { status: 429 });
-  const rlIp = rateLimit("earn_ip:" + ip, 60, 60 * 1000);
-  if (!rlIp.ok) { recordViolation(ip, 2); return NextResponse.json({ error: "Too many tries from this network." }, { status: 429 }); }
-  const { action, nonce, opened, adblock } = await req.json().catch(() => ({}));
-  // Strict: adblock on = no earn (client bait-check; honest browsers enforced,
-  // missing flag = old cached page, fail-open).
-  if (adblock === true) { recordViolation(ip, 2); return NextResponse.json({ error: "Adblock detected. Turn it off to earn coins." }, { status: 403 }); }
+  // NOTE: all blockers (ban/bot/rate/adblock/VPN) disabled by owner.
+  const { action, nonce } = await req.json().catch(() => ({}));
   const db = await readDb();
   if (action === "start") {
     if (earnedToday(db, p.sub) >= EARN_DAILY_MAX)
       return NextResponse.json({ error: "Daily ad limit reached. Come back tomorrow." }, { status: 400 });
-    // VPN/proxy farm block already at session open (was complete-only).
-    if (await isVpn(ip)) {
-      db.events.push({ id: uid("e"), userId: p.sub, action: "vpn_block", detail: "earn-start from VPN/proxy", fp: fpOf(req), at: new Date().toISOString() });
-      await writeDb(db);
-      recordViolation(ip, 1); // soft signal only — VPN flags have false positives
-      return NextResponse.json({ error: "VPN/Proxy detected. Disable it to earn coins. No VPN on? Wait ~10 min and retry." }, { status: 403 });
-    }
-    // One active session + min gap: parallel tabs / instant re-start = farm.
+    // One active session: parallel tabs / instant re-start = double session.
     const last = [...db.earnNonces].reverse().find((n) => n.userId === p.sub);
     if (last && !last.used && Date.now() - last.at < EARN_SECONDS * 1000)
       return NextResponse.json({ error: "Ad already playing. Finish it first." }, { status: 400 });
-    if (last && Date.now() - last.at < 25000) { recordViolation(ip, 2); return NextResponse.json({ error: "Too fast. Wait a bit before next ad." }, { status: 400 }); }
     const n = "ad_" + crypto.randomBytes(16).toString("hex");
     db.earnNonces.push({ nonce: n, userId: p.sub, at: Date.now(), used: false });
     await writeDb(db);
     return NextResponse.json({ ok: true, nonce: n, seconds: EARN_SECONDS, reward: EARN_REWARD });
   }
   if (action === "complete") {
-    if (await isVpn(clientIp(req))) {
-      db.events.push({ id: uid("e"), userId: p.sub, action: "vpn_block", detail: "earn from VPN/proxy", fp: fpOf(req), at: new Date().toISOString() });
-      await writeDb(db);
-      recordViolation(ip, 1); // soft signal only — VPN flags have false positives
-      return NextResponse.json({ error: "VPN/Proxy detected. Disable it to earn coins. No VPN on? Wait ~10 min and retry." }, { status: 403 });
-    }
-    // Sponsor must actually open (client-asserted; popup-blocked = retry).
-    if (opened !== true) { recordViolation(ip, 2); return NextResponse.json({ error: "Sponsor did not open. Allow popups and Watch again." }, { status: 400 }); }
     const rec = db.earnNonces.find((n) => n.nonce === String(nonce || ""));
     if (!rec || rec.userId !== p.sub || rec.used || consumedEarnNonces.has(rec.nonce)) {
-      recordViolation(ip, 2);
       return NextResponse.json({ error: "Invalid or expired ad session. Watch again." }, { status: 400 });
     }
     const watched = (Date.now() - rec.at) / 1000;
-    if (watched < EARN_SECONDS) { recordViolation(ip, 2); return NextResponse.json({ error: "Ad skipped too early. Watch the full ad." }, { status: 400 }); }
+    if (watched < EARN_SECONDS) { return NextResponse.json({ error: "Ad skipped too early. Watch the full ad." }, { status: 400 }); }
     if (watched > 600) return NextResponse.json({ error: "Ad session expired. Watch again." }, { status: 400 });
     if (earnedToday(db, p.sub) >= EARN_DAILY_MAX)
       return NextResponse.json({ error: "Daily ad limit reached." }, { status: 400 });

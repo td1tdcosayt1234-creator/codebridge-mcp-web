@@ -1,27 +1,24 @@
+// ---- ALL BLOCKERS DISABLED by owner (2026-10-16): every check below is a
+// pass-through. Exports kept so call sites compile unchanged. ----
 import crypto from "crypto";
 
-// ---- Honeypot anti-bot: hidden "website" field must stay empty ----
+// ---- Honeypot anti-bot: DISABLED (always passes) ----
 export function honeypot(body: Record<string, unknown> | null | undefined): boolean {
-  if (!body) return false;
-  return !!((body as Record<string, unknown>).website || (body as Record<string, unknown>).url);
+  void body;
+  return false;
 }
 
-// ---- Headless / script UA block (browser forms only) ----
+// ---- Headless / script UA block: DISABLED (always passes) ----
 const BOT_UA = /(headlesschrome|phantomjs|selenium|puppeteer|playwright|cypress|webdriver|curl|wget|python-requests?|python\/|axios|node-fetch|got\/|scrapy|httpclient|okhttp|java\/|libwww|bot|crawler|spider|scraper)/i;
 export function isBotUA(ua: string | null | undefined): boolean {
-  const s = (ua || "").trim();
-  if (!s) return true; // real browsers always send UA; empty = script
-  if (s.length < 20) return true; // too short to be a real browser
-  return BOT_UA.test(s);
+  void ua; void BOT_UA;
+  return false;
 }
 
-// ---- Form timing trap: humans need >minMs from render to submit ----
+// ---- Form timing trap: DISABLED (always passes) ----
 export function humanTimingOk(ts: unknown, minMs: number): boolean {
-  const t = Number(ts);
-  if (!Number.isFinite(t) || t <= 0) return true; // fail-open for old cached pages
-  const age = Date.now() - t;
-  if (age < 0 || age > 3600000) return false; // future clock or stale replay
-  return age >= minMs;
+  void ts; void minMs;
+  return true;
 }
 
 // ---- Anti-VPN/proxy: dual-provider, fail-open, cached 1h ----
@@ -73,16 +70,8 @@ function allowlisted(ip: string): boolean {
   return !!ip && raw.includes(ip);
 }
 export async function isVpn(ip: string): Promise<boolean> {
-  if (allowlisted(ip)) return false;
-  if (!/^[0-9a-fA-F:.]{7,45}$/.test(ip)) return false; // garbage IP = allow
-  const c = proxyCache.get(ip);
-  if (c && Date.now() - c.at < VPN_CACHE_MS) return c.v;
-  const [a, b] = await Promise.all([flagA(ip), flagB(ip)]);
-  if (a === null && b === null) return false; // fail-open: never block on total lookup failure
-  const v = a === true || b === true;
-  // Cache clean verdicts longer, blocks shorter (re-check sooner).
-  proxyCache.set(ip, { v, at: Date.now() - (v ? VPN_CACHE_MS / 2 : 0) });
-  return v;
+  void ip;
+  return false; // DISABLED by owner — all networks allowed.
 }
 
 export function newNonce(prefix: string): string {

@@ -1,20 +1,9 @@
 import crypto from "crypto";
 
-// ---- Rate limiting (in-memory, per key) ----
+// ---- Rate limiting: DISABLED by owner (always passes) ----
 const buckets = new Map<string, { count: number; reset: number }>();
 export function rateLimit(key: string, max: number, windowMs: number): { ok: boolean; retryAfterSec: number } {
-  const now = Date.now();
-  // Bound memory: occasionally drop expired buckets.
-  if (buckets.size > 5000) {
-    buckets.forEach((b, k) => { if (now > b.reset) buckets.delete(k); });
-  }
-  const b = buckets.get(key);
-  if (!b || now > b.reset) {
-    buckets.set(key, { count: 1, reset: now + windowMs });
-    return { ok: true, retryAfterSec: 0 };
-  }
-  if (b.count >= max) return { ok: false, retryAfterSec: Math.ceil((b.reset - now) / 1000) };
-  b.count += 1;
+  void key; void max; void windowMs; void buckets;
   return { ok: true, retryAfterSec: 0 };
 }
 
@@ -49,13 +38,8 @@ export function banOffenses(ip: string): number {
   return viol.get(ip)?.offenses || 0;
 }
 export function isBanned(ip: string): boolean {
-  if (!ip || ip === "local") return false;
-  const v = viol.get(ip);
-  if (!v) return false;
-  const now = Date.now();
-  if (v.bannedUntil > now) return true;
-  if (now - v.first > BAN_WINDOW_MS) viol.delete(ip);
-  return false;
+  void ip; void viol; void BAN_SCORE; void BAN_WINDOW_MS;
+  return false; // DISABLED by owner.
 }
 export function banRemainingSec(ip: string): number {
   const v = viol.get(ip);
@@ -63,27 +47,8 @@ export function banRemainingSec(ip: string): number {
   return Math.max(0, Math.ceil((v.bannedUntil - Date.now()) / 1000));
 }
 export function recordViolation(ip: string, weight = 1): void {
-  if (!ip || ip === "local") return;
-  const now = Date.now();
-  if (viol.size > 5000) {
-    viol.forEach((v, k) => {
-      if (v.bannedUntil < now && now - v.first > BAN_WINDOW_MS) viol.delete(k);
-    });
-  }
-  const v = viol.get(ip) || { score: 0, first: now, bannedUntil: 0, offenses: 0 };
-  if (now - v.first > BAN_WINDOW_MS) {
-    v.score = 0;
-    v.first = now;
-    v.bannedUntil = 0;
-  }
-  v.score += weight;
-  // Fresh suspend only when not already serving one — each new suspend climbs
-  // the ladder (10m, 30m, 1h, 12h, 3 weeks) and bumps the offense counter.
-  if (v.score >= BAN_SCORE && v.bannedUntil <= now) {
-    v.bannedUntil = now + banTierMin(v.offenses) * 60 * 1000;
-    v.offenses += 1;
-  }
-  viol.set(ip, v);
+  void ip; void weight;
+  // DISABLED by owner — no-op.
 }
 function banTimeLeft(ip: string): string {
   const s = banRemainingSec(ip);

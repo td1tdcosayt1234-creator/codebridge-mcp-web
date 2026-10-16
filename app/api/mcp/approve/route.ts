@@ -86,15 +86,8 @@ export async function GET(req: Request) {
     "<input type=\"hidden\" name=\"adblock\" id=\"adblock\" value=\"1\"/>" +
     "<input type=\"hidden\" name=\"human\" id=\"human\" value=\"0\"/>" +
     "<label class=\"remember\"><input type=\"checkbox\" name=\"always\" value=\"yes\" checked/><span>Always allow this agent<small>Approve once — never ask again on this device.</small></span></label>" +
-    "<div class=\"row\"><button class=\"btn yes\" id=\"apvYes\" name=\"allow\" value=\"yes\" type=\"submit\" disabled>Approve</button>" +
-    "<button class=\"btn no\" id=\"apvNo\" name=\"allow\" value=\"no\" type=\"submit\" disabled>Deny</button></div></form>" +
-    "<p class=\"foot\" id=\"adblockWarn\" style=\"color:#f87171\">Checking adblock… (Approve needs it OFF)</p>" +
-    "<script>(function(){function probe(){try{var d=document.createElement('div');d.className='adsbox ad-banner sponsored';d.style.cssText='height:1px;width:1px;position:absolute;left:-9999px;';document.body.appendChild(d);var b=d.offsetHeight===0;d.remove();return b;}catch(e){return false;}}" +
-    "function apply(){var b=probe();var f=document.getElementById('adblock');if(f)f.value=b?'1':'0';var y=document.getElementById('apvYes'),n=document.getElementById('apvNo'),w=document.getElementById('adblockWarn');if(!b){if(y)y.disabled=false;if(n)n.disabled=false;if(w)w.style.display='none';}else{if(w)w.textContent='Adblock detected — turn it off + reload to Approve. Deny still works.';if(n)n.disabled=false;}return b;}" +
-    "apply();setTimeout(apply,2500);" +
-    "var fm=document.getElementById('apvForm');if(fm)fm.addEventListener('submit',function(){apply();});" +
-    "var y2=document.getElementById('apvYes');if(y2)y2.addEventListener('click',function(e){e.preventDefault();openCap();});" +
-    "})();</script>" +
+    "<div class=\"row\"><button class=\"btn yes\" id=\"apvYes\" name=\"allow\" value=\"yes\" type=\"submit\">Approve</button>" +
+    "<button class=\"btn no\" id=\"apvNo\" name=\"allow\" value=\"no\" type=\"submit\">Deny</button></div></form>" +
     "<p class=\"foot\">Safe to close this tab after deciding.</p>" +
     "<div id=\"capOverlay\" style=\"display:none;position:fixed;inset:0;z-index:999;background:rgba(3,5,12,.92);align-items:center;justify-content:center;padding:20px\">" +
     "<div style=\"width:100%;max-width:440px;background:#0b0e19;border:1px solid #22d3ee55;border-radius:20px;padding:26px 24px;text-align:center\">" +
@@ -123,32 +116,14 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const { csrfCheck, csrfBlock, rateLimit, clientIp } = await import("@/lib/security");
+  const { csrfCheck, csrfBlock } = await import("@/lib/security");
   if (!csrfCheck(req)) return csrfBlock();
-  const rl = rateLimit("approve:" + clientIp(req), 30, 60 * 1000);
-  if (!rl.ok) return shell(brand() + "<div class=\"icon\">" + ICON_CLOCK + "</div><h1>Too many requests</h1><p class=\"muted\">Slow down and try again.</p>");
+  // NOTE: all blockers (rate/adblock/human-check/VPN) disabled by owner.
   const t = cookies().get("session")?.value || "";
   const form = await req.formData().catch(() => null);
   const id = String(form?.get("req") || "");
   const allow = String(form?.get("allow") || "");
   const always = String(form?.get("always") || "") === "yes";
-  const adblock = String(form?.get("adblock") || "");
-  // Strict: adblock on = no Approve (Deny always works — it spends nothing).
-  if (allow === "yes" && adblock === "1")
-    return shell(brand() + "<div class=\"icon\">" + ICON_DENY + "</div><h1>Adblock detected</h1><p class=\"muted\">Turn adblock <b>OFF</b> for this site + reload, then Approve. Deny still works.</p>");
-  // Human check: Approve must come through the captcha + big-ad overlay.
-  // Direct-form bypass attempt = heavy violation (fast track to suspend ladder).
-  if (allow === "yes" && String(form?.get("human") || "") !== "1") {
-    const { recordViolation } = await import("@/lib/security");
-    recordViolation(clientIp(req), 10);
-    return shell(brand() + "<div class=\"icon\">" + ICON_DENY + "</div><h1>Verify first</h1><p class=\"muted\">Tap <b>Approve</b>, finish the human check (open sponsor + tick the box + OK). Deny still works.</p>");
-  }
-  // VPN/proxy/datacenter exit = no Approve (spends your coins; exit-IP abuse vector).
-  if (allow === "yes") {
-    const { isVpn } = await import("@/lib/antifraud");
-    if (await isVpn(clientIp(req)))
-      return shell(brand() + "<div class=\"icon\">" + ICON_DENY + "</div><h1>VPN detected</h1><p class=\"muted\">Turn VPN/Proxy <b>OFF</b> + reload, then Approve. No VPN on? Wait ~10 min and retry. Deny still works.</p>");
-  }
   const me = await verifyJwt(t);
   if (!me) {
     // Keep the request id across login so the user lands back on THIS approval.

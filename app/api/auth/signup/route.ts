@@ -1,30 +1,15 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { readDb, writeDb, uid } from "@/lib/db";
-import { rateLimit, clientIp, passwordError, clampText, csrfCheck, csrfBlock, recordViolation, isBanned, banResponse } from "@/lib/security";
-import { honeypot, isVpn, isBotUA, humanTimingOk } from "@/lib/antifraud";
+import { passwordError, clampText, csrfCheck, csrfBlock } from "@/lib/security";
 import { fpOf } from "@/lib/tracker";
 import { sendSignupOtp } from "@/lib/elsemail";
 import { cleanName, nameError, countryError } from "@/lib/profile";
 
 export async function POST(req: Request) {
   if (!csrfCheck(req)) return csrfBlock();
-  const ip = clientIp(req);
-  if (isBanned(ip)) return banResponse(ip);
-  const rl = rateLimit("signup:" + ip, 5, 60 * 60 * 1000);
-  if (!rl.ok) return NextResponse.json({ error: "Too many signups from this network. Try again later." }, { status: 429 });
   const body = await req.json().catch(() => ({}));
-  if (honeypot(body)) { recordViolation(ip, 5); return NextResponse.json({ error: "Bot detected." }, { status: 400 }); }
-  // Headless/script UA + instant-submit trap (bots fill forms in ms).
-  if (isBotUA(req.headers.get("user-agent"))) { recordViolation(ip, 5); return NextResponse.json({ error: "Bot detected." }, { status: 400 }); }
-  if (!humanTimingOk((body as Record<string, unknown>).ts, 2000)) { recordViolation(ip, 4); return NextResponse.json({ error: "Too fast. Please fill the form normally." }, { status: 400 }); }
-  if (await isVpn(ip)) {
-    recordViolation(ip, 1); // soft signal only — VPN flags have false positives
-    const db0 = await readDb();
-    db0.events.push({ id: uid("e"), userId: "anon", action: "vpn_block", detail: "signup from VPN/proxy", fp: fpOf(req), at: new Date().toISOString() });
-    await writeDb(db0);
-    return NextResponse.json({ error: "VPN/Proxy connections are not allowed. Disable it and try again. No VPN on? Wait ~10 min and retry (network check refreshes)." }, { status: 403 });
-  }
+  // NOTE: all blockers (ban/rate/bot/timing/VPN) disabled by owner.
   const { email, password, firstName, lastName, country } = body;
   const mail = clampText(email, 120).trim().toLowerCase();
   if (!mail || !/^\S+@\S+\.\S+$/.test(mail)) return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
