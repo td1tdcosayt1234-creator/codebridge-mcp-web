@@ -6,9 +6,9 @@ MCP diye coding agent thekei full output paoa jay — dashboard e jete hoy na.
 ## Live URLs (Cloudflare)
 | Host | Ki ase |
 |---|---|
-| **https://roun.sryze.cc** | Public site — home, /pricing, /about, /mcp, /docs, /faq, /support, /login, /signup, /game |
-| **https://dash.roun.sryze.cc** | Dashboard — `/` = dashboard, `/tasks`, `/builds`, `/mcp` (key), `/earn`, `/settings`, `/tokens`, `/tracking`, `/uses`, `/github`; admin: `/admin/*` |
-| **https://api.roun.sryze.cc/api/mcp** | MCP endpoint (agent connect — shudhu MCP + OAuth ai host e) |
+| **[Roun — https://roun.sryze.cc](https://roun.sryze.cc)** | Public site — home, /pricing, /about, /mcp, /docs, /faq, /support, /login, /signup, /game |
+| **[Dashboard — https://dash.roun.sryze.cc](https://dash.roun.sryze.cc)** | Dashboard — `/` = dashboard, `/tasks`, `/builds`, `/mcp` (key), `/earn`, `/settings`, `/tokens`, `/tracking`, `/uses`, `/github`; admin: `/admin/*` |
+| **[MCP endpoint — https://api.roun.sryze.cc/api/mcp](https://api.roun.sryze.cc/api/mcp)** | MCP endpoint (agent connect — shudhu MCP + OAuth ai host e) |
 
 Middleware host-protocol: main host e `/dashboard/*` → dash host, `/api/mcp*` → api host (307). Pura host layout `middleware.ts` e.
 
