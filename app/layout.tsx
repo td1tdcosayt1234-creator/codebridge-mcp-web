@@ -53,6 +53,10 @@ function isAuthPath(p: string): boolean {
 export async function generateMetadata(): Promise<Metadata> {
   const host = reqHost();
   const indexable = PUBLIC_HOSTS.includes(host) || host === "" || host === "localhost";
+  const base = (process.env.SITE_URL || "https://roun.sryze.cc").replace(/\/+$/, "");
+  let cpath = reqPath();
+  if (!cpath.startsWith("/")) cpath = "/" + cpath;
+  if (cpath.length > 1) cpath = cpath.replace(/\/+$/, "");
   return {
     title: {
       default: "Roun — Request to Cloud Build",
@@ -61,6 +65,7 @@ export async function generateMetadata(): Promise<Metadata> {
       "Send a compile request on the web, Roun Co Pilot builds it in the cloud, the output comes back to you. Plus Game Studio: plan, build and play AI games.",
     keywords: ["Roun", "Roun Co Pilot", "cloud build", "compile online", "AI fix", "APK build", "Game Studio", "roun.sryze.cc"],
     metadataBase: new URL(process.env.SITE_URL || "https://roun.sryze.cc"),
+    alternates: indexable ? { canonical: base + cpath } : undefined,
     robots: indexable ? { index: true, follow: true } : { index: false, follow: false },
     verification: process.env.GOOGLE_SITE_VERIFICATION
       ? { google: process.env.GOOGLE_SITE_VERIFICATION }
@@ -69,7 +74,7 @@ export async function generateMetadata(): Promise<Metadata> {
       title: "Roun — Request to Cloud Build + Game Studio",
       description: "Cloud builds with AI auto-fix. Chat to plan, build and play single-file HTML5 games.",
       type: "website",
-      url: "/",
+      url: cpath,
       siteName: "Roun",
     },
     twitter: { card: "summary_large_image", title: "Roun", description: "Request → cloud build → result. Plus AI Game Studio." },
