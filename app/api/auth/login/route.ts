@@ -7,6 +7,7 @@ import { cookieSecure, cookieDomain, csrfCheck, csrfBlock } from "@/lib/security
 export async function POST(req: Request) {
   if (!csrfCheck(req)) return csrfBlock();
   const { email, password, remember } = await req.json().catch(() => ({}));
+  const { fpOf } = await import("@/lib/tracker");
   // NOTE: all blockers (ban/bot/timing/rate/lockout) disabled by owner.
   const mail = String(email || "").trim().toLowerCase().slice(0, 120);
   if (!mail || !password) return NextResponse.json({ error: "Email and password are required." }, { status: 400 });

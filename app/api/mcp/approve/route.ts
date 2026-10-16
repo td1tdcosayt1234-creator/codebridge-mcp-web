@@ -116,7 +116,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const { csrfCheck, csrfBlock } = await import("@/lib/security");
+  const { csrfCheck, csrfBlock, clientIp } = await import("@/lib/security");
   if (!csrfCheck(req)) return csrfBlock();
   // NOTE: all blockers (rate/adblock/human-check/VPN) disabled by owner.
   const t = cookies().get("session")?.value || "";
