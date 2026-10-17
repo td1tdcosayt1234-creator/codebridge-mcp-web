@@ -124,6 +124,16 @@ export async function middleware(req: NextRequest) {
 
   // ---- roun.sryze.cc (and other *.roun.sryze.cc hosts): public site ----
   if (isSryzeHost(host)) {
+    // http → https on the public site: the origin is plain HTTP and Cloudflare
+    // fronts it, so both schemes serve 200 and Google split the index between
+    // them (GSC: "Duplicate without user-selected canonical"). 301 everything
+    // on the main host to the https form. cloudflared sets X-Forwarded-Proto
+    // per visitor scheme; header absent = direct LAN/dev hit on the origin,
+    // where redirecting would loop — so only redirect when proto is "http".
+    const proto = (req.headers.get("x-forwarded-proto") || "").split(",")[0].trim().toLowerCase();
+    if (host === MAIN_HOST && proto === "http") {
+      return NextResponse.redirect(new URL(p + search, "https://" + MAIN_HOST), 301);
+    }
     if (p.startsWith("/dashboard") || p.startsWith("/admin")) {
       return redirectTo(DASH_HOST, p, search);
     }
