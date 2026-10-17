@@ -127,11 +127,19 @@ export async function middleware(req: NextRequest) {
     // http → https on the public site: the origin is plain HTTP and Cloudflare
     // fronts it, so both schemes serve 200 and Google split the index between
     // them (GSC: "Duplicate without user-selected canonical"). 301 everything
-    // on the main host to the https form. cloudflared sets X-Forwarded-Proto
-    // per visitor scheme; header absent = direct LAN/dev hit on the origin,
-    // where redirecting would loop — so only redirect when proto is "http".
-    const proto = (req.headers.get("x-forwarded-proto") || "").split(",")[0].trim().toLowerCase();
-    if (host === MAIN_HOST && proto === "http") {
+    // on the main host to the https form. cloudflared always reports
+    // x-forwarded-proto as https (edge→tunnel connection), so the visitor's
+    // real scheme comes from CF-Visitor instead; header absent (LAN/dev hit)
+    // = no redirect, never loop.
+    const cfv = req.headers.get("cf-visitor") || "";
+    let visitorScheme = "";
+    try {
+      const parsed = JSON.parse(cfv) as { scheme?: unknown } | null;
+      visitorScheme = typeof parsed?.scheme === "string" ? parsed.scheme.trim().toLowerCase() : "";
+    } catch {
+      visitorScheme = "";
+    }
+    if (host === MAIN_HOST && visitorScheme === "http") {
       return NextResponse.redirect(new URL(p + search, "https://" + MAIN_HOST), 301);
     }
     if (p.startsWith("/dashboard") || p.startsWith("/admin")) {
