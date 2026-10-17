@@ -47,6 +47,7 @@ export default function Footer() {
             <h3>Resources</h3>
             <Link href="/docs">Docs</Link>
             <Link href="/docs/game">Game Docs</Link>
+            <Link href="/demo">Demo</Link>
             <Link href="/faq">FAQ</Link>
             <Link href="/support">Support</Link>
             <Link href="/about">About</Link>
@@ -55,6 +56,8 @@ export default function Footer() {
             <h3>Legal</h3>
             <Link href="/terms">Terms</Link>
             <Link href="/privacy">Privacy</Link>
+            <Link href="/security">Security</Link>
+            <Link href="/refund">Refund</Link>
             {me ? (
               <Link href={me.role === "admin" ? "/admin" : "/dashboard"}>
                 {me.role === "admin" ? "Admin" : "Dashboard"}
@@ -68,7 +71,10 @@ export default function Footer() {
           </div>
         </div>
         <div className="footer-bottom">
-          <span>© {new Date().getFullYear()} Roun — request → cloud build → result</span>
+          <span>
+            © {new Date().getFullYear()} Roun — request → cloud build → result · operated by Tanvir Islam, Bangladesh ·
+            <a href="mailto:Talhamoyelolo52@gmail.com"> Talhamoyelolo52@gmail.com</a>
+          </span>
           <span className="status">
             <i />
             All systems normal

@@ -10,10 +10,12 @@ type Props = {
   className?: string;
 };
 
-/** Counts up to `value` the first time it scrolls into view. */
+/** Counts up to `value` the first time it scrolls into view.
+ *  Server render + no-JS always paint the final value (never a false "0");
+ *  the 0→value animation is optional client-side candy after hydration. */
 export default function Counter({ value, suffix = "", prefix = "", decimals = 0, duration = 1500, className = "" }: Props) {
   const ref = useRef<HTMLSpanElement>(null);
-  const [display, setDisplay] = useState(0);
+  const [display, setDisplay] = useState(value);
   const done = useRef(false);
 
   useEffect(() => {

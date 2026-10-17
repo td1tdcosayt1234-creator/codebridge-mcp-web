@@ -13,8 +13,13 @@ export default function Terms() {
       <PageHero kicker="Legal" title={<>Terms of <span className="grad-anim">Use</span></>} sub="Short and clear. Using the service means you accept them." />
 
       <Reveal variant="left">
-        <h3>1. Service</h3>
-        <p>Roun compiles your web requests with AI in the cloud (compile only, all types). Fair-use limits of the cloud backend apply.</p>
+        <h3>1. Service + who runs it</h3>
+        <p>
+          Roun (roun.sryze.cc) is operated by <strong>Tanvir Islam, Bangladesh</strong>. It compiles your web requests
+          with AI in the cloud (compile only, all types). Fair-use limits of the cloud backend apply. For paid plans,
+          <strong> Paddle.com acts as merchant of record</strong>: checkouts, invoices, recurring billing and refunds are
+          processed by Paddle on our behalf.
+        </p>
       </Reveal>
       <Reveal variant="left" delay={60}>
         <h3>2. Account + tokens</h3>
@@ -38,8 +43,12 @@ export default function Terms() {
         <p>&ldquo;As-is&rdquo; service. Max liability for build failures, downtime or data loss = what you paid last month ($0 on free). Keep backups of critical code.</p>
       </Reveal>
       <Reveal variant="left" delay={60}>
-        <h3>6. Changes</h3>
-        <p>Term changes are announced on the dashboard. Questions? <a href="/support">/support</a>.</p>
+        <h3>6. Changes + contact</h3>
+        <p>
+          Term changes are announced on the dashboard. Contact: open a ticket at <a href="/support">/support</a> or
+          email <a href="mailto:Talhamoyelolo52@gmail.com">Talhamoyelolo52@gmail.com</a>. Payment/billing questions for
+          paid plans can also go to Paddle&rsquo;s buyer support via the email on your Paddle receipt.
+        </p>
       </Reveal>
     </div>
   );

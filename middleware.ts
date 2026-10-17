@@ -49,7 +49,7 @@ function isMcpApi(p: string): boolean {
 const PUBLIC_PAGES = [
   "/about", "/docs", "/faq", "/pricing", "/privacy", "/refund",
   "/terms", "/support", "/login", "/signup", "/welcome", "/game", "/dev",
-  "/forgot-password", "/reset-password",
+  "/forgot-password", "/reset-password", "/security", "/demo",
 ];
 function isPublicPage(p: string): boolean {
   return PUBLIC_PAGES.some((x) => p === x || p.startsWith(x + "/"));

@@ -22,7 +22,13 @@ export default function RefundPolicy() {
       </Reveal>
       <Reveal variant="left" delay={60}>
         <h3>3. Requests</h3>
-        <p>To request a review, open <a href="/support">/support</a> with your transaction ID and the reason. We review each case and may offer credit or a refund where appropriate.</p>
+        <p>
+          To request a review, open <a href="/support">/support</a> with your transaction ID and the reason, or email
+          <a href="mailto:Talhamoyelolo52@gmail.com"> Talhamoyelolo52@gmail.com</a>. We review each case and may offer
+          credit or a refund where appropriate. Refunds for card payments are issued through Paddle (merchant of
+          record) and typically return to your card within 5–10 business days; regional rules of your country may
+          give you additional refund rights, which Paddle honors.
+        </p>
       </Reveal>
       <Reveal variant="left" delay={60}>
         <h3>4. Chargebacks</h3>

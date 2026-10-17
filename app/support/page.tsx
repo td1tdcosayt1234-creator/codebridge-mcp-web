@@ -70,6 +70,14 @@ export default function Support() {
         ))}
       </div>
 
+      <Reveal delay={120}>
+        <p className="muted small" style={{ textAlign: "center" }}>
+          Prefer email? Write to <a href="mailto:Talhamoyelolo52@gmail.com">Talhamoyelolo52@gmail.com</a> — both paths
+          reach the same admin inbox (security reports: subject &ldquo;Security&rdquo;, see
+          <a href="/security"> /security</a>).
+        </p>
+      </Reveal>
+
       <Reveal delay={140} variant="scale">
         <div className="card holo" style={{ maxWidth: 620, margin: "30px auto 0" }}>
           <h3>Open a ticket</h3>
