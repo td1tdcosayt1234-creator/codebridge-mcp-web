@@ -1,19 +1,19 @@
 "use client";
 import { useEffect } from "react";
 
-// Monetag Multitag — client-side (site already verified in dashboard).
+// Monetag — client-side (site already verified in dashboard).
+// Loadout (banner + popup exactly once each — no Multitag wrapper stacking):
+//   + Vignette fullscreen native banner: Immortal tag (11997991) — also
+//     server-rendered in <head> (layout.tsx) so the installer bot sees it
+//   + OnClick Popunder popup: Pretty tag (12029909)
+//   + In-Page Push banner: Magnificent tag (12029910)
 // WHERE IT LOADS:
 //   + public host (roun.sryze.cc) EXCEPT auth pages
 //   + dash host ONLY on the coin-earn page (/earn)
 // NEVER on: /signup, /login (OnClick popunder would hijack form taps),
 // dashboard/admin/api (tool UI stays clean).
-const TAG_SRC = "https://quge5.com/88/tag.min.js";
-const TAG_ZONE = "293462";
-// Standalone Vignette (extra zone from dashboard).
 const VIG_SRC = "https://n6wxm.com/vignette.min.js";
 const VIG_ZONE = "11997991";
-const VIG_ZONE_2 = "12029788"; // Industrious tag (Vignette Banner, video/interstitial)
-// Standalone OnClick popunder (high CPM) + In-Page Push banner.
 const ONCLICK_SRC = "https://al5sm.com/tag.min.js";
 const ONCLICK_ZONE = "12029909";
 const INPAGE_SRC = "https://nap5k.com/tag.min.js";
@@ -56,12 +56,11 @@ export default function MonetagTag() {
       const isEarn = h === DASH_HOST && (p === "/earn" || p.startsWith("/earn/"));
       if (!isPublic && !isEarn) return;
       // Deferred + staggered: ad scripts must never fight first paint.
-      // Multitag first when idle, rest 1.2s apart so low-end phones stay smooth.
+      // Primary vignette is already in <head> (layout.tsx, same zone is
+      // deduped by addTag); remaining tags 1.2s apart so low-end phones stay smooth.
       const run = () => {
-        addTag("multitag", TAG_SRC, TAG_ZONE, true);
-        timers.push(setTimeout(() => addTag("vignette", VIG_SRC, VIG_ZONE, false), 1200));
-        timers.push(setTimeout(() => addTag("vignette2", VIG_SRC, VIG_ZONE_2, false), 2400));
-        timers.push(setTimeout(() => addTag("onclick", ONCLICK_SRC, ONCLICK_ZONE, false), 3600));
+        addTag("vignette", VIG_SRC, VIG_ZONE, false);
+        timers.push(setTimeout(() => addTag("onclick", ONCLICK_SRC, ONCLICK_ZONE, false), 2400));
         timers.push(setTimeout(() => addTag("inpage", INPAGE_SRC, INPAGE_ZONE, false), 4800));
       };
       const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;

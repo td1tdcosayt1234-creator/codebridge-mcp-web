@@ -10,18 +10,20 @@ import Nav from "../components/Nav";
 import MonetagTag from "../components/ads/MonetagTag";
 import GoogleAnalytics from "../components/GoogleAnalytics";
 
-// Monetag Multitag loads client-side (site already verified in dashboard).
-// Auth pages (/signup, /login) are excluded inside <MonetagTag/> so the
-// OnClick popunder can never hijack form taps.
-// Standalone Vignette renders server-side in <head> on the public host so
-// Monetag's installer bot sees it in the HTML (banner never hijacks taps,
-// so auth pages are safe).
+// Monetag tags load client-side (site already verified in dashboard) — see
+// components/ads/MonetagTag.tsx. Loadout: Vignette banner (Immortal, here +
+// there), OnClick Popunder popup (Pretty) and In-Page Push banner (Magnificent).
+// Auth pages (/signup, /login) are excluded so popunder/vignette can never
+// hijack form taps.
+// The primary Vignette (Immortal tag) also renders server-side in <head> on
+// the public host so Monetag's installer bot sees it in the HTML (banner never
+// hijacks taps, so auth pages are safe).
 
 const VIG_SRC = "https://n6wxm.com/vignette.min.js";
 const VIG_ZONE = "11997991";
-// NOTE: second Vignette (12029788) + OnClick + In-Page Push load deferred via
-// <MonetagTag/> so first paint stays fast; only the primary tag stays in <head>
-// so Monetag's installer bot still sees it in the HTML.
+// NOTE: OnClick (12029909) + In-Page Push (12029910) load deferred via
+// <MonetagTag/> so first paint stays fast; only the primary Vignette stays
+// in <head> so Monetag's installer bot still sees it in the HTML.
 const PUBLIC_HOSTS = ["roun.sryze.cc", "www.roun.sryze.cc"];
 
 function reqHost(): string {
