@@ -7,23 +7,8 @@ import CinematicBackdrop from "../components/CinematicBackdrop";
 import CinematicFX from "../components/CinematicFX";
 import Footer from "../components/Footer";
 import Nav from "../components/Nav";
-import MonetagTag from "../components/ads/MonetagTag";
 import GoogleAnalytics from "../components/GoogleAnalytics";
 
-// Monetag tags load client-side (site already verified in dashboard) — see
-// components/ads/MonetagTag.tsx. Loadout: Vignette banner (Immortal, here +
-// there), OnClick Popunder popup (Pretty) and In-Page Push banner (Magnificent).
-// Auth pages (/signup, /login) are excluded so popunder/vignette can never
-// hijack form taps.
-// The primary Vignette (Immortal tag) also renders server-side in <head> on
-// the public host so Monetag's installer bot sees it in the HTML (banner never
-// hijacks taps, so auth pages are safe).
-
-const VIG_SRC = "https://n6wxm.com/vignette.min.js";
-const VIG_ZONE = "11997991";
-// NOTE: OnClick (12029909) + In-Page Push (12029910) load deferred via
-// <MonetagTag/> so first paint stays fast; only the primary Vignette stays
-// in <head> so Monetag's installer bot still sees it in the HTML.
 const PUBLIC_HOSTS = ["roun.sryze.cc", "www.roun.sryze.cc"];
 
 function reqHost(): string {
@@ -42,13 +27,6 @@ function reqPath(): string {
   } catch {
     return "";
   }
-}
-
-// Auth forms: no ad tags ever (popunder/vignette would hijack form taps).
-// Matches AUTH_PATHS in <MonetagTag/> — keep the two lists in sync.
-const AUTH_PATHS = ["/login", "/signup"];
-function isAuthPath(p: string): boolean {
-  return AUTH_PATHS.some((a) => p === a || p.startsWith(a + "/"));
 }
 
 // Host-aware metadata: ONLY the public site is indexable. dash/api hosts
@@ -93,17 +71,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {
-  // Primary vignette in <head> so Monetag's installer bot sees it in HTML —
-  // never on auth forms (same rule as <MonetagTag/>).
-  const vigHead = PUBLIC_HOSTS.includes(reqHost()) && !isAuthPath(reqPath());
   const gaId = PUBLIC_HOSTS.includes(reqHost()) ? process.env.NEXT_PUBLIC_GA_ID || "" : "";
   return (
     <html lang="en">
-      <head>
-        {vigHead && (
-          <script src={VIG_SRC} data-zone={VIG_ZONE} async data-cfasync="false" />
-        )}
-      </head>
       <body>
         <script
           type="application/ld+json"
@@ -120,7 +90,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
         <CinematicBackdrop />
         <CinematicFX />
-        <MonetagTag />
         <GoogleAnalytics id={gaId} />
 
         <header className="nav">
