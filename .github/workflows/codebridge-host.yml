@@ -145,19 +145,31 @@ jobs:
           sleep 19800 # 5h30m (build+tunnel took ~10-20m, total ~6h)
         timeout-minutes: 335
 
-      - name: Self-chain replacement (zero downtime)
+      - name: Self-chain replacement (zero downtime, retry x5)
         # success() only: a keeper-cancelled / failed run must NOT chain —
         # otherwise every prune spawns a replacement and runs die in ~10m
         # instead of living the full 6h (cancel-loop).
+        # Verified retry: the old single curl had continue-on-error, so ONE
+        # failed dispatch silently ended the chain and the site gapped for
+        # hours until a (drifting, 3-5h) keeper run noticed. Now: retry 5x,
+        # require HTTP 204, and FAIL the job loudly if the chain is dead —
+        # the denser keeper will reboot the site within ~15-25m.
         if: success()
-        continue-on-error: true
         run: |
-          if [ -z "${GH_PAT}" ]; then echo "GH_PAT not set - relying on schedule (may gap)"; exit 0; fi
+          if [ -z "${GH_PAT}" ]; then echo "GH_PAT not set - relying on keeper"; exit 0; fi
           WF_ID=$(curl -fsSL -H "Authorization: Bearer ${GH_PAT}" \
             "https://api.github.com/repos/${{ github.repository }}/actions/workflows/codebridge-host.yml" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).id))")
-          curl -fsSL -X POST -H "Authorization: Bearer ${GH_PAT}" -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/${WF_ID}/dispatches" \
-            -d '{"ref":"main"}' && echo "replacement dispatched"
+          ok=""
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+              -H "Authorization: Bearer ${GH_PAT}" -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/workflows/${WF_ID}/dispatches" \
+              -d '{"ref":"main"}' || echo 000)
+            echo "chain attempt $i -> HTTP $code"
+            if [ "$code" = "204" ]; then ok=1; echo "replacement dispatched"; break; fi
+            sleep 30
+          done
+          if [ -z "$ok" ]; then echo "CHAIN FAILED after 5 attempts"; exit 1; fi
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
 

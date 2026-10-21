@@ -1,24 +1,59 @@
-# CodeBridge keeper — checks site health every 5 minutes and re-boots the
-# 6h host workflow when https://roun.sryze.cc is unreachable.
+# CodeBridge keeper — watchdog for https://roun.sryze.cc
+#
+# Checks site health and re-boots the 6h host workflow when unreachable.
+#
+# WHY 3 staggered crons instead of a single */5:
+#   GitHub's scheduler silently drifted for this repo (observed Oct 19-21:
+#   single-cron runs landed 2.5h-5h apart). During those gaps the site sat
+#   dead long enough for Googlebot to get "Couldn't fetch" on the sitemap
+#   and drop the already-indexed homepage to "Crawled - currently not
+#   indexed". Three offset entries cut the worst-case blind window if one
+#   or two schedule events get skipped/delayed.
+#
+# Flow when unhealthy:
+#   1. 3 quick health tries (a single blip shouldn't reboot the host)
+#   2. dispatch codebridge-host.yml
+#   3. wait 75s, re-check; dispatch + verify again up to 3 total —
+#      the old keeper dispatched once and trusted it, which left the
+#      site down for a whole keeper-cycle when a dispatch was skipped.
 name: CodeBridge keeper (health)
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "2,22,42 * * * *"
+    - cron: "7,27,47 * * * *"
+    - cron: "12,32,52 * * * *"
   workflow_dispatch:
 permissions:
   actions: write
 jobs:
   keep:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Health check
+      - name: Health check (3 tries)
         id: hc
         run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://roun.sryze.cc/api/health || echo 000)
-          echo "code=$code"
-          if [ "$code" = "200" ]; then echo "healthy=true" >> "$GITHUB_OUTPUT"; else echo "healthy=false" >> "$GITHUB_OUTPUT"; fi
-      - name: Dispatch host workflow when down
+          ok=0
+          for i in 1 2 3; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 https://roun.sryze.cc/api/health || echo 000)
+            echo "try $i code=$code"
+            if [ "$code" = "200" ]; then ok=1; break; fi
+            sleep 20
+          done
+          if [ "$ok" = "1" ]; then echo "healthy=true" >> "$GITHUB_OUTPUT"; else echo "healthy=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Dispatch + verify host reboot (when down)
         if: steps.hc.outputs.healthy != 'true'
-        run: gh workflow run codebridge-host.yml --ref main
+        run: |
+          for attempt in 1 2 3; do
+            gh workflow run codebridge-host.yml --ref main
+            echo "dispatch #$attempt sent; waiting 120s for build+server+tunnel boot..."
+            sleep 120
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 https://roun.sryze.cc/api/health || echo 000)
+            echo "after dispatch #$attempt: code=$code"
+            if [ "$code" = "200" ]; then echo "RECOVERED after $attempt dispatch(es)"; exit 0; fi
+          done
+          echo "still down after 3 dispatch attempts — next keeper cycle will retry"
+          exit 1
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
