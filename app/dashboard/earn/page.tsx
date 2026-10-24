@@ -2,6 +2,10 @@
 import { useAdblock } from "../../../components/ads/useAdblock";
 // Monetag SmartLink (sponsor) — opens on Watch, reward still verified server-side.
 const SMARTLINK_URL = "https://uplcm.com/4/12029550";
+// Earn gate: coins are only earnable inside the CodeBridge Android app
+// (its WebView appends a CodeBridgeApp/ marker to the User-Agent).
+const IS_APP = typeof navigator !== "undefined" && /CodeBridgeApp\//.test(navigator.userAgent);
+
 export default function Earn(){
   const [info,setInfo]=useState<any>(null); const [nonce,setNonce]=useState(""); const [left,setLeft]=useState(0); const [msg,setMsg]=useState(""); const { adblock, recheck } = useAdblock();
   const finishing=useRef(false); const openedRef=useRef(false);
@@ -18,6 +22,7 @@ export default function Earn(){
   },[nonce]);
   async function start(){
     setMsg("");
+    if(!IS_APP){ setMsg("Earn from mobile — open the CodeBridge Android app to earn coins."); return; }
     finishing.current=false;
     // Re-probe at click time: blockers enabled mid-session must not slip through.
     const blockedNow = recheck();
@@ -72,6 +77,7 @@ export default function Earn(){
         {!nonce
           ? (<div><div style={{fontSize:40}}>📺</div><p className="muted small">Sponsored — real ads on this page pay for your coins</p>
               <button className="btn" disabled={info.remainingToday<=0} onClick={start}>{info.remainingToday<=0?"Daily limit reached":"Watch ad (+"+info.reward+")"}</button>
+              {!IS_APP && <p className="small" style={{marginTop:8}}>📱 Earn from mobile — earning is only available in the CodeBridge Android app.</p>}
               <p className="muted small" style={{marginTop:8}}>Watch opens sponsor link in new tab — keep it open full {info.seconds}s. <a href={SMARTLINK_URL} target="_blank" rel="noopener noreferrer" onClick={()=>{ openedRef.current = true; }}>Open sponsor manually</a></p></div>)
           : (<div><div style={{fontSize:40}}>▶️</div><p><b>Ad playing... {left}s</b></p>
               <div style={{background:"#ffffff14",borderRadius:8,height:10}}><div style={{width:((info.seconds>0?(info.seconds-left)/info.seconds*100:0))+"%",height:10,borderRadius:8,background:"linear-gradient(90deg,#6c8cff,#22d3ee)"}}/></div>

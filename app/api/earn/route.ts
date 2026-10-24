@@ -37,6 +37,16 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  // Earn only from the CodeBridge Android app. The app's WebView appends a
+  // "CodeBridgeApp/1.x" marker to its User-Agent; every other client (web
+  // browser, curl) gets the "earn from mobile" pointer instead of an ad session.
+  const ua = req.headers.get("user-agent") || "";
+  if (!ua.includes("CodeBridgeApp/")) {
+    return NextResponse.json(
+      { error: "Earn from mobile — open the CodeBridge Android app to earn." },
+      { status: 403 }
+    );
+  }
   const p = await me();
   if (!p) return NextResponse.json({ error: "auth" }, { status: 401 });
   const { csrfCheck, csrfBlock } = await import("@/lib/security");
