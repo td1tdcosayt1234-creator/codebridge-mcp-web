@@ -541,7 +541,7 @@ jobs:
 `;
 export default function AdminRunner(){
   const [st,setSt]=useState<any>(null); const [repo,setRepo]=useState(""); const [wf,setWf]=useState("opencode-task.yml"); const [msg,setMsg]=useState(""); const [newToken,setNewToken]=useState("");
-  async function load(){ const r=await fetch("/api/admin/runner"); const j=await r.json(); setSt(j); if(j.builderRepo!==undefined){ setRepo(j.builderRepo||""); setWf(j.builderWorkflow||"opencode-task.yml"); } }
+  async function load(){ const r=await fetch("/api/admin/runner"); const j=await r.json(); setSt(j); if(j.builderRepo!==undefined){ setRepo(j.builderRepoDefaulted?"":(j.builderRepo||"")); setWf(j.builderWorkflow||"opencode-task.yml"); } }
   useEffect(()=>{load();},[]);
   async function save(e:any){ e.preventDefault(); const r=await fetch("/api/admin/runner",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({builderRepo:repo,builderWorkflow:wf})}); setMsg(r.ok?"Saved.":"Failed"); load(); }
   async function regen(){ if(!confirm("Generate a new runner token? The old token will stop working.")) return; const r=await fetch("/api/admin/runner",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({regenerate:true})}); const j=await r.json(); if(r.ok){ setNewToken(j.token); setMsg("Shown only once — copy it into the repo secret now."); } load(); }
@@ -552,12 +552,13 @@ export default function AdminRunner(){
     <p className="muted small">Users send requests on the web → the web dispatches the workflow on the builder repo → the cloud runner builds in Actions → output returns to the web → users read it. Users never touch repos.</p>
     <div className="grid g2">
       <div className="card"><h3>1️⃣ Builder repo</h3><form onSubmit={save}>
-        <label>Builder repo (owner/repo) — the workflow file must live here</label><input value={repo} onChange={e=>setRepo(e.target.value)} placeholder="owner/repo"/>
+        <label>Builder repo (owner/repo) — the workflow file must live here</label><input value={repo} onChange={e=>setRepo(e.target.value)} placeholder={st?.builderRepoDefaulted?(st.builderRepo||"owner/repo"):"owner/repo"}/>
+        {st?.builderRepoDefaulted&&<p className="muted small" style={{margin:"4px 0"}}>Default repo auto-selected: <code>{st.builderRepo}</code>. Works without admin setup — leave empty and Save, or type owner/repo to override.</p>}
         <label>Workflow file</label><input value={wf} onChange={e=>setWf(e.target.value)}/>
         <div style={{marginTop:10}}><button className="btn">Save</button></div></form>{msg&&<p className="small">{msg}</p>}
         <p className="muted small">Status: queued {st.counts?.queued||0} • running {st.counts?.running||0} • done {st.counts?.done||0} • failed {st.counts?.failed||0}</p></div>
-      <div className="card"><h3>2️⃣ Runner token {st.tokenConfigured?<span className="badge ok">set</span>:<span className="badge bad">not set</span>}</h3>
-        <p className="muted small">Add it as the <code>RUNNER_TOKEN</code> secret in the builder repo.</p>
+      <div className="card"><h3>2️⃣ Runner token {st.tokenConfigured?<span className="badge ok">set</span>:<span className="badge bad">not set</span>}{st.tokenSource==="env"&&<span className="badge" style={{marginLeft:6}}>from env RUNNER_TOKEN</span>}</h3>
+        <p className="muted small">Add it as the <code>RUNNER_TOKEN</code> secret in the builder repo. Zero-admin alternative: set <code>RUNNER_TOKEN</code> in the web server .env — then no regenerate needed.</p>
         <button className="btn-ghost" onClick={regen}>Regenerate token</button>
         {newToken&&<pre style={{marginTop:8}}>{newToken}</pre>}</div>
     </div>

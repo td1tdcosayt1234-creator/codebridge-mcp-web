@@ -110,6 +110,13 @@ TOKEN_ENC_KEY=32chars-min-key
 2. `/admin/runner` — builder repo (owner/repo) + workflow file + runner token regenerate → builder repo secrets: `WEB_URL` (public URL; localhost e cloud runner pouchay na → Cloudflare Tunnel ba self-hosted runner), `RUNNER_TOKEN`. Kono AI API key lage na — runner free local Ollama (`qwen2.5-coder:1.5b`) use kore.
 3. Builder repo te `.github/workflows/opencode-task.yml` bosao (ready template `/admin/runner` page e — sob somoy repo file tai source of truth).
 
+## Zero-admin path (optional — env diye sob chole)
+Admin panel ekbaroo khai na? `.env` e ei 3 ta dilei runner kaj kore (dekho `.env.example`):
+- `BUILDER_REPO=owner/repo` — na dile default repo (ei repo itself, `workflow/opencode-task.yml` ready) auto-select hoy, admin na dileu kaj kore.
+- `GITHUB_TOKEN=ghp_...` — dispatch token; DB er admin token thakle DB wins.
+- `RUNNER_TOKEN=cb_run_...` — runner bearer token; admin regenerate na korleo ei value diye verify hoy.
+Admin panel e `BUILDER_REPO` khali + token "from env" badge dekhale bujhbe zero-admin path active.
+
 ## MCP connect (opencode.json)
 ```json
 {

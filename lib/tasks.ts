@@ -29,11 +29,35 @@ export function detectProjectType(files: { path: string }[]): string {
   if (files.length === 0) return "prompt-only";
   return "generic";
 }
+// Default builder repo: the site's own repo — its .github/workflows/opencode-task.yml
+// is the ready-made workflow. Admin panel e repo na set korleo dispatch kaj kore.
+export const DEFAULT_BUILDER_REPO = "td1tdcosayt1234-creator/codebridge-mcp-web";
+
+// Env fallbacks so the pipeline runs even when the admin never opens /admin/runner
+// or /admin/github: BUILDER_REPO, GITHUB_TOKEN (ROUN_GITHUB_TOKEN), RUNNER_TOKEN.
+export function envGithubToken(): string {
+  return (process.env.ROUN_GITHUB_TOKEN || process.env.GITHUB_TOKEN || "").trim();
+}
+
 export function runnerSettings(db: DbShape) {
+  const saved = db.settings?.builderRepo || "";
   return {
-    builderRepo: db.settings?.builderRepo || "",
+    builderRepo: saved || (process.env.BUILDER_REPO || "").trim() || DEFAULT_BUILDER_REPO,
     builderWorkflow: db.settings?.builderWorkflow || "opencode-task.yml",
   };
+}
+
+// Effective dispatch token: admin-panel (DB) token wins, .env fallback.
+export function effectiveGithubToken(db: DbShape): string {
+  if (db.globalGithub?.enc) {
+    try {
+      const t = decToken(db.globalGithub.enc);
+      if (t) return t;
+    } catch {
+      /* fall through to env */
+    }
+  }
+  return envGithubToken();
 }
 
 export function bearerToken(req: Request): string {
@@ -61,13 +85,18 @@ export async function waitForResult(taskId: string, timeoutMs = 480000): Promise
 }
 
 export function verifyRunner(db: DbShape, token: string): boolean {
+  if (!token) return false;
   const enc = db.settings?.runnerTokenEnc;
-  if (!enc || !token) return false;
-  try {
-    return safeEqual(decToken(enc), token);
-  } catch {
-    return false;
+  if (enc) {
+    try {
+      return safeEqual(decToken(enc), token);
+    } catch {
+      return false;
+    }
   }
+  // Admin token regenerate korbe na? .env RUNNER_TOKEN diye runner chalano jay.
+  const envTk = (process.env.RUNNER_TOKEN || "").trim();
+  return !!envTk && safeEqual(envTk, token);
 }
 
 export async function createTaskAndDispatch(
@@ -104,9 +133,10 @@ export async function createTaskAndDispatch(
   const db = await readDb();
   const { builderRepo, builderWorkflow } = runnerSettings(db);
   if (!builderRepo.includes("/"))
-    return { error: "Admin has not set the builder repo yet. Ask them to set it in /admin/runner.", status: 400 };
-  if (!db.globalGithub?.enc)
-    return { error: "Admin has not set the global build token yet.", status: 400 };
+    return { error: "No builder repo — set it in .env (BUILDER_REPO) or /admin/runner.", status: 400 };
+  const ghToken = effectiveGithubToken(db);
+  if (!ghToken)
+    return { error: "No GitHub token yet — ask the admin to save one in /admin/github or set GITHUB_TOKEN in .env.", status: 400 };
   // Token hold: bigger files cost more tokens
   const est = estimateTask(prompt, files);
   let us = db.usage.find((u) => u.userId === userId);
@@ -133,7 +163,7 @@ export async function createTaskAndDispatch(
   // Dispatch workflow -> Actions e opencode run korbe
   try {
     const { Octokit } = await import("octokit");
-    const oct = new Octokit({ auth: decToken(db.globalGithub.enc) });
+    const oct = new Octokit({ auth: ghToken });
     const [owner, repo] = builderRepo.split("/");
     await oct.request("POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches", {
       owner, repo, workflow_id: builderWorkflow, ref: "main", inputs: { task_id: task.id },

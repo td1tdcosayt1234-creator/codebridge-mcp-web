@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { verifyJwt } from "@/lib/auth";
 import { readDb, writeDb, uid } from "@/lib/db";
 import { encToken } from "@/lib/crypto";
+import { runnerSettings } from "@/lib/tasks";
 import crypto from "crypto";
 
 async function admin() {
@@ -22,10 +23,15 @@ export async function GET() {
   const p = await admin();
   if (!p) return NextResponse.json({ error: "admin only" }, { status: 403 });
   const db = await readDb();
+  const rs = runnerSettings(db);
+  const hasDbRunnerToken = !!db.settings?.runnerTokenEnc;
+  const hasEnvRunnerToken = !!(process.env.RUNNER_TOKEN || "").trim();
   return NextResponse.json({
-    builderRepo: db.settings?.builderRepo || "",
-    builderWorkflow: db.settings?.builderWorkflow || "opencode-task.yml",
-    tokenConfigured: !!db.settings?.runnerTokenEnc,
+    builderRepo: rs.builderRepo,
+    builderRepoDefaulted: !db.settings?.builderRepo,
+    builderWorkflow: rs.builderWorkflow,
+    tokenConfigured: hasDbRunnerToken || hasEnvRunnerToken,
+    tokenSource: hasDbRunnerToken ? "db" : hasEnvRunnerToken ? "env" : "none",
     updatedBy: db.settings?.updatedBy || "",
     updatedAt: db.settings?.updatedAt || "",
     counts: {

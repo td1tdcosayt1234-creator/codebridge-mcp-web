@@ -13,9 +13,9 @@ export default function AdminGithub(){
   if(st?.error) return <p>Admin only. <a href="/login">Login as admin</a></p>;
   return (<div>
     <h2>Global GitHub Classic Token</h2>
-    <p className="muted small">Set one Classic Token here (ghp_..., scopes: repo + workflow). If a user has no own token, the tool automatically uses this global token for repo list / push / build. A user token, if present, takes priority.</p>
+    <p className="muted small">Set one Classic Token here (ghp_..., scopes: repo + workflow). If a user has no own token, the tool automatically uses this global token for repo list / push / build. A user token, if present, takes priority. Zero-admin path: set <code>GITHUB_TOKEN</code> (ba <code>ROUN_GITHUB_TOKEN</code>) in the server .env — DB token here always wins over env.</p>
     <div className="card">
-      <div>Status: <b>{st?.configured?"configured":"not set"}</b>{st?.configured&&<span className="muted small"> — by {st.updatedBy} at {st.updatedAt}</span>}</div>
+      <div>Status: <b>{st?.configured?"configured":"not set"}</b>{st?.configured&&st?.source==="env"&&<span className="badge ok" style={{marginLeft:8}}>GITHUB_TOKEN env — paste korte hobe na</span>}{st?.configured&&st?.source==="db"&&<span className="muted small"> — by {st.updatedBy} at {st.updatedAt}</span>}</div>
       <form onSubmit={save}>
         <label>Paste new global Classic Token (verified before saving)</label>
         <input value={token} onChange={e=>setToken(e.target.value)} placeholder="ghp_..." autoComplete="off"/>

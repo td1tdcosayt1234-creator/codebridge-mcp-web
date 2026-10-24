@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { verifyJwt } from "@/lib/auth";
 import { readDb, writeDb, uid } from "@/lib/db";
 import { encToken } from "@/lib/crypto";
+import { envGithubToken } from "@/lib/tasks";
 async function admin(){
   const t=cookies().get("session")?.value||"";
   const p=await verifyJwt(t);
@@ -13,7 +14,8 @@ async function admin(){
 export async function GET(){
   const p=await admin(); if(!p) return NextResponse.json({error:"admin only"},{status:403});
   const db=await readDb();
-  return NextResponse.json({configured:!!db.globalGithub?.enc, updatedBy:db.globalGithub?.updatedBy||"", updatedAt:db.globalGithub?.updatedAt||""});
+  const hasDb=!!db.globalGithub?.enc; const hasEnv=!!envGithubToken();
+  return NextResponse.json({configured:hasDb||hasEnv, source:hasDb?"db":hasEnv?"env":"none", updatedBy:db.globalGithub?.updatedBy||"", updatedAt:db.globalGithub?.updatedAt||""});
 }
 export async function POST(req:Request){
   const p=await admin(); if(!p) return NextResponse.json({error:"admin only"},{status:403});
